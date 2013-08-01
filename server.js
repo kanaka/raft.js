@@ -68,8 +68,7 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
         var randTimeout = opts.electionTimeout +
                           parseInt(Math.random()*opts.electionTimeout);
         if (election_timer) {
-            clearTimeout(election_timer);
-            election_timer = null;
+            election_timer = clearTimeout(election_timer);
         }
         election_timer = setTimeout(start_election, randTimeout);
     }
@@ -86,11 +85,14 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
         self.state = 'follower';
         info("follower");
         if (heartbeat_timer) {
-            clearTimeout(heartbeat_timer);
-            heartbeat_timer = null;
+            heartbeat_timer = clearTimeout(heartbeat_timer);
+        }
+        if (!election_timer) {
+            reset_election_timer();
         }
     }
     function become_leader() {
+        if (self.state === 'leader') { return; }
         self.state = 'leader';
         info("leader");
         // send heartbeats until we step down
@@ -115,10 +117,14 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
                     }
                 );
             }
-            heartbeat_timer= setTimeout(heartbeat_function,
-                                        opts.heartbeatTime);
+            heartbeat_timer = setTimeout(heartbeat_function,
+                                         opts.heartbeatTime);
         }
         heartbeat_function();
+        election_timer = clearTimeout(election_timer);
+        self.votedFor = null;
+        votesResponded = {};
+        votesGranted = {};
         // TODO: what else?
     }
 
@@ -243,9 +249,17 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
     // start as follower by default
     step_down();
 
-    // Return the public API/RPCs
-    return {RequestVote:RequestVote,
-            AppendEntries:AppendEntries};
+
+    // Public API/RPCs
+    var api = {RequestVote:RequestVote,
+               AppendEntries:AppendEntries};
+    if (opts.debug) {
+        api._self = self;
+        api._step_down = step_down;
+        api._start_election = start_election;
+    }
+
+    return api;
 }
 
 // RaftServer that uses in-process communication for RPC
