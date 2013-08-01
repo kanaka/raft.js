@@ -1,14 +1,5 @@
 "use strict";
 
-if (typeof Object.create !== 'function') {
-    Object.create = function(o) {
-        var F = function() {};
-        F.prototype = o;
-        return new F();
-    };
-}
-
-
 function RaftServerBase(id, sendRPC, all_servers, opts) {
     var self = this;
 
@@ -40,7 +31,7 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
     self.log = [{term:0, command:'noop'}];  // [{term:TERM, comand:COMMAND}...]
 
     // candidate servers only
-    var votesResponded = {}; // servers that sent RequestVote in this term
+    var votesResponded = {}; // servers that sent requestVote in this term
     var votesGranted = {}; // servers that gave us a vote in this term
     // leader servers only
     var nextIndex = {};   // last log index for each server
@@ -103,7 +94,7 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
                 if (sid === id) {
                     continue;
                 }
-                sendRPC(sid, 'AppendEntries', {term: self.currentTerm,
+                sendRPC(sid, 'appendEntries', {term: self.currentTerm,
                                                leaderId: id, 
                                                prevLogIndex: self.log.length-1,
                                                prevLogTerm: self.log[self.log.length-1].term,
@@ -144,8 +135,8 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
             if (sid === id) {
                 continue;
             }
-            // TODO: reissue 'RequestVote' to non-responders while candidate
-            sendRPC(sid, 'RequestVote', {term: self.currentTerm,
+            // TODO: reissue 'requestVote' to non-responders while candidate
+            sendRPC(sid, 'requestVote', {term: self.currentTerm,
                                          candidateId: id, 
                                          lastLogIndex: self.log.length-1,
                                          lastLogTerm: self.log[self.log.length-1].term},
@@ -179,9 +170,9 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
     // RPCs/Public API (Figure 2)
     //
 
-    // RequestVote RPC
+    // requestVote RPC
     //   args keys: term, candidateId, lastLogIndex, lastLogTerm
-    function RequestVote(args) {
+    function requestVote(args) {
         // 1.
         if (args.term < self.currentTerm) {
             return {term:self.currentTerm, voteGranted:false};
@@ -206,10 +197,10 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
         return {term:self.currentTerm, voteGranted:false};
     }
 
-    // AppendEntries RPC
+    // appendEntries RPC
     //   args keys: term, leaderId, prevLogIndex, prevLogTerm,
     //              entries, commitIndex
-    function AppendEntries(args) {
+    function appendEntries(args) {
         // 1.
         if (args.term < self.currentTerm) {
             // continue in same state
@@ -251,8 +242,8 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
 
 
     // Public API/RPCs
-    var api = {RequestVote:RequestVote,
-               AppendEntries:AppendEntries};
+    var api = {requestVote:   requestVote,
+               appendEntries: appendEntries};
     if (opts.debug) {
         api._self = self;
         api._step_down = step_down;
