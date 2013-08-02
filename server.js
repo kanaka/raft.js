@@ -2,6 +2,7 @@
 
 function RaftServerBase(id, sendRPC, opts) {
     var self = this;
+    self.id = id;
 
     // 
     // Default Options
@@ -21,8 +22,25 @@ function RaftServerBase(id, sendRPC, opts) {
     if (typeof opts.serverStart === 'undefined') {
         opts.serverStart = [id];
     }
-    if (typeof opts.applyCmd === 'undefined') {
-        opts.applyCmd = function (stateMachine, args) {
+    if (typeof opts.saveFn === 'undefined') {
+        console.warn("no saveFn, server recovery will not work");
+        opts.saveFn = function(data, callback) {
+            // no-op
+            if(callback) {
+                callback();
+            }
+        }
+    }
+    if (typeof opts.loadFn === 'undefined') {
+        console.warn("no loadFn, server recovery will not work");
+        opts.loadFn = function(callback) {
+            if(callback) {
+                callback(false);
+            }
+        }
+    }
+    if (typeof opts.applyFn === 'undefined') {
+        opts.applyFn = function (stateMachine, args) {
             // By default treat args as a function to apply
             return args(stateMachine);
         };
@@ -38,7 +56,7 @@ function RaftServerBase(id, sendRPC, opts) {
     self.servers = opts.serverStart; // all server IDs including ours
     self.commitIndex = 0; // highest index known to be committed
     // persistant/durable
-    self.currentTerm = 0;
+    self.currentTerm = -1;
     self.votedFor = null;
     self.log = [{term:0, command:null}];  // [{term:TERM, comand:COMMAND}...]
 
@@ -54,7 +72,8 @@ function RaftServerBase(id, sendRPC, opts) {
     var election_timer = null,
         heartbeat_timer = null,
         leaderId = null,
-        clientCallbacks = {}; // client callbacks keyed by log index
+        clientCallbacks = {}, // client callbacks keyed by log index
+        pendingPersist = false;
 
     // Utility functions
     var info = self.info = function() {
@@ -84,9 +103,9 @@ function RaftServerBase(id, sendRPC, opts) {
             new_term = self.currentTerm + 1;
         }
         self.currentTerm = new_term;
+        pendingPersist = true;
         votesResponded = {};
         votesGranted = {};
-        // TODO: persist to durable storage
     }
 
     function step_down() {
@@ -110,6 +129,37 @@ function RaftServerBase(id, sendRPC, opts) {
             }
             sendRPC(sid, rpc, args, callback);
         }
+    }
+
+    function saveBefore(callback) {
+        if (pendingPersist) {
+            var data = {currentTerm: self.currentTerm,
+                        votedFor: self.votedFor,
+                        log: self.log};
+            pendingPersist = false;
+            opts.saveFn(data, callback);
+        } else {
+            callback();
+        }
+
+    }
+
+    function loadBefore(callback) {
+        opts.loadFn(function (success, data) {
+            if (success) {
+                self.currentTerm = data.currentTerm;
+                self.votedFor = data.votedFor;
+                self.log = data.log;
+            } else {
+                // set some defaults if nothing found
+                self.currentTerm = 0;
+                self.votedFor = null;
+                self.log = [{term:0, command:null}];  // [{term:TERM, comand:COMMAND}...]
+            }
+            votesResponded = {};
+            votesGranted = {};
+            callback();
+        });
     }
 
     // The core of the leader/log replication algorithm
@@ -147,12 +197,15 @@ function RaftServerBase(id, sendRPC, opts) {
                     // a majority of the servers.
                     if (majorityIndex > self.commitIndex) {
                         for (var idx=self.commitIndex+1; idx <= majorityIndex; idx++) {
-                            // TODO: commit them: opts.applyCmd(self.stateMachine, cmd);
+                            // TODO: commit them: opts.applyFn(self.stateMachine, cmd);
                             // call client callback for the committed cmds
                             var clientCallback = clientCallbacks[idx];
                             if (clientCallback) {
                                 delete clientCallbacks[idx];
-                                clientCallback({'status': 'success'});
+                                // TODO: saveBefore wider scope?
+                                saveBefore(function() {
+                                    clientCallback({'status': 'success'});
+                                });
                             }
                         }
                         self.commitIndex = majorityIndex;
@@ -192,9 +245,10 @@ function RaftServerBase(id, sendRPC, opts) {
         info("leader");
         self.state = 'leader';
         leaderId = id;
-        self.votedFor = null;
         votesResponded = {};
         votesGranted = {};
+        self.votedFor = null;
+        pendingPersist = true;
 
         for (var i=0; i < self.servers.length; i++) {
             // start nextIndex set to the next entry in the log
@@ -205,7 +259,7 @@ function RaftServerBase(id, sendRPC, opts) {
 
         election_timer = clearTimeout(election_timer);
         // start sending heartbeats (appendEntries) until we step down
-        leader_heartbeat();
+        saveBefore(leader_heartbeat);
         
         // TODO: what else?
     }
@@ -219,6 +273,7 @@ function RaftServerBase(id, sendRPC, opts) {
         // vote for self
         self.votedFor = id;
         votesGranted[id] = true;
+        pendingPersist = true;
         // reset election timeout
         reset_election_timer();
         // TODO: reissue 'requestVote' quickly to non-responders while candidate
@@ -260,7 +315,9 @@ function RaftServerBase(id, sendRPC, opts) {
     function requestVote(args, callback) {
         // 1. return if term < currentTerm
         if (args.term < self.currentTerm) {
-            callback({term:self.currentTerm, voteGranted:false});
+            saveBefore(function() {
+                callback({term:self.currentTerm, voteGranted:false});
+            });
             return;
         }
         // 2. if term > currentTerm, set currentTerm to term
@@ -278,12 +335,17 @@ function RaftServerBase(id, sendRPC, opts) {
             // we have not voted for somebody else and the candidate
             // log at least as current as ours
             self.votedFor = args.candidateId;
+            pendingPersist = true;
             reset_election_timer();
-            callback({term:self.currentTerm, voteGranted:true});
+            saveBefore(function() {
+                callback({term:self.currentTerm, voteGranted:true});
+            });
             return;
         }
 
-        callback({term:self.currentTerm, voteGranted:false});
+        saveBefore(function() {
+            callback({term:self.currentTerm, voteGranted:false});
+        });
         return;
     }
 
@@ -294,7 +356,9 @@ function RaftServerBase(id, sendRPC, opts) {
         // 1. return if term < currentTerm
         if (args.term < self.currentTerm) {
             // continue in same state
-            callback({term:self.currentTerm, success:false});
+            saveBefore(function() {
+                callback({term:self.currentTerm, success:false});
+            });
             return;
         }
         // 2. if term > currentTerm, set currentTerm to term
@@ -311,48 +375,56 @@ function RaftServerBase(id, sendRPC, opts) {
         //    prevLogIndex whose term matches prevLogTerm
         if ((self.log.length - 1 < args.prevLogIndex) ||
             (self.log[args.prevLogIndex].term !== args.prevLogTerm)) {
-            callback({term:self.currentTerm, success:false});
+            saveBefore(function() {
+                callback({term:self.currentTerm, success:false});
+            });
             return;
         }
         // 6. If existing entries conflict with new entries,
         // delete all existing entries starting with first conflicting
         // entry
         // 7. append any new entries not already in the log
-        Array.prototype.splice.apply(self.log,
-                [args.prevLogIndex+1, self.log.length].concat(args.entries));
+        if ((args.prevLogIndex+1 < self.log.length) ||
+            (args.entries.length > 0)) {
+            Array.prototype.splice.apply(self.log,
+                    [args.prevLogIndex+1, self.log.length].concat(args.entries));
+            pendingPersist = true;
+        }
         // 8. apply newly committed entries to the state machine
         if (self.commitIndex < args.commitIndex) {
-            // TODO: commit: opts.applyCmd(self.stateMachine, cmd);
+            // TODO: commit: opts.applyFn(self.stateMachine, cmd);
             self.commitIndex = args.commitIndex;
         }
 
-        callback({term:self.currentTerm, success:true});
+        saveBefore(function() {
+            callback({term:self.currentTerm, success:true});
+        });
     }
 
     // clientRequest RPC
-    //   cmd is opaque and sent to applyCmd
+    //   cmd is opaque and sent to applyFn
     //   callback is called after the cmd is committed and applied to
     //   the stateMachine
     function clientRequest(cmd, callback) {
         if (self.state !== 'leader') {
             // tell the client to use a different server
-            callback({'status': 'not_leader',
-                      'leaderId': leaderId});
+            callback({'status': 'not_leader', 'leaderId': leaderId});
             return;
         }
         clientCallbacks[self.log.length] = callback;
-        self.log[self.log.length] = {term:self.currentTerm, command:cmd};
+        self.log[self.log.length] = {term:self.currentTerm,
+                                     command:cmd};
+        pendingPersist = true;
         leader_heartbeat();
         // TODO: what else?
     }
 
 
-    // start election timeout timer
-    reset_election_timer();
-    // TODO: load persistent/durable state from disk
-    update_term();
-    // start as follower by default
-    step_down();
+    loadBefore(function() {
+        // start as follower by default
+        step_down();
+        reset_election_timer();
+    });
 
 
     // Public API/RPCs
@@ -370,22 +442,23 @@ function RaftServerBase(id, sendRPC, opts) {
 
 // RaftServer that uses in-process communication for RPC
 // Most useful for testing
-var localRaftServerPool = {};
+var _serverPool = {};
+var _serverStore = {};
 function RaftServerLocal(id, all_servers, opts) {
     "use strict";
     var self = this;
-    if (id in localRaftServerPool) {
+    if (id in _serverPool) {
         throw new Error("Server id '" + id + "' already exists");
     }
     
-    function sendRPC (targetId, rpcName, args, callback) {
+    function sendRPC(targetId, rpcName, args, callback) {
         self.dbg("RPC to "  + targetId + ": " + rpcName + " (" + args + ")");
-        if (!targetId in localRaftServerPool) {
+        if (!targetId in _serverPool) {
             console.log("Server id '" + targetId + "' does not exist");
             // No target, just drop RPC (no callback)
             return;
         }
-        localRaftServerPool[targetId][rpcName](args,
+        _serverPool[targetId][rpcName](args,
                 // NOTE: non-local servers need to rewrite
                 // 'not_leader' results
                 function(results) {
@@ -394,14 +467,36 @@ function RaftServerLocal(id, all_servers, opts) {
         );
     }
 
-    opts.serverStart = all_servers;
-    var parent = RaftServerBase.call(self, id, sendRPC, opts);
-    localRaftServerPool[id] = parent;
-    //console.log("localRaftServerPool: ", localRaftServerPool);
+    var optsCopy = {};
+    for (var k in opts) {
+        if (opts.hasOwnProperty(k)) optsCopy[k] = opts[k];
+    }
+    
+    optsCopy.saveFn = function(data, callback) {
+        _serverStore[id] = data;
+        if(callback) {
+            callback();
+        }
+    }
+
+    optsCopy.loadFn = function(callback) {
+        var data = _serverStore[id]
+        if (data) {
+            callback(true, _serverStore[id]);
+        } else {
+            callback(false);
+        }
+    }
+
+    optsCopy.serverStart = all_servers;
+    var parent = RaftServerBase.call(self, id, sendRPC, optsCopy);
+    _serverPool[id] = parent;
+    //console.log("_serverPool: ", _serverPool);
     return parent;
 }
  
 
 exports.RaftServerBase = RaftServerBase;
 exports.RaftServerLocal = RaftServerLocal;
-exports.localRaftServerPool = localRaftServerPool;
+exports._serverPool = _serverPool;
+exports._serverStore = _serverStore;
