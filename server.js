@@ -1,6 +1,6 @@
 "use strict";
 
-function RaftServerBase(id, sendRPC, all_servers, opts) {
+function RaftServerBase(id, sendRPC, opts) {
     var self = this;
 
     // 
@@ -15,6 +15,18 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
     if (typeof opts.heartbeatTime === 'undefined') {
         opts.heartbeatTime = opts.electionTimeout/5;
     }
+    if (typeof opts.stateMachineStart === 'undefined') {
+        opts.stateMachineStart = {};
+    }
+    if (typeof opts.serverStart === 'undefined') {
+        opts.serverStart = [id];
+    }
+    if (typeof opts.applyCmd === 'undefined') {
+        opts.applyCmd = function (stateMachine, args) {
+            // By default treat args as a function to apply
+            return args(stateMachine);
+        };
+    }
 
     //
     // Raft State
@@ -22,26 +34,27 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
 
     // all servers
     self.state = 'follower'; // follower, candidate, leader
-    self.stateMachine = {};
-    self.servers = all_servers; // all server IDs including ours
-    self.commitIndex;
+    self.stateMachine = opts.stateMachineStart;
+    self.servers = opts.serverStart; // all server IDs including ours
+    self.commitIndex = 0; // highest index known to be committed
     // persistant/durable
     self.currentTerm = 0;
     self.votedFor = null;
-    self.log = [{term:0, command:'noop'}];  // [{term:TERM, comand:COMMAND}...]
+    self.log = [{term:0, command:null}];  // [{term:TERM, comand:COMMAND}...]
 
     // candidate servers only
     var votesResponded = {}; // servers that sent requestVote in this term
     var votesGranted = {}; // servers that gave us a vote in this term
     // leader servers only
-    var nextIndex = {};   // last log index for each server
-    var lastAgreeIndex;
-
+    var nextIndex = {};   // index of next log entry to send to follower
+    var lastAgreeIndex = {}; // latest index of agreement with server
 
 
     // Other state
     var election_timer = null,
-        heartbeat_timer = null;
+        heartbeat_timer = null,
+        leaderId = null,
+        clientCallbacks = {}; // client callbacks keyed by log index
 
     // Utility functions
     var info = self.info = function() {
@@ -54,6 +67,8 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
             self.info.apply(arguments);
         }
     }
+
+    // Internal implementation functions
     function reset_election_timer() {
         // random between electionTimeout -> electionTimeout*2
         var randTimeout = opts.electionTimeout +
@@ -63,6 +78,7 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
         }
         election_timer = setTimeout(start_election, randTimeout);
     }
+
     function update_term(new_term) {
         if (typeof new_term === 'undefined') {
             new_term = self.currentTerm + 1;
@@ -70,11 +86,13 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
         self.currentTerm = new_term;
         votesResponded = {};
         votesGranted = {};
+        // TODO: persist to durable storage
     }
+
     function step_down() {
         if (self.state === 'follower') { return; }
-        self.state = 'follower';
         info("follower");
+        self.state = 'follower';
         if (heartbeat_timer) {
             heartbeat_timer = clearTimeout(heartbeat_timer);
         }
@@ -82,88 +100,155 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
             reset_election_timer();
         }
     }
+
+    // send an RPC to each of the other servers
+    function sendRPCs(rpc, args, callback) {
+        for (var i=0; i < self.servers.length; i++) {
+            var sid = self.servers[i];
+            if (sid === id) {
+                continue;
+            }
+            sendRPC(sid, rpc, args, callback);
+        }
+    }
+
+    // The core of the leader/log replication algorithm
+    function leader_heartbeat() {
+        if (self.state !== 'leader') { return; }
+
+        // close over the current last log index
+        var appendEntriesResponse = (function() {
+            var curAgreeIndex = self.log.length-1;
+            return function (sid, args) {
+                if (args.term > self.currentTerm) {
+                    step_down();
+                    return;
+                }
+                if (args.success) {
+                    lastAgreeIndex[sid] = curAgreeIndex;
+                    // gather a list of current agreed on log indexes
+                    var agreeIndexes = [self.log.length-1];
+                    for (var i=0; i < self.servers.length; i++) {
+                        var sidi = self.servers[i];
+                        if (sidi === id) { continue; }
+                        agreeIndexes.push(lastAgreeIndex[sidi]);
+                    }
+                    // Sort the agree indexes and and find the index
+                    // at (or if odd, just above) the half-way mark.
+                    // This index is the one that is stored on
+                    // a majority of servers.
+                    agreeIndexes.sort();
+                    var agreePos = Math.floor(self.servers.length/2),
+                        majorityIndex = agreeIndexes[agreePos];
+                    // If majority of followers have stored entries,
+                    // then commit those entries.
+                    // TODO: at least one entry from the leader's
+                    // current term must also be stored on
+                    // a majority of the servers.
+                    if (majorityIndex > self.commitIndex) {
+                        for (var idx=self.commitIndex+1; idx <= majorityIndex; idx++) {
+                            // TODO: commit them: opts.applyCmd(self.stateMachine, cmd);
+                            // call client callback for the committed cmds
+                            var clientCallback = clientCallbacks[idx];
+                            if (clientCallback) {
+                                delete clientCallbacks[idx];
+                                clientCallback({'status': 'success'});
+                            }
+                        }
+                        self.commitIndex = majorityIndex;
+                    }
+                } else {
+                    nextIndex[sid] -= 1;
+                    // TODO: resend immediately
+                }
+            };
+        })();
+
+        for (var i=0; i < self.servers.length; i++) {
+            var sid = self.servers[i];
+            if (sid === id) { continue; }
+            var nindex = nextIndex[sid]-1,
+                nterm = self.log[nindex].term,
+                nentries = self.log.slice(nindex+1);
+
+            sendRPC(sid, 'appendEntries',
+                    {term: self.currentTerm,
+                     leaderId: id, 
+                     prevLogIndex: nindex,
+                     prevLogTerm: nterm,
+                     entries: nentries,
+                     commitIndex: self.commitIndex},
+                appendEntriesResponse);
+        }
+        // we may be called directly so cancel any outstanding timer
+        clearTimeout(heartbeat_timer);
+        // queue us up to be called again
+        heartbeat_timer = setTimeout(leader_heartbeat,
+                opts.heartbeatTime);
+    }
+
     function become_leader() {
         if (self.state === 'leader') { return; }
-        self.state = 'leader';
         info("leader");
-        // send heartbeats until we step down
-        function heartbeat_function() {
-            if (self.state !== 'leader') { return; }
-            for (var i=0; i < self.servers.length; i++) {
-                var sid = self.servers[i];
-                if (sid === id) {
-                    continue;
-                }
-                sendRPC(sid, 'appendEntries', {term: self.currentTerm,
-                                               leaderId: id, 
-                                               prevLogIndex: self.log.length-1,
-                                               prevLogTerm: self.log[self.log.length-1].term,
-                                               entries: [], // heartbeat
-                                               commitIndex: 0}, // TODO
-
-                    function(sid, args) {
-                        if (args.term > self.currentTerm) {
-                            step_down();
-                        }
-                    }
-                );
-            }
-            heartbeat_timer = setTimeout(heartbeat_function,
-                                         opts.heartbeatTime);
-        }
-        heartbeat_function();
-        election_timer = clearTimeout(election_timer);
+        self.state = 'leader';
+        leaderId = id;
         self.votedFor = null;
         votesResponded = {};
         votesGranted = {};
+
+        for (var i=0; i < self.servers.length; i++) {
+            // start nextIndex set to the next entry in the log
+            nextIndex[self.servers[i]] = self.log.length;
+            // Start lastAgreeIndex set to commitIndex
+            lastAgreeIndex[self.servers[i]] = self.commitIndex;
+        }
+
+        election_timer = clearTimeout(election_timer);
+        // start sending heartbeats (appendEntries) until we step down
+        leader_heartbeat();
+        
         // TODO: what else?
     }
 
     // Section 5.2 Leader Election
     function start_election() {
         if (self.state === 'leader') { return; }
+        info("candidate");
         self.state = 'candidate';
         update_term();
-        info("candidate");
         // vote for self
         self.votedFor = id;
         votesGranted[id] = true;
         // reset election timeout
         reset_election_timer();
-        for (var i=0; i < self.servers.length; i++) {
-            var sid = self.servers[i];
-            if (sid === id) {
-                continue;
-            }
-            // TODO: reissue 'requestVote' to non-responders while candidate
-            sendRPC(sid, 'requestVote', {term: self.currentTerm,
-                                         candidateId: id, 
-                                         lastLogIndex: self.log.length-1,
-                                         lastLogTerm: self.log[self.log.length-1].term},
-                function (other_id, args) {
-                    if ((self.state !== 'candidate') ||
-                        (args.term < self.currentTerm)) {
-                        // ignore
-                        return;
-                    }
-                    if (args.term > self.currentTerm) {
-                        // Does this happen? How?
-                        step_down();
-                        return;
-                    }
-                    if (args.voteGranted) {
-                        dbg("got vote from:", sid);
-                        votesGranted[sid] = true;
-                    }
-                    dbg("votesGranted: ", votesGranted);
-                    // Check if we won the election
-                    var need = Math.round((self.servers.length+1)/2); // more than half
-                    if (Object.keys(votesGranted).length >= need) {
-                        become_leader();
-                    }
+        // TODO: reissue 'requestVote' quickly to non-responders while candidate
+        sendRPCs('requestVote', {term: self.currentTerm,
+                                 candidateId: id, 
+                                 lastLogIndex: self.log.length-1,
+                                 lastLogTerm: self.log[self.log.length-1].term},
+            function (other_id, args) {
+                if ((self.state !== 'candidate') ||
+                    (args.term < self.currentTerm)) {
+                    // ignore
+                    return;
                 }
-            );
-        }
+                if (args.term > self.currentTerm) {
+                    // Does this happen? How?
+                    step_down();
+                    return;
+                }
+                if (args.voteGranted) {
+                    dbg("got vote from:", other_id);
+                    votesGranted[other_id] = true;
+                }
+                dbg("votesGranted: ", votesGranted);
+                // Check if we won the election
+                var need = Math.round((self.servers.length+1)/2); // more than half
+                if (Object.keys(votesGranted).length >= need) {
+                    become_leader();
+                }
+            }
+        );
     }
 
     //
@@ -172,17 +257,20 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
 
     // requestVote RPC
     //   args keys: term, candidateId, lastLogIndex, lastLogTerm
-    function requestVote(args) {
-        // 1.
+    function requestVote(args, callback) {
+        // 1. return if term < currentTerm
         if (args.term < self.currentTerm) {
-            return {term:self.currentTerm, voteGranted:false};
+            callback({term:self.currentTerm, voteGranted:false});
+            return;
         }
-        // 2.
+        // 2. if term > currentTerm, set currentTerm to term
         if (args.term > self.currentTerm) {
             update_term(args.term);
             step_down(); // step down from candidate or leader
         }
-        // 3.
+        // 3. if votedFor is null or candidateId, and candidate's log
+        // candidate's log is at least as complete as local log, grant
+        // vote and reset election timeout
         if ((self.votedFor === null || self.votedFor === args.candidateId) &&
                 (args.lastLogTerm >= self.log[self.log.length-1].term || 
                  (args.lastLogTerm === self.log[self.log.length-1].term &&
@@ -191,45 +279,71 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
             // log at least as current as ours
             self.votedFor = args.candidateId;
             reset_election_timer();
-            return {term:self.currentTerm, voteGranted:true};
+            callback({term:self.currentTerm, voteGranted:true});
+            return;
         }
 
-        return {term:self.currentTerm, voteGranted:false};
+        callback({term:self.currentTerm, voteGranted:false});
+        return;
     }
 
     // appendEntries RPC
     //   args keys: term, leaderId, prevLogIndex, prevLogTerm,
     //              entries, commitIndex
-    function appendEntries(args) {
-        // 1.
+    function appendEntries(args, callback) {
+        // 1. return if term < currentTerm
         if (args.term < self.currentTerm) {
             // continue in same state
-            return [self.currentTerm, false];
+            callback({term:self.currentTerm, success:false});
+            return;
         }
-        // 2.
+        // 2. if term > currentTerm, set currentTerm to term
         if (args.term > self.currentTerm) {
             update_term(args.term);
         }
-        // 3.
+        // 3. if candidate or leader, step down
         step_down(); // step down from candidate or leader
-        // 4.
+        leaderId = args.leaderId;
+        // 4. reset election timeout
         reset_election_timer();
+
         // 5. return fail if log doesn't contain an entry at
         //    prevLogIndex whose term matches prevLogTerm
-        if (self.log[args.prevLogIndex].term !== args.prevLogTerm) {
-            return [self.currentTerm, false];
+        if ((self.log.length - 1 < args.prevLogIndex) ||
+            (self.log[args.prevLogIndex].term !== args.prevLogTerm)) {
+            callback({term:self.currentTerm, success:false});
+            return;
         }
-        // 6. TODO: If existing entries conflict with new entries,
+        // 6. If existing entries conflict with new entries,
         // delete all existing entries starting with first conflicting
         // entry
-        // 7. TODO: append any new entries not already in the log
-        // 8. TODO: apply newly committed entries to the state machine
-
-        // no log entries is a heartbeat, reset election timer
-        if (args.entries.length === 0) {
-            reset_election_timer();
+        // 7. append any new entries not already in the log
+        Array.prototype.splice.apply(self.log,
+                [args.prevLogIndex+1, self.log.length].concat(args.entries));
+        // 8. apply newly committed entries to the state machine
+        if (self.commitIndex < args.commitIndex) {
+            // TODO: commit: opts.applyCmd(self.stateMachine, cmd);
+            self.commitIndex = args.commitIndex;
         }
-        return [self.currentTerm, true];
+
+        callback({term:self.currentTerm, success:true});
+    }
+
+    // clientRequest RPC
+    //   cmd is opaque and sent to applyCmd
+    //   callback is called after the cmd is committed and applied to
+    //   the stateMachine
+    function clientRequest(cmd, callback) {
+        if (self.state !== 'leader') {
+            // tell the client to use a different server
+            callback({'status': 'not_leader',
+                      'leaderId': leaderId});
+            return;
+        }
+        clientCallbacks[self.log.length] = callback;
+        self.log[self.log.length] = {term:self.currentTerm, command:cmd};
+        leader_heartbeat();
+        // TODO: what else?
     }
 
 
@@ -243,7 +357,8 @@ function RaftServerBase(id, sendRPC, all_servers, opts) {
 
     // Public API/RPCs
     var api = {requestVote:   requestVote,
-               appendEntries: appendEntries};
+               appendEntries: appendEntries,
+               clientRequest: clientRequest};
     if (opts.debug) {
         api._self = self;
         api._step_down = step_down;
@@ -263,19 +378,24 @@ function RaftServerLocal(id, all_servers, opts) {
         throw new Error("Server id '" + id + "' already exists");
     }
     
-    function localRPC (targetId, rpcName, args, callback) {
+    function sendRPC (targetId, rpcName, args, callback) {
         self.dbg("RPC to "  + targetId + ": " + rpcName + " (" + args + ")");
         if (!targetId in localRaftServerPool) {
             console.log("Server id '" + targetId + "' does not exist");
             // No target, just drop RPC (no callback)
             return;
         }
-        var results = localRaftServerPool[targetId][rpcName](args);
-        callback(targetId, results);
+        localRaftServerPool[targetId][rpcName](args,
+                // NOTE: non-local servers need to rewrite
+                // 'not_leader' results
+                function(results) {
+                    callback(targetId, results);
+                }
+        );
     }
 
-
-    var parent = RaftServerBase.call(self, id, localRPC, all_servers, opts);
+    opts.serverStart = all_servers;
+    var parent = RaftServerBase.call(self, id, sendRPC, opts);
     localRaftServerPool[id] = parent;
     //console.log("localRaftServerPool: ", localRaftServerPool);
     return parent;
