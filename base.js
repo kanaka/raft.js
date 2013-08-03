@@ -1,49 +1,36 @@
 "use strict";
 
-function RaftServerBase(id, sendRPC, opts) {
+function RaftServerBase(id, opts) {
     var self = this;
     self.id = id;
+    opts = opts || {};
+
+    if (typeof id === 'undefined' || !opts.sendRPC || !opts.applyCmd) {
+        throw new Error("id, opts.sendRPC and opts.applyCmd required");
+    }
 
     // 
     // Default Options
     //
-    if (typeof opts === 'undefined') {
-        opts = {};
+    function setDefault(k, v) {
+        if (typeof opts[k] === 'undefined') { opts[k] = v; }
     }
-    if (typeof opts.electionTimeout === 'undefined') {
-        opts.electionTimeout = 300;
-    }
-    if (typeof opts.heartbeatTime === 'undefined') {
-        opts.heartbeatTime = opts.electionTimeout/5;
-    }
-    if (typeof opts.stateMachineStart === 'undefined') {
-        opts.stateMachineStart = {};
-    }
-    if (typeof opts.serverStart === 'undefined') {
-        opts.serverStart = [id];
-    }
+    setDefault('electionTimeout',   300);
+    setDefault('heartbeatTime',     opts.electionTimeout/5);
+    setDefault('stateMachineStart', {});
+    setDefault('serverStart',       [id]);
     if (typeof opts.saveFn === 'undefined') {
         console.warn("no saveFn, server recovery will not work");
         opts.saveFn = function(data, callback) {
             // no-op
-            if(callback) {
-                callback();
-            }
+            if(callback) { callback(); }
         }
     }
     if (typeof opts.loadFn === 'undefined') {
         console.warn("no loadFn, server recovery will not work");
         opts.loadFn = function(callback) {
-            if(callback) {
-                callback(false);
-            }
+            if(callback) { callback(false); }
         }
-    }
-    if (typeof opts.applyFn === 'undefined') {
-        opts.applyFn = function (stateMachine, cmd) {
-            // By default treat cmd as a function to apply
-            return cmd(stateMachine);
-        };
     }
 
     //
@@ -127,7 +114,7 @@ function RaftServerBase(id, sendRPC, opts) {
             if (sid === id) {
                 continue;
             }
-            sendRPC(sid, rpc, args, callback);
+            opts.sendRPC(sid, rpc, args, callback);
         }
     }
 
@@ -137,7 +124,12 @@ function RaftServerBase(id, sendRPC, opts) {
                         votedFor: self.votedFor,
                         log: self.log};
             pendingPersist = false;
-            opts.saveFn(data, callback);
+            opts.saveFn(data, function(success){
+                if (!success) {
+                    console.error("Failed to persist state");
+                }
+                callback()
+            });
         } else {
             callback();
         }
@@ -199,7 +191,7 @@ function RaftServerBase(id, sendRPC, opts) {
                         for (var idx=self.commitIndex+1; idx <= majorityIndex; idx++) {
                             // TODO: handle exceptions
                             var cmd = self.log[idx].command,
-                                result = opts.applyFn(self.stateMachine, cmd);
+                                result = opts.applyCmd(self.stateMachine, cmd);
                             // call client callback for the committed cmds
                             var clientCallback = clientCallbacks[idx];
                             if (clientCallback) {
@@ -227,7 +219,7 @@ function RaftServerBase(id, sendRPC, opts) {
                 nterm = self.log[nindex].term,
                 nentries = self.log.slice(nindex+1);
 
-            sendRPC(sid, 'appendEntries',
+            opts.sendRPC(sid, 'appendEntries',
                     {term: self.currentTerm,
                      leaderId: id, 
                      prevLogIndex: nindex,
@@ -278,10 +270,11 @@ function RaftServerBase(id, sendRPC, opts) {
         // reset election timeout
         reset_election_timer();
         // TODO: reissue 'requestVote' quickly to non-responders while candidate
-        sendRPCs('requestVote', {term: self.currentTerm,
-                                 candidateId: id, 
-                                 lastLogIndex: self.log.length-1,
-                                 lastLogTerm: self.log[self.log.length-1].term},
+        sendRPCs('requestVote',
+                {term: self.currentTerm,
+                 candidateId: id, 
+                 lastLogIndex: self.log.length-1,
+                 lastLogTerm: self.log[self.log.length-1].term},
             function (other_id, args) {
                 if ((self.state !== 'candidate') ||
                     (args.term < self.currentTerm)) {
@@ -396,7 +389,7 @@ function RaftServerBase(id, sendRPC, opts) {
             for (var idx=self.commitIndex+1; idx <= args.commitIndex; idx++) {
                 // TODO: handle exceptions
                 var cmd = self.log[idx].command;
-                opts.applyFn(self.stateMachine, cmd);
+                opts.applyCmd(self.stateMachine, cmd);
             }
             self.commitIndex = args.commitIndex;
         }
@@ -407,7 +400,7 @@ function RaftServerBase(id, sendRPC, opts) {
     }
 
     // clientRequest RPC
-    //   cmd is opaque and sent to applyFn
+    //   cmd is opaque and sent to opts.applyCmd
     //   callback is called after the cmd is committed and applied to
     //   the stateMachine
     function clientRequest(cmd, callback) {

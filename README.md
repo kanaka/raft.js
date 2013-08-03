@@ -8,9 +8,10 @@ and communicate directly with function calls.
 
     node
     > t = require('./test_local');
-    > t.startTest({debug:true});
+    > t.startLocalDurable({debug:true});  // persist to disk store
 
     > lid = t.getLeaderId();
     > t.getAll('log');
 
-    > t.local._serverPool[lid].clientRequest(function(sm) { sm.XXX = 'YYY'; console.log("sm:", sm); return "done"; }, function(results) { console.log("results: ", results); });
+    > t.local._serverPool[lid].clientRequest(["set", 'a', 1], function(results) { console.log("results: ", results); });
+    > t.getAll('log');

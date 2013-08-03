@@ -2,12 +2,19 @@
 
 local = require('./local');
 
-function startTest (opts) {
+function startLocal (opts) {
+    opts.serverStart = [0,1,2];
     for (var i=0; i < 3; i++) {
-        new local.RaftServerLocal(i, [0,1,2], opts);
+        new local.RaftServerLocal(i, opts);
     }
 }
 
+function startLocalDurable (opts) {
+    opts.serverStart = [0,1,2];
+    for (var i=0; i < 3; i++) {
+        new local.RaftServerLocalDurable(i, opts);
+    }
+}
 function getAll(attr) {
     var results = {};
     for (var i in local._serverPool) {
@@ -29,9 +36,10 @@ function getLeaderId() {
 
 
 if (require.main === module) {
-    startTest();
+    startLocal();
 } else {
-    exports.startTest = startTest;
+    exports.startLocal = startLocal;
+    exports.startLocalDurable = startLocalDurable;
     exports.local = local;
     exports.getAll = getAll;
     exports.getLeaderId = getLeaderId;
