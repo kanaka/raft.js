@@ -1,3 +1,11 @@
+/*
+ * raft.js: Raft consensus algorithm in JavaScript
+ * Copyright (C) 2013 Joel Martin
+ * Licensed under MPL 2.0 (see LICENSE.txt)
+ *
+ * See README.md for description and usage instructions.
+ */
+
 "use strict";
 
 var fs = require('fs');
