@@ -40,9 +40,9 @@ function RaftServerBase(id, sendRPC, opts) {
         }
     }
     if (typeof opts.applyFn === 'undefined') {
-        opts.applyFn = function (stateMachine, args) {
-            // By default treat args as a function to apply
-            return args(stateMachine);
+        opts.applyFn = function (stateMachine, cmd) {
+            // By default treat cmd as a function to apply
+            return cmd(stateMachine);
         };
     }
 
@@ -197,14 +197,17 @@ function RaftServerBase(id, sendRPC, opts) {
                     // a majority of the servers.
                     if (majorityIndex > self.commitIndex) {
                         for (var idx=self.commitIndex+1; idx <= majorityIndex; idx++) {
-                            // TODO: commit them: opts.applyFn(self.stateMachine, cmd);
+                            // TODO: handle exceptions
+                            var cmd = self.log[idx].command,
+                                result = opts.applyFn(self.stateMachine, cmd);
                             // call client callback for the committed cmds
                             var clientCallback = clientCallbacks[idx];
                             if (clientCallback) {
                                 delete clientCallbacks[idx];
                                 // TODO: saveBefore wider scope?
                                 saveBefore(function() {
-                                    clientCallback({'status': 'success'});
+                                    clientCallback({'status': 'success',
+                                                    'result': result});
                                 });
                             }
                         }
@@ -260,8 +263,6 @@ function RaftServerBase(id, sendRPC, opts) {
         election_timer = clearTimeout(election_timer);
         // start sending heartbeats (appendEntries) until we step down
         saveBefore(leader_heartbeat);
-        
-        // TODO: what else?
     }
 
     // Section 5.2 Leader Election
@@ -392,7 +393,11 @@ function RaftServerBase(id, sendRPC, opts) {
         }
         // 8. apply newly committed entries to the state machine
         if (self.commitIndex < args.commitIndex) {
-            // TODO: commit: opts.applyFn(self.stateMachine, cmd);
+            for (var idx=self.commitIndex+1; idx <= args.commitIndex; idx++) {
+                // TODO: handle exceptions
+                var cmd = self.log[idx].command;
+                opts.applyFn(self.stateMachine, cmd);
+            }
             self.commitIndex = args.commitIndex;
         }
 
@@ -416,7 +421,6 @@ function RaftServerBase(id, sendRPC, opts) {
                                      command:cmd};
         pendingPersist = true;
         leader_heartbeat();
-        // TODO: what else?
     }
 
 
@@ -440,63 +444,4 @@ function RaftServerBase(id, sendRPC, opts) {
     return api;
 }
 
-// RaftServer that uses in-process communication for RPC
-// Most useful for testing
-var _serverPool = {};
-var _serverStore = {};
-function RaftServerLocal(id, all_servers, opts) {
-    "use strict";
-    var self = this;
-    if (id in _serverPool) {
-        throw new Error("Server id '" + id + "' already exists");
-    }
-    
-    function sendRPC(targetId, rpcName, args, callback) {
-        self.dbg("RPC to "  + targetId + ": " + rpcName + " (" + args + ")");
-        if (!targetId in _serverPool) {
-            console.log("Server id '" + targetId + "' does not exist");
-            // No target, just drop RPC (no callback)
-            return;
-        }
-        _serverPool[targetId][rpcName](args,
-                // NOTE: non-local servers need to rewrite
-                // 'not_leader' results
-                function(results) {
-                    callback(targetId, results);
-                }
-        );
-    }
-
-    var optsCopy = {};
-    for (var k in opts) {
-        if (opts.hasOwnProperty(k)) optsCopy[k] = opts[k];
-    }
-    
-    optsCopy.saveFn = function(data, callback) {
-        _serverStore[id] = data;
-        if(callback) {
-            callback();
-        }
-    }
-
-    optsCopy.loadFn = function(callback) {
-        var data = _serverStore[id]
-        if (data) {
-            callback(true, _serverStore[id]);
-        } else {
-            callback(false);
-        }
-    }
-
-    optsCopy.serverStart = all_servers;
-    var parent = RaftServerBase.call(self, id, sendRPC, optsCopy);
-    _serverPool[id] = parent;
-    //console.log("_serverPool: ", _serverPool);
-    return parent;
-}
- 
-
 exports.RaftServerBase = RaftServerBase;
-exports.RaftServerLocal = RaftServerLocal;
-exports._serverPool = _serverPool;
-exports._serverStore = _serverStore;
