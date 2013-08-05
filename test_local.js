@@ -42,7 +42,8 @@ if (require.main === module) {
 } else {
     exports.startLocal = startLocal;
     exports.startLocalDurable = startLocalDurable;
-    exports.local = local;
+    exports.serverPool = local._serverPool;
     exports.getAll = getAll;
     exports.getLeaderId = getLeaderId;
+    exports.local = local;
 }

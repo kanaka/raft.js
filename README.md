@@ -19,24 +19,42 @@ and communicate directly with function calls.
     > lid = t.getLeaderId();
     > t.getAll('log');
 
-    > t.local._serverPool[lid].clientRequest(["set", 'a', 1], function(results) { console.log("results: ", results); });
+    > t.serverPool[lid].clientRequest(["set", 'a', 1], function(results) { console.log("results: ", results); });
     > t.getAll('log');
+    > t.getAll('stateMachine');
+
+
+## Example: Three Raft Servers Communicating via HTTP
+
+In this example, three raft servers are created in the same process
+but they communicate with each other by sending messages over HTTP.
+
+    node
+    > t = require('./test_http');
+    > t.startHttp({debug:true});
+
+    > lid = t.getLeaderId();
+    > t.getAll('log');
+
+    > t.serverPool[lid].clientRequest(["set", 'a', 1], function(results) { console.log("results: ", results); });
+    > t.getAll('log');
+    > t.getAll('stateMachine');
 
 ## Status
 
 The following features of the Raft algorithm have been implemented:
 
-* Leader Election
+* Leader election
 * Log replication and persistence
 * Safety features (except for one aspect related to server crashes)
 * Client interaction
-* local in process RPCs
+* In-process RPCs (direct function calls) for quick testing
+* Communication via HTTP ("RPC" over HTTP)
 
 ## TODO
 
 * implement second safety check (current term) on commit
-* membership change
-* socket based RPCs/communication
+* membership change (joint consensus)
 * faster resend of appendEntries when follower responds with fail
   (nextIndex update)
 * faster re-issue of requestVote to non-responders

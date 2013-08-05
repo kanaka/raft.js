@@ -8,6 +8,14 @@
 
 "use strict";
 
+function copyOpts(obj) {
+    var nobj = {};
+    for (var k in obj) {
+        if (obj.hasOwnProperty(k)) nobj[k] = obj[k];
+    }
+    return nobj;
+};
+
 function RaftServerBase(id, opts) {
     var self = this;
     self.id = id;
@@ -445,4 +453,5 @@ function RaftServerBase(id, opts) {
     return api;
 }
 
+exports.copyOpts = copyOpts;
 exports.RaftServerBase = RaftServerBase;

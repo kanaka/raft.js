@@ -11,24 +11,19 @@
 var fs = require('fs');
 var base = require("./base");
 
-function copy(obj) {
-    var nobj = {};
-    for (var k in obj) {
-        if (obj.hasOwnProperty(k)) nobj[k] = obj[k];
-    }
-    return nobj;
-};
-
 // RaftServer that uses in-process communication for RPC
 // Most useful for testing
 var _serverPool = {};
 var _serverStore = {};
 function RaftServerLocal(id, opts) {
     var self = this,
-        opts = copy(opts); // make a local copy
+        opts = base.copyOpts(opts); // make a local copy
 
     if (id in _serverPool) {
         throw new Error("Server id '" + id + "' already exists");
+    }
+    if (!opts.serverMap) {
+        throw new Error("opts.serverMap is required");
     }
     
     function sendRPC(targetId, rpcName, args, callback) {
@@ -39,8 +34,6 @@ function RaftServerLocal(id, opts) {
             return;
         }
         _serverPool[targetId][rpcName](args,
-                // NOTE: non-local servers need to rewrite
-                // 'not_leader' results
                 function(results) {
                     callback(targetId, results);
                 }
@@ -70,9 +63,6 @@ function RaftServerLocal(id, opts) {
 
 
     // Options
-    if (!opts.serverMap) {
-        throw new Error("opts.serverMap is required");
-    }
     if (!opts.loadFn) { opts.loadFn = loadFn; }
     if (!opts.saveFn) { opts.saveFn = saveFn; }
     if (!opts.sendRPC) { opts.sendRPC = sendRPC; }
@@ -88,7 +78,7 @@ function RaftServerLocal(id, opts) {
 // serializable/unserializable by saveFn/loadFn
 function RaftServerLocalDurable(id, opts) {
     var self = this,
-        opts = copy(opts), // make a local copy
+        opts = base.copyOpts(opts), // make a local copy
         savePath = "raft.store." + id;
     
     function saveFn(data, callback) {
@@ -139,6 +129,7 @@ function RaftServerLocalDurable(id, opts) {
 }
 
 
+exports.copyOpts = base.copyOpts;
 exports.RaftServerLocal = RaftServerLocal;
 exports.RaftServerLocalDurable = RaftServerLocalDurable;
 exports._serverPool = _serverPool;
