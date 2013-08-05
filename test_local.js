@@ -4,17 +4,17 @@ local = require('./local');
 
 function startLocal (opts) {
     opts = opts || {};
-    opts.serverStart = [0,1,2];
+    opts.serverMap = {0:true,1:true,2:true};
     for (var i=0; i < 3; i++) {
-        new local.RaftServerLocal(i, opts);
+        new local.RaftServerLocal(i.toString(), opts);
     }
 }
 
 function startLocalDurable (opts) {
     opts = opts || {};
-    opts.serverStart = [0,1,2];
+    opts.serverMap = {0:true,1:true,2:true};
     for (var i=0; i < 3; i++) {
-        new local.RaftServerLocalDurable(i, opts);
+        new local.RaftServerLocalDurable(i.toString(), opts);
     }
 }
 function getAll(attr) {

@@ -24,7 +24,6 @@ function copy(obj) {
 var _serverPool = {};
 var _serverStore = {};
 function RaftServerLocal(id, opts) {
-    "use strict";
     var self = this,
         opts = copy(opts); // make a local copy
 
@@ -71,8 +70,8 @@ function RaftServerLocal(id, opts) {
 
 
     // Options
-    if (!opts.serverStart) {
-        throw new Error("opts.serverStart is required");
+    if (!opts.serverMap) {
+        throw new Error("opts.serverMap is required");
     }
     if (!opts.loadFn) { opts.loadFn = loadFn; }
     if (!opts.saveFn) { opts.saveFn = saveFn; }
@@ -85,8 +84,9 @@ function RaftServerLocal(id, opts) {
     return api;
 }
 
+// Data/commands sent in sendRPC and applied in applyCmd must be
+// serializable/unserializable by saveFn/loadFn
 function RaftServerLocalDurable(id, opts) {
-    "use strict";
     var self = this,
         opts = copy(opts), // make a local copy
         savePath = "raft.store." + id;

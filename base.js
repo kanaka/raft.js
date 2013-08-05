@@ -26,7 +26,7 @@ function RaftServerBase(id, opts) {
     setDefault('electionTimeout',   300);
     setDefault('heartbeatTime',     opts.electionTimeout/5);
     setDefault('stateMachineStart', {});
-    setDefault('serverStart',       [id]);
+    setDefault('serverMap',         {id: true});
     if (typeof opts.saveFn === 'undefined') {
         console.warn("no saveFn, server recovery will not work");
         opts.saveFn = function(data, callback) {
@@ -48,7 +48,7 @@ function RaftServerBase(id, opts) {
     // all servers
     self.state = 'follower'; // follower, candidate, leader
     self.stateMachine = opts.stateMachineStart;
-    self.servers = opts.serverStart; // all server IDs including ours
+    self.servers = Object.keys(opts.serverMap); // all server IDs including ours
     self.commitIndex = 0; // highest index known to be committed
     // persistant/durable
     self.currentTerm = -1;
