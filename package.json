@@ -1,0 +1,21 @@
+{
+  "name": "raftjs",
+  "author": {
+    "name": "Joel Martin",
+    "email": "github@martintribe.org",
+    "url": "http://github.com/kanaka"
+  },
+  "description": "Raft.js is an implementation of the Raft Consensus Algorithm",
+  "license": "MPL-2",
+  "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/kanaka/raft.js.git"
+  },
+  "main": "index.js",
+  "files": ["LICENSE.txt"],
+  "engines": {
+    "node": ">=0.8.9"
+  }
+}
+
