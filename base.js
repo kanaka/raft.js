@@ -53,25 +53,25 @@ function RaftServerBase(id, opts) {
     // Raft State
     //
 
-    // all servers
+    // all servers, ephemeral
     self.state = 'follower'; // follower, candidate, leader
     self.stateMachine = opts.stateMachineStart;
     self.servers = Object.keys(opts.serverMap); // all server IDs including ours
     self.commitIndex = 0; // highest index known to be committed
-    // persistant/durable
+    // all servers, persistant/durable
     self.currentTerm = -1;
     self.votedFor = null;
     self.log = [{term:0, command:null}];  // [{term:TERM, comand:COMMAND}...]
 
-    // candidate servers only
+    // candidate servers only, ephemeral
     var votesResponded = {}; // servers that sent requestVote in this term
     var votesGranted = {}; // servers that gave us a vote in this term
-    // leader servers only
+    // leader servers only, ephemeral
     var nextIndex = {};   // index of next log entry to send to follower
     var lastAgreeIndex = {}; // latest index of agreement with server
 
 
-    // Other state
+    // Other server state, ephemeral
     var election_timer = null,
         heartbeat_timer = null,
         leaderId = null,
@@ -170,6 +170,30 @@ function RaftServerBase(id, opts) {
         });
     }
 
+    function commitEntries(lastIdx) {
+        var firstIdx = self.commitIndex;
+        for (var idx=firstIdx; idx <= lastIdx; idx++) {
+            var entry = self.log[idx],
+                cmd = entry.command;
+            if (cmd) {
+                self.dbg("Applying:", cmd);
+                // TODO: handle exceptions
+                var result = opts.applyCmd(self.stateMachine, cmd);
+                // call client callback for the committed cmds
+                var clientCallback = clientCallbacks[idx];
+                if (clientCallback) {
+                    delete clientCallbacks[idx];
+                    // TODO: saveBefore wider scope?
+                    saveBefore(function() {
+                        clientCallback({'status': 'success',
+                                        'result': result});
+                    });
+                }
+            }
+            self.commitIndex = idx;
+        }
+    }
+
     // The core of the leader/log replication algorithm
     function leader_heartbeat() {
         if (self.state !== 'leader') { return; }
@@ -183,7 +207,13 @@ function RaftServerBase(id, opts) {
                     return;
                 }
                 if (args.success) {
+                    // A log entry is considered committed if
+                    // it is stored on a majority of the servers;
+                    // also, at least one entry from the leader's
+                    // current term must also be stored on a majority
+                    // of the servers.
                     lastAgreeIndex[sid] = curAgreeIndex;
+                    nextIndex[sid] = curAgreeIndex+1;
                     // gather a list of current agreed on log indexes
                     var agreeIndexes = [self.log.length-1];
                     for (var i=0; i < self.servers.length; i++) {
@@ -198,28 +228,19 @@ function RaftServerBase(id, opts) {
                     agreeIndexes.sort();
                     var agreePos = Math.floor(self.servers.length/2),
                         majorityIndex = agreeIndexes[agreePos];
-                    // If majority of followers have stored entries,
-                    // then commit those entries.
-                    // TODO: at least one entry from the leader's
-                    // current term must also be stored on
-                    // a majority of the servers.
+                    // Is our term stored on a majority of the servers
                     if (majorityIndex > self.commitIndex) {
-                        for (var idx=self.commitIndex+1; idx <= majorityIndex; idx++) {
-                            // TODO: handle exceptions
-                            var cmd = self.log[idx].command,
-                                result = opts.applyCmd(self.stateMachine, cmd);
-                            // call client callback for the committed cmds
-                            var clientCallback = clientCallbacks[idx];
-                            if (clientCallback) {
-                                delete clientCallbacks[idx];
-                                // TODO: saveBefore wider scope?
-                                saveBefore(function() {
-                                    clientCallback({'status': 'success',
-                                                    'result': result});
-                                });
+                        var termStored = false;
+                        for (var idx=majorityIndex; idx < self.log.length; idx++) {
+                            if (self.log[idx].term === self.currentTerm) {
+                                termStored = true;
+                                break;
                             }
                         }
-                        self.commitIndex = majorityIndex;
+                        console.log("here2",self.commitIndex, majorityIndex, termStored);
+                        if (termStored) {
+                            commitEntries(majorityIndex);
+                        }
                     }
                 } else {
                     nextIndex[sid] -= 1;
@@ -260,6 +281,17 @@ function RaftServerBase(id, opts) {
         votesGranted = {};
         self.votedFor = null;
         pendingPersist = true;
+
+        // NOTE: this is an addition to the basic Raft algorithm:
+        // add leader entry to log to force all previous entries to
+        // become committed; at least one entry from leader's current
+        // term must be added to the log before prior entries are
+        // considered committed. Otherwise, read-only commands after
+        // an election would return stale data until somebody does
+        // an update command.
+        self.log[self.log.length] = {term:self.currentTerm,
+                                     command:null,
+                                     newLeaderId: id};
 
         for (var i=0; i < self.servers.length; i++) {
             // start nextIndex set to the next entry in the log
@@ -378,8 +410,13 @@ function RaftServerBase(id, opts) {
         // 3. if candidate or leader, step down
         step_down(); // step down from candidate or leader
         leaderId = args.leaderId;
+
         // 4. reset election timeout
         reset_election_timer();
+
+        // TODO: if pending clientCallbacks this means we were
+        // a leader and lost it, reject the clientCallbacks with
+        // not_leader
 
         // 5. return fail if log doesn't contain an entry at
         //    prevLogIndex whose term matches prevLogTerm
@@ -398,16 +435,12 @@ function RaftServerBase(id, opts) {
             (args.entries.length > 0)) {
             Array.prototype.splice.apply(self.log,
                     [args.prevLogIndex+1, self.log.length].concat(args.entries));
+            console.log("here1",args.prevLogIndex, args.entries, self.log.length);
             pendingPersist = true;
         }
         // 8. apply newly committed entries to the state machine
         if (self.commitIndex < args.commitIndex) {
-            for (var idx=self.commitIndex+1; idx <= args.commitIndex; idx++) {
-                // TODO: handle exceptions
-                var cmd = self.log[idx].command;
-                opts.applyCmd(self.stateMachine, cmd);
-            }
-            self.commitIndex = args.commitIndex;
+            commitEntries(args.commitIndex);
         }
 
         saveBefore(function() {
@@ -415,21 +448,37 @@ function RaftServerBase(id, opts) {
         });
     }
 
-    // clientRequest RPC
-    //   cmd is opaque and sent to opts.applyCmd
-    //   callback is called after the cmd is committed and applied to
-    //   the stateMachine
+    // clientRequest
+    //   - cmd is map that is opaque for the most part but may contain
+    //     a "ro" key (read-only) that when truthy implies the cmd is
+    //     a read operation that will not change the stateMachine and
+    //     is called with the stateMachine immediately.
+    //   - callback is called after the cmd is committed (or
+    //     immediately for a read-only cmd) and applied to the
+    //     stateMachine
     function clientRequest(cmd, callback) {
         if (self.state !== 'leader') {
             // tell the client to use a different server
             callback({'status': 'not_leader', 'leaderId': leaderId});
             return;
         }
-        clientCallbacks[self.log.length] = callback;
-        self.log[self.log.length] = {term:self.currentTerm,
-                                     command:cmd};
-        pendingPersist = true;
-        leader_heartbeat();
+        // NOTE: this is an addition to the basic Raft algorithm:
+        // Read-only operations are applied immediately against the
+        // current state of the stateMachine (i.e. committed state)
+        // and are not added to the log. Otherwise, the cmd is added
+        // to the log and the client callback will be called when the
+        // cmdn is is committed. See 7.1
+        if (cmd.ro) {
+            var result = opts.applyCmd(self.stateMachine, cmd);
+            callback({status: 'success',
+                      result: result});
+        } else {
+            clientCallbacks[self.log.length] = callback;
+            self.log[self.log.length] = {term:self.currentTerm,
+                                         command:cmd};
+            pendingPersist = true;
+            leader_heartbeat();
+        }
     }
 
 

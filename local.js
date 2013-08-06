@@ -106,13 +106,12 @@ function RaftServerLocalDurable(id, opts) {
     }
 
     function applyCmd(stateMachine, cmd) {
-        var op=cmd[0], key=cmd[1], value=cmd[2];
         // TODO: sanity check args
-        switch (op) {
-            case 'get': stateMachine[key]; break;
-            case 'set': stateMachine[key] = value; break;
+        switch (cmd.op) {
+            case 'get': stateMachine[cmd.key]; break;
+            case 'set': stateMachine[cmd.key] = cmd.value; break;
         }
-        return stateMachine[key];
+        return stateMachine[cmd.key];
     };
 
 

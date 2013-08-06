@@ -19,9 +19,10 @@ and communicate directly with function calls.
     > lid = t.getLeaderId();
     > t.getAll('log');
 
-    > t.serverPool[lid].clientRequest(["set", 'a', 1], function(results) { console.log("results: ", results); });
+    > t.serverPool[lid].clientRequest({op:"set",key:'a',value:1}, function(results) { console.log("results: ", results); });
     > t.getAll('log');
     > t.getAll('stateMachine');
+    > t.serverPool[lid].clientRequest({op:"get",key:'a',ro:1}, function(results) { console.log("results: ", results); });
 
 
 ## Example: Three Raft Servers Communicating via HTTP
@@ -36,28 +37,31 @@ but they communicate with each other by sending messages over HTTP.
     > lid = t.getLeaderId();
     > t.getAll('log');
 
-    > t.serverPool[lid].clientRequest(["set", 'a', 1], function(results) { console.log("results: ", results); });
+    > t.serverPool[lid].clientRequest({op:"set",key:'a',value:1}, function(results) { console.log("results: ", results); });
     > t.getAll('log');
     > t.getAll('stateMachine');
+    > t.serverPool[lid].clientRequest({op:"get",key:'a',ro:1}, function(results) { console.log("results: ", results); });
 
 ## Status
 
-The following features of the Raft algorithm have been implemented:
+The following features have been implemented (the section number of
+the Raft paper is listed in brackets):
 
-* Leader election
-* Log replication and persistence
-* Safety features (except for one aspect related to server crashes)
-* Client interaction
-* In-process RPCs (direct function calls) for quick testing
-* Communication via HTTP ("RPC" over HTTP)
+* [5.2] Leader election
+* [5.3] Log replication and persistence
+* [5.4, 5.5, 5.6, 5.7] Safety features
+* [7.1] Client interaction (except filtering duplicates)
+* [5.1] RPCs:
+ * In-process (direct function calls) for quick testing
+ * Over HTTP
 
 ## TODO
 
-* implement second safety check (current term) on commit
-* membership change (joint consensus)
+* [6] membership change (joint consensus)
+* [7.1] filter duplicate client requests
+* [7.2] log compaction
 * faster resend of appendEntries when follower responds with fail
   (nextIndex update)
 * faster re-issue of requestVote to non-responders
 * more exception handling
 * in depth testing
-* log compaction
