@@ -1,3 +1,4 @@
 Sources:
     - raft.pdf: https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf
     - proof.pdf: http://raftuserstudy.s3-website-us-west-1.amazonaws.com/proof.pdf
+    - Ousterhout presentation: http://www.youtube.com/watch?v=YbZ3zDzDnrw
