@@ -91,9 +91,13 @@ function RaftServerBase(id, opts) {
         }
     }
 
+    //
     // Internal implementation functions
+    //
+
+    // Reset the election timer to a random between value between
+    // electionTimeout -> electionTimeout*2
     function reset_election_timer() {
-        // random between electionTimeout -> electionTimeout*2
         var randTimeout = opts.electionTimeout +
                           parseInt(Math.random()*opts.electionTimeout);
         if (election_timer) {
@@ -102,6 +106,7 @@ function RaftServerBase(id, opts) {
         election_timer = setTimeout(start_election, randTimeout);
     }
 
+    // Set our term to new_term (defaults to currentTerm+1)
     function update_term(new_term) {
         if (typeof new_term === 'undefined') {
             new_term = self.currentTerm + 1;
@@ -112,6 +117,7 @@ function RaftServerBase(id, opts) {
         votesGranted = {};
     }
 
+    // Become a follower and start the election timeout timer
     function step_down() {
         if (self.state === 'follower') { return; }
         info("follower");
@@ -124,7 +130,7 @@ function RaftServerBase(id, opts) {
         }
     }
 
-    // send an RPC to each of the other servers
+    // Send an RPC to each of the other servers
     function sendRPCs(rpc, args, callback) {
         for (var i=0; i < self.servers.length; i++) {
             var sid = self.servers[i];
@@ -135,6 +141,9 @@ function RaftServerBase(id, opts) {
         }
     }
 
+    // If pendingPersist is set then this means some aspect of our
+    // durable state has changed so call opts.saveFn to save it to
+    // durable storage. Finally call callback.
     function saveBefore(callback) {
         if (pendingPersist) {
             var data = {currentTerm: self.currentTerm,
@@ -153,6 +162,9 @@ function RaftServerBase(id, opts) {
 
     }
 
+    // Call opts.loadFn to load our durable state from durable
+    // storage. If loadFn fails then initialize to starting state.
+    // Also initialize voting related state, then call callback.
     function loadBefore(callback) {
         opts.loadFn(function (success, data) {
             if (success) {
@@ -195,7 +207,28 @@ function RaftServerBase(id, opts) {
         }
     }
 
-    // The core of the leader/log replication algorithm
+    // Return the log index that is stored on a majority of the
+    // servers in serverIds
+    function getMajorityIndex(serverIds) {
+        // gather a list of current agreed on log indexes
+        var agreeIndexes = [self.log.length-1];
+        for (var i=0; i < serverIds.length; i++) {
+            var sidi = serverIds[i];
+            if (sidi === id) { continue; }
+            agreeIndexes.push(lastAgreeIndex[sidi]);
+        }
+        // Sort the agree indexes and and find the index
+        // at (or if odd, just above) the half-way mark.
+        // This index is the one that is stored on
+        // a majority of the given serverIds.
+        agreeIndexes.sort();
+        var agreePos = Math.floor(serverIds.length/2),
+            majorityIndex = agreeIndexes[agreePos];
+        return majorityIndex;
+    }
+
+    // The core of the leader/log replication algorithm, called
+    // periodically (opts.heartbeatTime) while a leader.
     function leader_heartbeat() {
         if (self.state !== 'leader') { return; }
 
@@ -215,20 +248,7 @@ function RaftServerBase(id, opts) {
                     // of the servers.
                     lastAgreeIndex[sid] = curAgreeIndex;
                     nextIndex[sid] = curAgreeIndex+1;
-                    // gather a list of current agreed on log indexes
-                    var agreeIndexes = [self.log.length-1];
-                    for (var i=0; i < self.servers.length; i++) {
-                        var sidi = self.servers[i];
-                        if (sidi === id) { continue; }
-                        agreeIndexes.push(lastAgreeIndex[sidi]);
-                    }
-                    // Sort the agree indexes and and find the index
-                    // at (or if odd, just above) the half-way mark.
-                    // This index is the one that is stored on
-                    // a majority of servers.
-                    agreeIndexes.sort();
-                    var agreePos = Math.floor(self.servers.length/2),
-                        majorityIndex = agreeIndexes[agreePos];
+                    var majorityIndex = getMajorityIndex(self.servers);
                     // Is our term stored on a majority of the servers
                     if (majorityIndex > self.commitIndex) {
                         var termStored = false;
@@ -238,7 +258,6 @@ function RaftServerBase(id, opts) {
                                 break;
                             }
                         }
-                        console.log("here2",self.commitIndex, majorityIndex, termStored);
                         if (termStored) {
                             commitEntries(majorityIndex);
                         }
@@ -273,6 +292,9 @@ function RaftServerBase(id, opts) {
                 opts.heartbeatTime);
     }
 
+    // We won the election so initialize the leader state, record our
+    // win in the log (addition to Raft algorithm), and call the
+    // leader_heartbeat function.
     function become_leader() {
         if (self.state === 'leader') { return; }
         info("leader");
@@ -318,37 +340,41 @@ function RaftServerBase(id, opts) {
         pendingPersist = true;
         // reset election timeout
         reset_election_timer();
+
+        var requestVoteResponse = function(other_id, args) {
+            if ((self.state !== 'candidate') ||
+                (args.term < self.currentTerm)) {
+                // ignore
+                return;
+            }
+            if (args.term > self.currentTerm) {
+                // Does this happen? How?
+                step_down();
+                return;
+            }
+            if (args.voteGranted) {
+                dbg("got vote from:", other_id);
+                votesGranted[other_id] = true;
+            }
+            dbg("votesGranted: ", votesGranted);
+            // Check if we won the election
+            var need = Math.round((self.servers.length+1)/2); // more than half
+            if (Object.keys(votesGranted).length >= need) {
+                become_leader();
+            }
+        }
         // TODO: reissue 'requestVote' quickly to non-responders while candidate
         sendRPCs('requestVote',
                 {term: self.currentTerm,
                  candidateId: id, 
                  lastLogIndex: self.log.length-1,
                  lastLogTerm: self.log[self.log.length-1].term},
-            function (other_id, args) {
-                if ((self.state !== 'candidate') ||
-                    (args.term < self.currentTerm)) {
-                    // ignore
-                    return;
-                }
-                if (args.term > self.currentTerm) {
-                    // Does this happen? How?
-                    step_down();
-                    return;
-                }
-                if (args.voteGranted) {
-                    dbg("got vote from:", other_id);
-                    votesGranted[other_id] = true;
-                }
-                dbg("votesGranted: ", votesGranted);
-                // Check if we won the election
-                var need = Math.round((self.servers.length+1)/2); // more than half
-                if (Object.keys(votesGranted).length >= need) {
-                    become_leader();
-                }
-            }
-        );
+            requestVoteResponse);
     }
 
+    // We are terminating either as a result of being removed by
+    // a membership change or by direct invocation (for
+    // testing/debug).
     function terminate() {
         // Disable any timers
         heartbeat_timer = clearTimeout(heartbeat_timer);
@@ -499,7 +525,9 @@ function RaftServerBase(id, opts) {
         }
     }
 
-
+    // Initialization/constructor: load any durable state from
+    // storage, become a follower and start the election timeout
+    // timer.
     loadBefore(function() {
         // start as follower by default
         step_down();
