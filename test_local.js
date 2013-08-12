@@ -1,49 +1,44 @@
 #!/usr/bin/env node
 
+common = require('./test_common');
 local = require('./local');
 
-function startLocal (opts) {
-    opts = opts || {};
-    opts.serverMap = {0:true,1:true,2:true};
+serverPool = local._serverPool;
+
+function _startLocal (opts, n, klass) {
+    n = n || 3;
+    var serverOpts = {};
     for (var i=0; i < 3; i++) {
-        new local.RaftServerLocal(i.toString(), opts);
+        serverOpts[i] = local.copyMap(opts);
+        serverOpts[i].listenAddress = "local:" + i;
     }
+    return common.startServers(serverPool, serverOpts, klass);
 }
 
-function startLocalDurable (opts) {
-    opts = opts || {};
-    opts.serverMap = {0:true,1:true,2:true};
-    for (var i=0; i < 3; i++) {
-        new local.RaftServerLocalDurable(i.toString(), opts);
-    }
+function startLocal(opts, n) {
+    return _startLocal(opts, n, local.RaftServerLocal);
 }
+
+function startLocalDurable(opts, n) {
+    return _startLocal(opts, n, local.RaftServerLocalDurable);
+}
+
 function getAll(attr) {
-    var results = {};
-    for (var i in local._serverPool) {
-        if (!local._serverPool.hasOwnProperty(i)) { continue; }
-        results[i] = local._serverPool[i]._self[attr];
-    }
-    return results;
+    return common.getAll(serverPool, attr);
 }
  
 function getLeaderId() {
-    for (var i in local._serverPool) {
-        if (!local._serverPool.hasOwnProperty(i)) { continue; }
-        if (local._serverPool[i]._self.state === 'leader') {
-            return i;
-        }
-    }
-    return null;
+    return common.getLeaderId(serverPoool);
 }
 
 
 if (require.main === module) {
     startLocal();
 } else {
+    exports.local = local;
     exports.startLocal = startLocal;
     exports.startLocalDurable = startLocalDurable;
-    exports.serverPool = local._serverPool;
+    exports.serverPool = serverPool;
     exports.getAll = getAll;
     exports.getLeaderId = getLeaderId;
-    exports.local = local;
 }

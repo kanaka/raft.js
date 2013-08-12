@@ -1,44 +1,37 @@
 #!/usr/bin/env node
 
+common = require('./test_common');
 http = require('./http');
 
 serverPool = {};
-function startHttp (opts) {
-    opts = opts || {};
-    opts.serverMap = {0:"localhost:9000",
-                      1:"localhost:9001",
-                      2:"localhost:9002"};
-    for (var i=0; i < 3; i++) {
-        var o = http.copyOpts(opts);
-        o.listenPort = 9000+i;
-        serverPool[i] = new http.RaftServerHttp(i.toString(), o);
+
+function startHttp(opts, n) {
+    n = n || 3;
+    var serverOpts = {};
+    for (var i=0; i<n; i++) {
+        serverOpts[i] = http.copyMap(opts);
+        serverOpts[i].listenAddress = "localhost:" + (9000 + i);
     }
+    return common.startServers(serverPool, serverOpts,
+                                  http.RaftServerHttp);
 }
 
+//function addServers(opts, n) {
+//}
+
 function getAll(attr) {
-    var results = {};
-    for (var i in serverPool) {
-        if (!serverPool.hasOwnProperty(i)) { continue; }
-        results[i] = serverPool[i]._self[attr];
-    }
-    return results;
+    return common.getAll(serverPool, attr);
 }
  
 function getLeaderId() {
-    for (var i in serverPool) {
-        if (!serverPool.hasOwnProperty(i)) { continue; }
-        if (serverPool[i]._self.state === 'leader') {
-            return i;
-        }
-    }
-    return null;
+    return common.getLeaderId(serverPool);
 }
 
 
 if (require.main === module) {
     startHttp();
 } else {
-    exports.serverPool = serverPool;
+    exports.http = http;
     exports.startHttp = startHttp;
     exports.serverPool = serverPool;
     exports.getAll = getAll;

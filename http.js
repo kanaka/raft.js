@@ -16,13 +16,13 @@ var local = require("./local"),
 function RaftServerHttp(id, opts) {
     var self = this,
         api,
-        opts = local.copyOpts(opts); // make a local copy
+        opts = local.copyMap(opts); // make a local copy
 
     if (!opts.serverMap) {
         throw new Error("opts.serverMap is required");
     }
-    if (!opts.listenPort) {
-        throw new Error("opts.listenPort is required");
+    if (!opts.listenAddress) {
+        throw new Error("opts.listenAddress is required");
     }
 
     function sendRPC(targetId, rpcName, args, callback) {
@@ -65,7 +65,10 @@ function RaftServerHttp(id, opts) {
             });
         })
     });
-    httpServer.listen(opts.listenPort, opts.listenAddress);
+    var parts = opts.listenAddress.split(/:/),
+        port = parts[parts.length-1],
+        host = parts[parts.length-2];
+    httpServer.listen(port, host);
 
     // Options
     if (!opts.sendRPC) { opts.sendRPC = sendRPC; }
@@ -75,5 +78,5 @@ function RaftServerHttp(id, opts) {
     return api;
 }
 
-exports.copyOpts = local.copyOpts;
+exports.copyMap = local.copyMap;
 exports.RaftServerHttp = RaftServerHttp;

@@ -17,7 +17,7 @@ var _serverPool = {};
 var _serverStore = {};
 function RaftServerLocal(id, opts) {
     var self = this,
-        opts = base.copyOpts(opts); // make a local copy
+        opts = base.copyMap(opts); // make a local copy
 
     if (id in _serverPool) {
         throw new Error("Server id '" + id + "' already exists");
@@ -78,7 +78,7 @@ function RaftServerLocal(id, opts) {
 // serializable/unserializable by saveFn/loadFn
 function RaftServerLocalDurable(id, opts) {
     var self = this,
-        opts = base.copyOpts(opts), // make a local copy
+        opts = base.copyMap(opts), // make a local copy
         savePath = "raft.store." + id;
     
     function saveFn(data, callback) {
@@ -128,7 +128,7 @@ function RaftServerLocalDurable(id, opts) {
 }
 
 
-exports.copyOpts = base.copyOpts;
+exports.copyMap = base.copyMap;
 exports.RaftServerLocal = RaftServerLocal;
 exports.RaftServerLocalDurable = RaftServerLocalDurable;
 exports._serverPool = _serverPool;
