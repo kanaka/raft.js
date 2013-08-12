@@ -17,7 +17,8 @@ function copyOpts(obj) {
 };
 
 function RaftServerBase(id, opts) {
-    var self = this;
+    var self = this,
+        api = {};
     self.id = id;
     opts = opts || {};
 
@@ -348,6 +349,23 @@ function RaftServerBase(id, opts) {
         );
     }
 
+    function terminate() {
+        // Disable any timers
+        heartbeat_timer = clearTimeout(heartbeat_timer);
+        election_timer = clearTimeout(election_timer);
+        // Ignore or reject RPC/API calls
+        api.requestVote = function(args) {
+            self.dbg("Ignoring clientRequest(", args, ")");
+        };
+        api.appendEntries = function(args) {
+            self.dbg("Ignoring appenEntries(", args, ")");
+        };
+        api.clientRequest = function(cmd, callback) {
+            self.dbg("Rejecting clientRequest(", cmd, ")");
+            callback({'status': 'error', 'msg': 'terminated'});
+        };
+    }
+
     //
     // RPCs/Public API (Figure 2)
     //
@@ -490,13 +508,14 @@ function RaftServerBase(id, opts) {
 
 
     // Public API/RPCs
-    var api = {requestVote:   requestVote,
-               appendEntries: appendEntries,
-               clientRequest: clientRequest};
+    api = {requestVote:   requestVote,
+           appendEntries: appendEntries,
+           clientRequest: clientRequest};
     if (opts.debug) {
         api._self = self;
         api._step_down = step_down;
         api._start_election = start_election;
+        api._terminate = terminate;
     }
 
     return api;
