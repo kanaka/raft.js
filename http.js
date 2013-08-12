@@ -74,7 +74,7 @@ function RaftServerHttp(id, opts) {
     if (!opts.sendRPC) { opts.sendRPC = sendRPC; }
 
     // Call the superclass
-    api = local.RaftServerLocalDurable.call(self, id, opts);
+    api = local.RaftServerLocal.call(self, id, opts);
     return api;
 }
 

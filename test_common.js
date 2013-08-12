@@ -12,6 +12,24 @@ function startServers (spool, serverOpts, klass) {
     }
 }
 
+function addServer (spool, sid, opts, klass) {
+    if (sid in serverMap) {
+        throw new Error("Server " + sid + " already exists");
+    }
+    var lid = getLeaderId(spool);
+    if (!lid) {
+        throw new Error("Could not determine current leader");
+    }
+    var addr = opts.listenAddress;
+    serverMap[sid] = addr;
+    opts.serverMap = serverMap;
+    spool[sid] = new klass(sid.toString(), opts);
+    spool[lid].clientRequest({newServerMap:serverMap},
+            function(res) {
+                console.log("addServer callback result:", res);
+            });
+}
+
 function getAll(spool, attr) {
     var results = {};
     for (var i in spool) {
@@ -32,5 +50,6 @@ function getLeaderId(spool) {
 }
 
 exports.startServers = startServers;
+exports.addServer = addServer;
 exports.getAll = getAll;
 exports.getLeaderId = getLeaderId;

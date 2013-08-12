@@ -1,6 +1,7 @@
 var base = require("./base");
 var local = require("./local");
+var http = require("./http");
 
 exports.RaftServerBase = base.RaftServerBase;
 exports.RaftServerLocal = local.RaftServerLocal;
-exports.RaftServerLocalDurable = local.RaftServerLocalDurable;
+exports.RaftServerHttp = http.RaftServerHttp;

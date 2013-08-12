@@ -5,22 +5,23 @@ local = require('./local');
 
 serverPool = local._serverPool;
 
-function _startLocal (opts, n, klass) {
+function startServers(opts, n) {
+    return _startLocal(opts, n, local.RaftServerLocal);
     n = n || 3;
     var serverOpts = {};
     for (var i=0; i < 3; i++) {
         serverOpts[i] = local.copyMap(opts);
         serverOpts[i].listenAddress = "local:" + i;
     }
-    return common.startServers(serverPool, serverOpts, klass);
+    return common.startServers(serverPool, serverOpts,
+                               local.RaftServerLocal);
 }
 
-function startLocal(opts, n) {
-    return _startLocal(opts, n, local.RaftServerLocal);
-}
-
-function startLocalDurable(opts, n) {
-    return _startLocal(opts, n, local.RaftServerLocalDurable);
+function addServer(sid, opts) {
+    opts = local.copyMap(opts);
+    opts.listenAddress = "local:" + sid;
+    return common.addServer(serverPool, sid, opts,
+                            local.RaftServerLocal);
 }
 
 function getAll(attr) {
@@ -28,7 +29,7 @@ function getAll(attr) {
 }
  
 function getLeaderId() {
-    return common.getLeaderId(serverPoool);
+    return common.getLeaderId(serverPool);
 }
 
 
@@ -36,8 +37,8 @@ if (require.main === module) {
     startLocal();
 } else {
     exports.local = local;
-    exports.startLocal = startLocal;
-    exports.startLocalDurable = startLocalDurable;
+    exports.startServers = startServers;
+    exports.addServer = addServer;
     exports.serverPool = serverPool;
     exports.getAll = getAll;
     exports.getLeaderId = getLeaderId;

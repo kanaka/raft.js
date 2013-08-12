@@ -17,7 +17,8 @@ var _serverPool = {};
 var _serverStore = {};
 function RaftServerLocal(id, opts) {
     var self = this,
-        opts = base.copyMap(opts); // make a local copy
+        opts = base.copyMap(opts), // make a local copy
+        savePath = "raft.store." + id;
 
     if (id in _serverPool) {
         throw new Error("Server id '" + id + "' already exists");
@@ -25,6 +26,7 @@ function RaftServerLocal(id, opts) {
     if (!opts.serverMap) {
         throw new Error("opts.serverMap is required");
     }
+    base.setDefault(opts, 'durable', true);
     
     function sendRPC(targetId, rpcName, args, callback) {
         self.dbg("RPC to "  + targetId + ": " + rpcName + " (" + args + ")");
@@ -40,69 +42,48 @@ function RaftServerLocal(id, opts) {
         );
     }
 
-    function saveFn(data, callback) {
-        _serverStore[id] = data;
-        if(callback) {
-            callback(true);
+    if (opts.durable) {
+        // Data/commands sent in sendRPC and applied in applyCmd must be
+        // serializable/unserializable by saveFn/loadFn
+        var saveFn = function(data, callback) {
+            var dstr = JSON.stringify(data);
+            fs.writeFile(savePath, dstr, function(err) {
+                if(callback) {
+                    callback(!err);
+                }
+            });
         }
-    }
 
-    function loadFn(callback) {
-        var data = _serverStore[id]
-        if (data) {
-            callback(true, data);
-        } else {
-            callback(false);
-        }
-    }
-
-    function applyCmd(stateMachine, cmd) {
-        // By default treat cmd as a function to apply
-        return cmd(stateMachine);
-    };
-
-
-    // Options
-    if (!opts.loadFn) { opts.loadFn = loadFn; }
-    if (!opts.saveFn) { opts.saveFn = saveFn; }
-    if (!opts.sendRPC) { opts.sendRPC = sendRPC; }
-    if (!opts.applyCmd) { opts.applyCmd = applyCmd; }
-
-    // Call the superclass
-    var api = base.RaftServerBase.call(self, id, opts);
-    _serverPool[id] = api;
-    return api;
-}
-
-// Data/commands sent in sendRPC and applied in applyCmd must be
-// serializable/unserializable by saveFn/loadFn
-function RaftServerLocalDurable(id, opts) {
-    var self = this,
-        opts = base.copyMap(opts), // make a local copy
-        savePath = "raft.store." + id;
-    
-    function saveFn(data, callback) {
-        var dstr = JSON.stringify(data);
-        fs.writeFile(savePath, dstr, function(err) {
-            if(callback) {
-                callback(!err);
-            }
-        });
-    }
-
-    function loadFn(callback) {
-        fs.readFile(savePath, function(err, dstr) {
-            if (!err) {
-                try {
-                    var data = JSON.parse(dstr);
-                    callback(true, data);
-                } catch (e) {
+        var loadFn = function(callback) {
+            fs.readFile(savePath, function(err, dstr) {
+                if (!err) {
+                    try {
+                        var data = JSON.parse(dstr);
+                        callback(true, data);
+                    } catch (e) {
+                        callback(false);
+                    }
+                } else {
                     callback(false);
                 }
+            });
+        }
+    } else {
+        var saveFn = function(data, callback) {
+            _serverStore[id] = data;
+            if(callback) {
+                callback(true);
+            }
+        }
+
+        var loadFn = function(callback) {
+            var data = _serverStore[id]
+            if (data) {
+                callback(true, data);
             } else {
                 callback(false);
             }
-        });
+        }
     }
 
     function applyCmd(stateMachine, cmd) {
@@ -118,18 +99,16 @@ function RaftServerLocalDurable(id, opts) {
     // Options
     if (!opts.loadFn) { opts.loadFn = loadFn; }
     if (!opts.saveFn) { opts.saveFn = saveFn; }
+    if (!opts.sendRPC) { opts.sendRPC = sendRPC; }
     if (!opts.applyCmd) { opts.applyCmd = applyCmd; }
 
     // Call the superclass
-    var api = RaftServerLocal.call(self, id, opts);
+    var api = base.RaftServerBase.call(self, id, opts);
     _serverPool[id] = api;
-    //console.log("_serverPool: ", _serverPool);
     return api;
 }
 
-
 exports.copyMap = base.copyMap;
 exports.RaftServerLocal = RaftServerLocal;
-exports.RaftServerLocalDurable = RaftServerLocalDurable;
 exports._serverPool = _serverPool;
 exports._serverStore = _serverStore;
