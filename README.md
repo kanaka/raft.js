@@ -68,3 +68,9 @@ the Raft paper is listed in brackets):
 * faster re-issue of requestVote to non-responders
 * more exception handling
 * in depth testing
+
+
+## License
+
+Licensed under [MPL-2.0](http://www.mozilla.org/MPL/2.0/). See
+LICENSE.txt.
