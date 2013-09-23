@@ -6,7 +6,6 @@ local = require('./local');
 serverPool = local._serverPool;
 
 function startServers(opts, n) {
-    return _startLocal(opts, n, local.RaftServerLocal);
     n = n || 3;
     var serverOpts = {};
     for (var i=0; i < 3; i++) {
