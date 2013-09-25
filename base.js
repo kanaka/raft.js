@@ -70,7 +70,7 @@ function RaftServerBase(id, opts) {
     var votesGranted = {}; // servers that gave us a vote in this term
     // leader servers only, ephemeral
     var nextIndex = {};   // index of next log entry to send to follower
-    var lastAgreeIndex = {}; // latest index of agreement with server
+    var matchIndex = {}; // latest index known replicated to follower
 
 
     // Other server state, ephemeral
@@ -286,7 +286,7 @@ function RaftServerBase(id, opts) {
         for (var i=0; i < serverIds.length; i++) {
             var sidi = serverIds[i];
             if (sidi === id) { continue; }
-            agreeIndexes.push(lastAgreeIndex[sidi]);
+            agreeIndexes.push(matchIndex[sidi]);
         }
         // Sort the agree indexes and and find the index
         // at (or if even, just above) the half-way mark.
@@ -317,7 +317,7 @@ function RaftServerBase(id, opts) {
                     // also, at least one entry from the leader's
                     // current term must also be stored on a majority
                     // of the servers.
-                    lastAgreeIndex[sid] = curAgreeIndex;
+                    matchIndex[sid] = curAgreeIndex;
                     nextIndex[sid] = curAgreeIndex+1;
                     var sids = Object.keys(self.serverMap),
                         majorityIndex = getMajorityIndex(sids);
@@ -401,14 +401,14 @@ function RaftServerBase(id, opts) {
         }
     }
 
-    // Initialize nextIndex and lastAgreeIndex for each server. The
+    // Initialize nextIndex and matchIndex for each server. The
     // optional argument indicates that the indexes should be
     // initialized from scratch (rather than just updated for new
     // members) which is done when we are a newly elected leader.
     function update_indexes(from_scratch) {
         if (from_scratch) {
             nextIndex = {};
-            lastAgreeIndex = {};
+            matchIndex = {};
         }
         var sids = servers();
         for (var i=0; i < sids.length; i++) {
@@ -416,9 +416,9 @@ function RaftServerBase(id, opts) {
             if (typeof nextIndex[sids[i]] === 'undefined') {
                 nextIndex[sids[i]] = self.log.length;
             }
-            // Start lastAgreeIndex set to commitIndex
-            if (typeof lastAgreeIndex[sids[i]] === 'undefined') {
-                lastAgreeIndex[sids[i]] = self.commitIndex;
+            // Start matchIndex set to commitIndex
+            if (typeof matchIndex[sids[i]] === 'undefined') {
+                matchIndex[sids[i]] = self.commitIndex;
             }
         }
     }
