@@ -1,7 +1,10 @@
-#!/usr/bin/env node
-
-common = require('./test_common');
-local = require('./local');
+if (typeof module !== 'undefined') {
+    var test_common = require('./test_common');
+    var local = require('./local');
+} else {
+    var test_local = {},
+        exports = test_local;
+}
 
 serverPool = local._serverPool;
 
@@ -12,28 +15,28 @@ function startServers(opts, n) {
         serverOpts[i] = local.copyMap(opts);
         serverOpts[i].listenAddress = "local:" + i;
     }
-    return common.startServers(serverPool, serverOpts,
-                               local.RaftServerLocal);
+    return test_common.startServers(serverPool, serverOpts,
+                                    local.RaftServerLocal);
 }
 
 function addServer(sid, opts) {
     opts = local.copyMap(opts);
     opts.listenAddress = "local:" + sid;
-    return common.addServer(serverPool, sid, opts,
-                            local.RaftServerLocal);
+    return test_common.addServer(serverPool, sid, opts,
+                                 local.RaftServerLocal);
 }
 
 function getAll(attr) {
-    return common.getAll(serverPool, attr);
+    return test_common.getAll(serverPool, attr);
 }
  
 function getLeaderId() {
-    return common.getLeaderId(serverPool);
+    return test_common.getLeaderId(serverPool);
 }
 
 
-if (require.main === module) {
-    startLocal();
+if (typeof require !== 'undefined' && require.main === module) {
+    startServers();
 } else {
     exports.local = local;
     exports.startServers = startServers;

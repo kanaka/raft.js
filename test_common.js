@@ -1,3 +1,7 @@
+if (typeof module === 'undefined') {
+    var test_common = {},
+        exports = test_common;
+}
 
 serverMap = {};
 

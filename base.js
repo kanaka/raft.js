@@ -8,6 +8,11 @@
 
 "use strict";
 
+if (typeof module === 'undefined') {
+    var base = {},
+        exports = base;
+}
+
 function copyMap(obj) {
     var nobj = {};
     for (var k in obj) {

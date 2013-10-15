@@ -8,8 +8,14 @@
 
 "use strict";
 
-var fs = require('fs');
-var base = require("./base");
+if (typeof module !== 'undefined') {
+    var fs = require('fs');
+    var base = require("./base");
+} else {
+    var local = {},
+        exports = local,
+        fs = null;
+}
 
 // RaftServer that uses in-process communication for RPC
 // Most useful for testing
@@ -42,7 +48,7 @@ function RaftServerLocal(id, opts) {
         );
     }
 
-    if (opts.durable) {
+    if (opts.durable && fs) {
         // Data/commands sent in sendRPC and applied in applyCmd must be
         // serializable/unserializable by saveFn/loadFn
         var saveFn = function(data, callback) {
