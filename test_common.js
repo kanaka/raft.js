@@ -11,6 +11,8 @@ function startServers (spool, serverOpts, klass) {
         serverMap[sid] = addr;
     }
     for (var sid in serverOpts) {
+        // force debug so _self is exposed for get* functions
+        serverOpts[sid].debug = true;
         serverOpts[sid].serverMap = serverMap;
         spool[sid] = new klass(sid.toString(), serverOpts[sid]);
     }
