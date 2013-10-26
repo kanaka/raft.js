@@ -191,15 +191,21 @@ function RaftServerBase(id, opts) {
             if (success) {
                 self.currentTerm = data.currentTerm;
                 self.votedFor = data.votedFor;
-                self.log = data.log;
+                addEntries(data.log, true);
             } else {
                 // set some defaults if nothing found
                 self.currentTerm = 0;
                 self.votedFor = null;
-                self.log = [{term:0, command:null}];  // [{term:TERM, comand:COMMAND}...]
+                addEntries([{term:0, command:null}], true);
             }
             votesResponded = {};
             votesGranted = {};
+            // We are starting up/reseting our state, assume that
+            // opts.serverMap is our current membership.
+            // TODO: is this correct if the log says we were in
+            // joint consensus?
+            self.serverMap = opts.serverMap;
+            self.newServerMap = null;
             callback();
         });
     }
@@ -209,23 +215,25 @@ function RaftServerBase(id, opts) {
     // and self.newServerMap are updated to reflect this (membership
     // change entries come into effect as soon as we see them and not
     // when they are committed)
-    function addEntries(entries) {
+    function addEntries(entries, startup) {
         for (var i=0; i < entries.length; i++) {
-            var entry = entries[i];
+            var entry = entries[i],
+                cmd = entry.command;
             if (typeof entry.term === 'undefined') {
                 entry.term = self.currentTerm;
             }
-            if (typeof entry.command === 'undefined') {
+            if (!cmd) {
                 entry.command = null;
-            } else if (entry.command) {
-                // Check for membership changes. Cold,new and Cnew take effect
-                // as soon as we see them, not when they are committed
-                var cmd = entry.command;
-                if (cmd.oldServerMap && cmd.newServerMap) {
+            }
+
+            // Check for membership changes. Cold,new and Cnew take effect
+            // as soon as we see them, not when they are committed
+            if (cmd && !startup) {
+                if (cmd.op === 'Cold,new') {
                     // Joint consensus (Cold,new)
                     self.serverMap = cmd.oldServerMap;
                     self.newServerMap = cmd.newServerMap;
-                } else if (!cmd.oldServerMap && cmd.newServerMap) {
+                } else if (cmd.op === 'Cnew') {
                     // Transition to Cnew
                     self.serverMap = cmd.newServerMap;
                     self.newServerMap = null;
@@ -241,13 +249,18 @@ function RaftServerBase(id, opts) {
     // changing membership (joint consensus)
     function commitEntries(lastIdx) {
         var firstIdx = self.commitIndex+1,
-            result = null;
+            result = null,
+            callbacks = {};
         for (var idx=firstIdx; idx <= lastIdx; idx++) {
             var entry = self.log[idx],
                 cmd = entry.command;
             self.commitIndex = idx;
-            if (!cmd) { continue; }
-            if (cmd.oldServerMap && cmd.newServerMap) {
+            if (!cmd) {
+                continue;
+
+            // TODO: should only do this for entries we didn't load
+            // from disk
+            } else if (cmd.op === 'Cold,new') {
                 result = "committed Cold,new";
                 if (self.state === 'leader') {
                     // We are committing Cnew,old and adding Cnew.
@@ -256,11 +269,12 @@ function RaftServerBase(id, opts) {
                     // we have implicitly seen it.
                     self.serverMap = cmd.newServerMap;
                     self.newServerMap = null;
-                    var cmdNew = {newServerMap: cmd.newServerMap};
+                    var cmdNew = {op:           'Cnew',
+                                  newServerMap: cmd.newServerMap};
                     addEntries([{command:cmdNew}]);
                     result += ", adding Cnew";
                 }
-            } else if (!cmd.oldServerMap && cmd.newServerMap) {
+            } else if (cmd.op === 'Cnew') {
                 // We are committing Cnew. If we are not part of
                 // Cnew then we need step down and terminate
                 result = "committed Cnew";
@@ -269,7 +283,7 @@ function RaftServerBase(id, opts) {
                     terminate();
                     result += ", removed from membership";
                 }
-            } else if (!cmd.oldServerMap && !cmd.newServerMap) {
+            } else {
                 self.dbg("Applying:", cmd);
                 // TODO: handle exceptions
                 result = opts.applyCmd(self.stateMachine, cmd);
@@ -277,14 +291,18 @@ function RaftServerBase(id, opts) {
             // call client callback for the committed cmds
             var clientCallback = clientCallbacks[idx];
             if (clientCallback) {
+                callbacks[idx] = [clientCallback, result];
                 delete clientCallbacks[idx];
-                // TODO: saveBefore wider scope?
-                saveBefore(function() {
-                    clientCallback({'status': 'success',
-                                    'result': result});
-                });
             }
         }
+        saveBefore(function() {
+            for (var idx in callbacks) {
+                var callback = callbacks[idx][0],
+                    result =   callbacks[idx][1];
+                callback({'status': 'success',
+                          'result': result});
+            }
+        });
     }
 
     // Return the log index that is stored on a majority of the
@@ -661,18 +679,32 @@ function RaftServerBase(id, opts) {
                       result: result});
         } else {
             clientCallbacks[self.log.length] = callback;
-            if (cmd.newServerMap) {
-                // Create Cold,new joint consensus state
-                cmd.oldServerMap = self.serverMap;
-                addEntries([{command:cmd}]);
+            addEntries([{command:cmd}]);
+            if (cmd.op === 'Cold,new' || cmd.op === 'Cnew') {
                 update_indexes();
-            } else {
-                addEntries([{command:cmd}]);
             }
             pendingPersist = true;
-            leader_heartbeat();
+            // trigger leader heartbeat
+            setTimeout(leader_heartbeat,1);
         }
     }
+
+    // changeMembership
+    //   - newServerMap is the new map of server IDs to addresses for
+    //     the new membership. This is really just a wrapper around
+    //     clientRequest that adds a 'Cold,new' command.
+    //   - callback is called after joint consensus (Cold,new) is
+    //     committed (not when Cnew is committed)
+    function changeMembership(newServerMap, callback) {
+        // Create Cold,new joint consensus state
+        // TODO: check that newServerMap overlaps enough with
+        // self.serverMap
+        var cmd = {op:          'Cold,new',
+                   oldServerMap: self.serverMap,
+                   newServerMap: newServerMap};
+        clientRequest(cmd, callback);
+    }
+
 
     // Initialization/constructor: load any durable state from
     // storage, become a follower and start the election timeout
@@ -685,9 +717,10 @@ function RaftServerBase(id, opts) {
 
 
     // Public API/RPCs
-    api = {requestVote:   requestVote,
-           appendEntries: appendEntries,
-           clientRequest: clientRequest};
+    api = {requestVote:      requestVote,
+           appendEntries:    appendEntries,
+           clientRequest:    clientRequest,
+           changeMembership: changeMembership};
     if (opts.debug) {
         api._self = self;
         api._step_down = step_down;

@@ -53,6 +53,7 @@ function RaftServerLocal(id, opts) {
         // serializable/unserializable by saveFn/loadFn
         var saveFn = function(data, callback) {
             var dstr = JSON.stringify(data);
+            //var dstr = JSON.stringify(data,null,2);
             fs.writeFile(savePath, dstr, function(err) {
                 if(callback) {
                     callback(!err);

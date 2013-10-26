@@ -7,13 +7,14 @@ if (typeof module !== 'undefined') {
 }
 
 serverPool = local._serverPool;
+idIdx = 0;
 
 function startServers(opts, n) {
     n = n || 3;
     var serverOpts = {};
     for (var i=0; i < 3; i++) {
         serverOpts[i] = local.copyMap(opts);
-        serverOpts[i].listenAddress = "local:" + i;
+        serverOpts[i].listenAddress = "local:" + (idIdx++);
     }
     return test_common.startServers(serverPool, serverOpts,
                                     local.RaftServerLocal);
@@ -24,6 +25,10 @@ function addServer(sid, opts) {
     opts.listenAddress = "local:" + sid;
     return test_common.addServer(serverPool, sid, opts,
                                  local.RaftServerLocal);
+}
+
+function removeServer(sid) {
+    test_common.removeServer(serverPool, sid);
 }
 
 function getAll(attr) {

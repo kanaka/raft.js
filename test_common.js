@@ -30,10 +30,26 @@ function addServer (spool, sid, opts, klass) {
     serverMap[sid] = addr;
     opts.serverMap = serverMap;
     spool[sid] = new klass(sid.toString(), opts);
-    spool[lid].clientRequest({newServerMap:serverMap},
+    spool[lid].changeMembership(serverMap,
             function(res) {
-                console.log("addServer callback result:", res);
+                console.log("addServer result:", res);
             });
+}
+
+function removeServer(spool, sid) {
+    if (!sid in serverMap) {
+        throw new Error("Server " + sid + " does not exists");
+    }
+    var lid = getLeaderId(spool);
+    if (!lid) {
+        throw new Error("Could not determine current leader");
+    }
+    delete serverMap[sid];
+    spool[lid].changeMembership(serverMap,
+            function(res) {
+                console.log("removeServer result:", res);
+            });
+
 }
 
 function getAll(spool, attr) {
