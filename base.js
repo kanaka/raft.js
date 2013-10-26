@@ -41,6 +41,10 @@ function RaftServerBase(id, opts) {
     setDefault(opts, 'heartbeatTime',     opts.electionTimeout/5);
     setDefault(opts, 'stateMachineStart', {});
     setDefault(opts, 'serverMap',         {id: true});
+    setDefault(opts, 'schedule',          function(fn, ms) {
+                                            return setTimeout(fn, ms); });
+    setDefault(opts, 'unschedule',        function(id) {
+                                            return clearTimeout(id); });
     if (typeof opts.saveFn === 'undefined') {
         console.warn("no saveFn, server recovery will not work");
         opts.saveFn = function(data, callback) {
@@ -117,9 +121,9 @@ function RaftServerBase(id, opts) {
         var randTimeout = opts.electionTimeout +
                           parseInt(Math.random()*opts.electionTimeout);
         if (election_timer) {
-            election_timer = clearTimeout(election_timer);
+            election_timer = opts.unschedule(election_timer);
         }
-        election_timer = setTimeout(start_election, randTimeout);
+        election_timer = opts.schedule(start_election, randTimeout);
     }
 
     // Set our term to new_term (defaults to currentTerm+1)
@@ -139,7 +143,7 @@ function RaftServerBase(id, opts) {
         info("follower");
         self.state = 'follower';
         if (heartbeat_timer) {
-            heartbeat_timer = clearTimeout(heartbeat_timer);
+            heartbeat_timer = opts.unschedule(heartbeat_timer);
         }
         if (!election_timer) {
             reset_election_timer();
@@ -377,9 +381,9 @@ function RaftServerBase(id, opts) {
                 appendEntriesResponse);
         }
         // we may be called directly so cancel any outstanding timer
-        clearTimeout(heartbeat_timer);
+        opts.unschedule(heartbeat_timer);
         // queue us up to be called again
-        heartbeat_timer = setTimeout(leader_heartbeat,
+        heartbeat_timer = opts.schedule(leader_heartbeat,
                 opts.heartbeatTime);
     }
 
@@ -452,7 +456,7 @@ function RaftServerBase(id, opts) {
 
         update_indexes(true);
 
-        election_timer = clearTimeout(election_timer);
+        election_timer = opts.unschedule(election_timer);
         // start sending heartbeats (appendEntries) until we step down
         saveBefore(leader_heartbeat);
     }
@@ -512,8 +516,8 @@ function RaftServerBase(id, opts) {
     function terminate() {
         self.info("terminating");
         // Disable any timers
-        heartbeat_timer = clearTimeout(heartbeat_timer);
-        election_timer = clearTimeout(election_timer);
+        heartbeat_timer = opts.unschedule(heartbeat_timer);
+        election_timer = opts.unschedule(election_timer);
         // Ignore or reject RPC/API calls
         api.requestVote = function(args) {
             self.dbg("Ignoring clientRequest(", args, ")");
