@@ -28,7 +28,7 @@ function RaftServerHttp(id, opts) {
         var saddr = opts.serverMap[targetId],
             ropts = url.parse("http://" + saddr);
         ropts.method = 'POST';
-        self.dbg("RPC to "  + targetId + "[" + saddr + "]: " + rpcName + " (" + args + ")");
+        self.dbg("RPC to "  + targetId + "[" + saddr + "]: " + rpcName);
         var req = http.request(ropts, function (response) {
             var dstr = "";
             response.on('data', function (chunk) {

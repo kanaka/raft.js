@@ -41,10 +41,12 @@ function RaftServerBase(id, opts) {
     setDefault(opts, 'heartbeatTime',     opts.electionTimeout/5);
     setDefault(opts, 'stateMachineStart', {});
     setDefault(opts, 'serverMap',         {id: true});
+    setDefault(opts, 'log',               function() {
+        console.log.apply(console, arguments); });
     setDefault(opts, 'schedule',          function(fn, ms, type, desc) {
-                                            return setTimeout(fn, ms); });
+        return setTimeout(fn, ms); });
     setDefault(opts, 'unschedule',        function(id) {
-                                            return clearTimeout(id); });
+        return clearTimeout(id); });
     if (typeof opts.saveFn === 'undefined') {
         console.warn("no saveFn, server recovery will not work");
         opts.saveFn = function(data, callback) {
@@ -91,13 +93,14 @@ function RaftServerBase(id, opts) {
 
     // Utility functions
     var info = self.info = function() {
-        var now = (new Date()).getTime();
-        console.log(now + ": " + id + " [" + self.currentTerm + "]: ",
-                Array.prototype.slice.call(arguments));
+        var now = (new Date()).getTime(),
+            prefix = now + ": " + id + " [" + self.currentTerm + "]:",
+            args = Array.prototype.slice.call(arguments);
+        opts.log.apply(null, [prefix].concat(args));
     }
     var dbg = self.dbg = function () {
         if (opts.verbose) {
-            self.info.apply(arguments);
+            self.info.apply(null, arguments);
         }
     }
 
@@ -140,7 +143,7 @@ function RaftServerBase(id, opts) {
     // Become a follower and start the election timeout timer
     function step_down() {
         if (self.state === 'follower') { return; }
-        info("follower");
+        info("new state 'follower'");
         self.state = 'follower';
         if (heartbeat_timer) {
             heartbeat_timer = opts.unschedule(heartbeat_timer);
@@ -284,7 +287,7 @@ function RaftServerBase(id, opts) {
                     result += ", removed from membership";
                 }
             } else {
-                self.dbg("Applying:", cmd);
+                dbg("Applying:", cmd);
                 // TODO: handle exceptions
                 result = opts.applyCmd(self.stateMachine, cmd);
             }
@@ -386,7 +389,7 @@ function RaftServerBase(id, opts) {
                 nterm = self.log[nindex].term,
                 nentries = self.log.slice(nindex+1);
             if (nentries.length > 0) {
-                self.dbg("sid:",sid,"sids:",sids,"nentries:",nentries);
+                dbg("sid:",sid,"sids:",sids,"nentries:",nentries);
             }
 
             opts.sendRPC(sid, 'appendEntries',
@@ -455,7 +458,7 @@ function RaftServerBase(id, opts) {
     // leader_heartbeat function.
     function become_leader() {
         if (self.state === 'leader') { return; }
-        info("leader");
+        info("new state 'leader'");
         self.state = 'leader';
         leaderId = id;
         votesResponded = {};
@@ -482,7 +485,7 @@ function RaftServerBase(id, opts) {
     // Section 5.2 Leader Election
     function start_election() {
         if (self.state === 'leader') { return; }
-        info("candidate");
+        info("new state 'candidate'");
         self.state = 'candidate';
         update_term();
         // vote for self
@@ -532,19 +535,19 @@ function RaftServerBase(id, opts) {
     // a membership change or by direct invocation (for
     // testing/debug).
     function terminate() {
-        self.info("terminating");
+        info("terminating");
         // Disable any timers
         heartbeat_timer = opts.unschedule(heartbeat_timer);
         election_timer = opts.unschedule(election_timer);
         // Ignore or reject RPC/API calls
         api.requestVote = function(args) {
-            self.dbg("Ignoring clientRequest(", args, ")");
+            dbg("Ignoring clientRequest(", args, ")");
         };
         api.appendEntries = function(args) {
-            self.dbg("Ignoring appenEntries(", args, ")");
+            dbg("Ignoring appenEntries(", args, ")");
         };
         api.clientRequest = function(cmd, callback) {
-            self.dbg("Rejecting clientRequest(", cmd, ")");
+            dbg("Rejecting clientRequest(", cmd, ")");
             callback({'status': 'error', 'msg': 'terminated'});
         };
     }
@@ -711,6 +714,7 @@ function RaftServerBase(id, opts) {
     // a follower and start the election timeout timer. Schedule it to
     // happen immediately after the constructor returns.
     opts.schedule(function() {
+        info("Initializing");
         loadBefore(function() {
             // start as follower by default
             step_down();
