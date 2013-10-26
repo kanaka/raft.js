@@ -15,8 +15,7 @@ var local = require("./local"),
 // RaftServer that uses HTTP communication for RPC
 function RaftServerHttp(id, opts) {
     var self = this,
-        api,
-        opts = local.copyMap(opts); // make a local copy
+        api;
 
     if (!opts.serverMap) {
         throw new Error("opts.serverMap is required");

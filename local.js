@@ -23,7 +23,6 @@ var _serverPool = {};
 var _serverStore = {};
 function RaftServerLocal(id, opts) {
     var self = this,
-        opts = base.copyMap(opts), // make a local copy
         savePath = "raft.store." + id;
 
     if (id in _serverPool) {
