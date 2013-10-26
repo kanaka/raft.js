@@ -18,19 +18,20 @@ if (typeof module === 'undefined') {
 // removing/executing the 
 // cancelled, 
 // Tasks are stored as an array of:
-//   {id:     EVENT_ID,
+//   {id:     TASK_ID,
 //    action: ACTION_FUNCTION,
 //    time:   MS_TIME,
 //    type:   OPTIONAL_TYPE,
 //    desc:   OPTIONAL_DESCRIPTION}
-function Tasks() {
+function Tasks(opts) {
     var nextId = 1,
         curTime = 0,
         tasks = [],
         api = {};
+    opts = opts || {};
 
     // Find the chronological position in the tasks queue for this
-    // new event and insert it there. Returns the unique ID of this
+    // new task and insert it there. Returns the unique ID of this
     // task (for use with cancel).
     api.schedule = function(action, timeOffset, type, description) {
         var idx = tasks.length,
@@ -56,8 +57,11 @@ function Tasks() {
         return api.schedule(action, timeOffset, type, description);
     };
 
-    // Remove the event with ID id from the tasks queue
+    // Remove the task with ID id from the tasks queue
     api.cancel = function(id) {
+        if (opts.verbose) {
+            console.log("Cancelling task ID " + id);
+        }
         for (var i = 0; i < tasks.length; i++) {
             if (tasks[i].id === id) {
                 tasks.splice(i,1);
@@ -66,18 +70,18 @@ function Tasks() {
         }
     };
 
-    // Return the event at the front of the tasks queue without
+    // Return the task at the front of the tasks queue without
     // removing it
     api.current = function() {
         return tasks[0];
     }
 
-    // Return the event queue
+    // Return the task queue
     api.dump = function() {
         return tasks;
     }
 
-    // Return the event queue
+    // Return the task queue
     api.show = function() {
         console.log("Current time: " + curTime + "ms");
         for (var i = 0; i < tasks.length; i++) {
@@ -89,14 +93,16 @@ function Tasks() {
         }
     }
 
-    // Advanced the time to the next event in the queue, remove it,
+    // Advanced the time to the next task in the queue, remove it,
     // and execute it's action. Returns the new "current" time.
     api.step = function() {
         var e = tasks.shift(),
-            msg = "Executing event ID " + e.id;
+            msg = "Executing task ID " + e.id;
         if (e.type) { msg += " [" + e.type + "]"; }
         if (e.desc) { msg += " " + e.desc; }
-        console.log(msg);
+        if (opts.verbose) {
+            console.log(msg);
+        }
         curTime = e.time;
         e.action();
 
