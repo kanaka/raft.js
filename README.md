@@ -1,9 +1,10 @@
 # Raft.js: Raft Consensus Algorithm in JavaScript
 
-Raft.js is an implementation of the Raft consensus algorithm in
-JavaScript. The Raft algorithm was developed by Diego Ongaro and John
-Ousterhout at Stanford University. Please refer to their excellent
-paper on Raft: ["In Search of an Understandable Consensus
+Raft.js is an implementation of [The Raft Consensus
+Algorithm](http://raftconsensus.github.io/) in JavaScript. The Raft
+algorithm was developed by Diego Ongaro and John Ousterhout at
+Stanford University. Please refer to their excellent paper on Raft:
+["In Search of an Understandable Consensus
 Algorithm"](https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf).
 
 
