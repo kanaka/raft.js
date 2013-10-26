@@ -41,7 +41,7 @@ function RaftServerBase(id, opts) {
     setDefault(opts, 'heartbeatTime',     opts.electionTimeout/5);
     setDefault(opts, 'stateMachineStart', {});
     setDefault(opts, 'serverMap',         {id: true});
-    setDefault(opts, 'schedule',          function(fn, ms) {
+    setDefault(opts, 'schedule',          function(fn, ms, type, desc) {
                                             return setTimeout(fn, ms); });
     setDefault(opts, 'unschedule',        function(id) {
                                             return clearTimeout(id); });
@@ -72,7 +72,7 @@ function RaftServerBase(id, opts) {
     // all servers, persistant/durable
     self.currentTerm = -1;
     self.votedFor = null;
-    self.log = [{term:0, command:null}];  // [{term:TERM, comand:COMMAND}...]
+    self.log = [];  // [{term:TERM, comand:COMMAND}...]
 
     // candidate servers only, ephemeral
     var votesResponded = {}; // servers that sent requestVote in this term
@@ -402,7 +402,7 @@ function RaftServerBase(id, opts) {
         opts.unschedule(heartbeat_timer);
         // queue us up to be called again
         heartbeat_timer = opts.schedule(leader_heartbeat,
-                opts.heartbeatTime);
+                                        opts.heartbeatTime);
     }
 
 
@@ -707,14 +707,16 @@ function RaftServerBase(id, opts) {
     }
 
 
-    // Initialization/constructor: load any durable state from
-    // storage, become a follower and start the election timeout
-    // timer.
-    loadBefore(function() {
-        // start as follower by default
-        step_down();
-        reset_election_timer();
-    });
+    // Initialization: load any durable state from storage, become
+    // a follower and start the election timeout timer. Schedule it to
+    // happen immediately after the constructor returns.
+    opts.schedule(function() {
+        loadBefore(function() {
+            // start as follower by default
+            step_down();
+            reset_election_timer();
+        });
+    }, 0, "Initialize");
 
 
     // Public API/RPCs
