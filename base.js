@@ -556,19 +556,19 @@ function RaftServerBase(id, opts) {
     // requestVote RPC
     //   args keys: term, candidateId, lastLogIndex, lastLogTerm
     function requestVote(args, callback) {
-        // 1. return if term < currentTerm
+        // 1. reply flase if term < currentTerm
         if (args.term < self.currentTerm) {
             saveBefore(function() {
                 callback({term:self.currentTerm, voteGranted:false});
             });
             return;
         }
-        // 2. if term > currentTerm, set currentTerm to term
+        // if term > currentTerm, set currentTerm to term
         if (args.term > self.currentTerm) {
             update_term(args.term);
             step_down(); // step down from candidate or leader
         }
-        // 3. if votedFor is null or candidateId, and candidate's log
+        // 2. if votedFor is null or candidateId, and candidate's log
         // candidate's log is at least as complete as local log, grant
         // vote and reset election timeout
         if ((self.votedFor === null || self.votedFor === args.candidateId) &&
@@ -596,7 +596,7 @@ function RaftServerBase(id, opts) {
     //   args keys: term, leaderId, prevLogIndex, prevLogTerm,
     //              entries, commitIndex
     function appendEntries(args, callback) {
-        // 1. return if term < currentTerm
+        // 1. reply false if term < currentTerm
         if (args.term < self.currentTerm) {
             // continue in same state
             saveBefore(function() {
@@ -604,22 +604,22 @@ function RaftServerBase(id, opts) {
             });
             return;
         }
-        // 2. if term > currentTerm, set currentTerm to term
+        // if term > currentTerm, set currentTerm to term
         if (args.term > self.currentTerm) {
             update_term(args.term);
         }
-        // 3. if candidate or leader, step down
+        // if candidate or leader, step down
         step_down(); // step down from candidate or leader
         leaderId = args.leaderId;
 
-        // 4. reset election timeout
+        // reset election timeout
         reset_election_timer();
 
         // TODO: if pending clientCallbacks this means we were
         // a leader and lost it, reject the clientCallbacks with
         // not_leader
 
-        // 5. return fail if log doesn't contain an entry at
+        // 2. reply false if log doesn't contain an entry at
         //    prevLogIndex whose term matches prevLogTerm
         if ((self.log.length - 1 < args.prevLogIndex) ||
             (self.log[args.prevLogIndex].term !== args.prevLogTerm)) {
@@ -628,19 +628,20 @@ function RaftServerBase(id, opts) {
             });
             return;
         }
-        // 6. If existing entries conflict with new entries,
+        // 3. If existing entries conflict with new entries,
         // delete all existing entries starting with first conflicting
         // entry
         if (args.prevLogIndex+1 < self.log.length) {
             self.log.splice(args.prevLogIndex+1, self.log.length);
         }
-        // 7. append any new entries not already in the log
+        // 4. append any new entries not already in the log
         if (args.entries.length > 0) {
             addEntries(args.entries);
             pendingPersist = true;
         }
 
-        // 8. apply newly committed entries to the state machine
+        // 5. if leader commitIndex > commitIndex, apply newly
+        // committed entries to the state machine
         if (self.commitIndex < args.commitIndex) {
             commitEntries(args.commitIndex);
         }
