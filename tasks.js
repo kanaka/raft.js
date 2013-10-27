@@ -77,8 +77,8 @@ function Tasks(opts) {
             console.log("Cancelling task ID " + id);
         }
         for (var i = 0; i < tasks.length; i++) {
-            if (task[i].id === id) {
-                task = task[i];
+            if (tasks[i].id === id) {
+                task = tasks[i];
                 tasks.splice(i,1);
                 break;
             }
@@ -92,12 +92,12 @@ function Tasks(opts) {
     // removing it
     api.current = function() {
         return tasks[0];
-    }
+    };
 
     // Return the task queue
     api.dump = function() {
         return tasks;
-    }
+    };
 
     // Return the task queue
     api.show = function() {
@@ -109,7 +109,12 @@ function Tasks(opts) {
             if (t.desc) { msg += " " + t.desc; }
             console.log(msg);
         }
-    }
+    };
+
+    // Return the current time
+    api.currentTime = function() {
+        return currentTime;
+    };
 
     //api.start(factor) {}
     //api.stop() {}
