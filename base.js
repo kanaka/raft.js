@@ -510,7 +510,7 @@ function RaftServerBase(id, opts) {
                 dbg("got vote from:", other_id);
                 votesGranted[other_id] = true;
             }
-            dbg("votesGranted: ", votesGranted);
+            dbg("current votes:", Object.keys(votesGranted));
             // Check if we won the election
             if (check_vote(self.serverMap, votesGranted)) {
                 // If self.newServerMap is set then we are in joint

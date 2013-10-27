@@ -113,7 +113,7 @@ function Tasks(opts) {
 
     // Return the current time
     api.currentTime = function() {
-        return currentTime;
+        return curTime;
     };
 
     //api.start(factor) {}
