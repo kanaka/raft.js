@@ -13,10 +13,19 @@ if (typeof module === 'undefined') {
         exports = tasks;
 }
 
-// An Task/Event Queue system. The primary methods are scheduling a task
-// (schedule, scheduleRand), cancelling a task (cancel), and
-// removing/executing the 
-// cancelled, 
+// An Task/Event Queue system. The primary methods are scheduling
+// a task (schedule, scheduleRand), cancelling a task (cancel), and
+// executing the next task.
+// The opts map take the following keys:
+//   - verbose: enable/disable verbose loggin
+//   - scheduleCallback: called when a task is scheduled. Passed the
+//     new task.
+//   - cancelCallback: called when a task is cancelled. Passed the
+//     cancelled task.
+//   - startCallback: called right before a task is executed. Passed
+//     the task that is about to run.
+//   - finishCallback: called right after a task is executed. Passed
+//     the task that just ran.
 // Tasks are stored as an array of:
 //   {id:     TASK_ID,
 //    action: ACTION_FUNCTION,
@@ -36,18 +45,22 @@ function Tasks(opts) {
     api.schedule = function(action, timeOffset, type, description) {
         var idx = tasks.length,
             tid = nextId++,
-            time = curTime + timeOffset;
+            time = curTime + timeOffset,
+            task = {id:     tid,
+                    action: action,
+                    time:   time,
+                    type:   type,
+                    desc:   description};
         // TODO: this should be binary search
         for (; idx > 0; idx--) {
             if (tasks[idx-1].time <= time) {
                 break;
             }
         }
-        tasks.splice(idx, 0, {id:     tid,
-                              action: action,
-                              time:   time,
-                              type:   type,
-                              desc:   description});
+        tasks.splice(idx, 0, task);
+        if (opts.scheduleCallback) {
+            opts.scheduleCallback(task);
+        }
         return tid;
     };
 
@@ -59,14 +72,19 @@ function Tasks(opts) {
 
     // Remove the task with ID id from the tasks queue
     api.cancel = function(id) {
+        var task = null;
         if (opts.verbose) {
             console.log("Cancelling task ID " + id);
         }
         for (var i = 0; i < tasks.length; i++) {
-            if (tasks[i].id === id) {
+            if (task[i].id === id) {
+                task = task[i];
                 tasks.splice(i,1);
                 break;
             }
+        }
+        if (opts.cancelCallback && task) {
+            opts.cancelCallback(task);
         }
     };
 
@@ -93,19 +111,33 @@ function Tasks(opts) {
         }
     }
 
+    //api.start(factor) {}
+    //api.stop() {}
+
     // Advanced the time to the next task in the queue, remove it,
     // and execute it's action. Returns the new "current" time.
     api.step = function() {
-        var e = tasks.shift(),
-            msg = "Executing task ID " + e.id;
-        if (e.type) { msg += " [" + e.type + "]"; }
-        if (e.desc) { msg += " " + e.desc; }
+        if (tasks.length === 0) {
+            console.warn("Step called on empty tasks queue");
+            return null;
+        }
+        var task = tasks.shift(),
+            msg = "Executing task ID " + task.id;
+
+        if (opts.startCallback) {
+            opts.startCallback(task);
+        }
+        if (task.type) { msg += " [" + task.type + "]"; }
+        if (task.desc) { msg += " " + task.desc; }
         if (opts.verbose) {
             console.log(msg);
         }
-        curTime = e.time;
-        e.action();
+        curTime = task.time;
+        task.action();
 
+        if (opts.finishCallback) {
+            opts.finishCallback(task);
+        }
         return curTime;
     };
 
