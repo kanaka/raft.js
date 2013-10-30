@@ -25,52 +25,65 @@ function startServers(opts, n) {
     var serverOpts = {};
     for (var i=0; i < 3; i++) {
         serverOpts[i] = local.copyMap(opts);
-        serverOpts[i].verbose = true;
-        serverOpts[i].listenAddress = "Node " + (idIdx++);
-        serverOpts[i].schedule = (function () {
-            var sopts = serverOpts[i],
-                sidx = i;
-            return function (action, time, type, desc) {
+        (function () {
+            var sidx = i,
+                sopts = serverOpts[i];
+            sopts.verbose = true;
+            sopts.listenAddress = "Node " + (idIdx++);
+            sopts.schedule = function (action, time, type, desc) {
                 desc = desc || "";
-                desc += ", sid: " + sopts.listenAddress;
+                desc += " / " + sopts.listenAddress;
                 return tqueue.schedule(action, time, type, desc);
-            }
+            };
+            sopts.unschedule = function (id) {
+                tqueue.cancel(id);
+            };
+            sopts.log = function() {
+                var msg = Array.prototype.join.call(arguments, " ");
+                msg = msg.replace(/^[0-9]*:/, tqueue.currentTime() + ":");
+                messages.innerHTML += msg + "\n";
+                messages.scrollTop = messages.scrollHeight;
+            };
         })();
-        serverOpts[i].unschedule = function (id) {
-            tqueue.cancel(id);
-        };
-        serverOpts[i].log = function() {
-            var msg = Array.prototype.join.call(arguments, " ");
-            msg = msg.replace(/^[0-9]*:/, tqueue.currentTime() + ":");
-            messages.innerHTML += msg + "\n";
-            messages.scrollTop = messages.scrollHeight;
-        };
     }
     // Create the servers
     var ret = test_common.startServers(serverPool, serverOpts,
                                        local.RaftServerLocal);
-    // Wrap the sendRPC with a scheduled version
+    // Wrap the sendRPC and applyCmd with a scheduled version
     // Note the double closures: one for the sendRPC and one inside
     // that for the wrapped callback response
     for (var i=0; i < 3; i++) {
-        serverOpts[i].sendRPC = (function () {
-            var origSendRPC = serverOpts[i].sendRPC;
-            return function (sid, rpc, args, callback) {
+        (function () {
+            var sidx = i,
+                sopts = serverOpts[i],
+                origSendRPC = serverOpts[i].sendRPC,
+                origSaveFn = serverOpts[i].saveFn;
+            sopts.sendRPC = function (sid, rpc, args, callback) {
+                var nsid = sid,
+                    nrpc = rpc,
+                    nargs = args,
+                    ncallback;
+                ncallback = function (tid, cargs) {
+                    sopts.schedule(function() {
+                        callback(tid, cargs);
+                    }, 10, nrpc+"_RPC_Response", " from " + tid);
+                };
                 var newSendRPC = (function () {
                     return function () {
-                        var nsid = sid,
-                            nrpc = rpc,
-                            nargs = args,
-                            ncallback;
-                        ncallback = function (tid, cargs) {
-                            tqueue.schedule(function() {
-                                callback(tid, cargs);
-                            }, 10, nrpc+"_RPC_Response");
-                        };
                         origSendRPC(nsid, nrpc, nargs, ncallback);
                     };
                 })();
-                tqueue.schedule(newSendRPC, 10, rpc+"_RPC");
+                sopts.schedule(newSendRPC, 10, rpc+"_RPC", "to " + sid);
+            };
+            sopts.saveFn = function (data, callback) {
+                var newSaveFn = (function () {
+                    var ndata = data,
+                        ncallback = callback;
+                    return function () {
+                        origSaveFn(ndata, ncallback);
+                    };
+                })();
+                sopts.schedule(newSaveFn, 20, "saveFn");
             };
         })();
     }
