@@ -21,9 +21,9 @@ var stepButton = document.getElementById('stepButton'),
 
 
 function startServers(opts, n) {
-    n = n || 3;
+    n = n || 5;
     var serverOpts = {};
-    for (var i=0; i < 3; i++) {
+    for (var i=0; i < n; i++) {
         serverOpts[i] = local.copyMap(opts);
         (function () {
             var sidx = i,
@@ -52,7 +52,7 @@ function startServers(opts, n) {
     // Wrap the sendRPC and applyCmd with a scheduled version
     // Note the double closures: one for the sendRPC and one inside
     // that for the wrapped callback response
-    for (var i=0; i < 3; i++) {
+    for (var i=0; i < n; i++) {
         (function () {
             var sidx = i,
                 sopts = serverOpts[i],

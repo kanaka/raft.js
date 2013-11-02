@@ -1,0 +1,92 @@
+.two_column > div {
+    display: inline-block;
+    position: relative;
+    vertical-align: top;
+}
+#tasks {
+    width: auto;
+    border: 1px dashed;
+}
+#messages {
+    width: 100%;
+}
+
+
+/* Relative to occupy the space */
+#svg {
+    position: relative;
+    left: 0px;
+    top: 0px;
+    border: 1px solid;
+}
+/* Absolute and in same position as #svg */
+#divs {
+    position: absolute;
+    left: 0px;
+    top: 0px;
+    border: 1px solid;
+}
+
+.node {
+    margin: 0px;
+    padding: 0px;
+    position: absolute;
+    width: 100px;
+    border-radius: 5px 5px 5px 5px;
+}
+
+.node div {
+    padding: 1px;
+    /*font-size: 0.9em;*/
+}
+
+.node .name {
+    border-radius: 5px 5px 0px 0px;
+    border-bottom: 1px solid;
+}
+.node .state {
+    float: left;
+}
+.node .term {
+    float: right;
+}
+.node .log {
+    border-top: 1px dashed;
+    clear: both;
+}
+
+.follower        { background: #c0ffc0; }
+.follower .name  { background: #a0e0a0; }
+.follower .term  { background: #b0d080; }
+.candidate       { background: #ffc0c0; }
+.candidate .name { background: #e0a0a0; }
+.candidate .term { background: #d0b080; }
+.leader          { background: #c0c0ff; }
+.leader .name    { background: #a0a0e0; }
+.leader .term    { background: #d0b0d0; }
+
+path.link {
+    fill: none;
+    stroke: #666;
+    stroke-width: 1.5px;
+}
+
+marker#green {
+    fill: green;
+}
+
+path.link.green {
+    stroke: green;
+}
+
+marker#red {
+    fill: red;
+}
+
+path.link.red {
+    stroke: red;
+}
+
+path.link.dashed {
+    stroke-dasharray: 0,2 1;
+}
