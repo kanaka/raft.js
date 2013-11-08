@@ -30,8 +30,7 @@ if (typeof module === 'undefined') {
 //   {id:     TASK_ID,
 //    action: ACTION_FUNCTION,
 //    time:   MS_TIME,
-//    type:   OPTIONAL_TYPE,
-//    desc:   OPTIONAL_DESCRIPTION}
+//    data:   MAP_OF_DATA_ATTRIBUTES}
 function Tasks(opts) {
     var nextId = 1,
         curTime = 0,
@@ -42,15 +41,14 @@ function Tasks(opts) {
     // Find the chronological position in the tasks queue for this
     // new task and insert it there. Returns the unique ID of this
     // task (for use with cancel).
-    api.schedule = function(action, timeOffset, type, description) {
+    api.schedule = function(action, timeOffset, data) {
         var idx = tasks.length,
             tid = nextId++,
             time = curTime + timeOffset,
             task = {id:     tid,
                     action: action,
                     time:   time,
-                    type:   type,
-                    desc:   description};
+                    data:   data};
         // TODO: this should be binary search
         for (; idx > 0; idx--) {
             if (tasks[idx-1].time <= time) {
@@ -65,9 +63,9 @@ function Tasks(opts) {
     };
 
     // Like schedule but picks a random timeOffset between min and max
-    api.scheduleRand = function(action, min, max, type, description) {
+    api.scheduleRand = function(action, min, max, data) {
         var timeOffset = Math.floor(Math.random() * (max - min) + min);
-        return api.schedule(action, timeOffset, type, description);
+        return api.schedule(action, timeOffset, data);
     };
 
     // Remove the task with ID id from the tasks queue
@@ -104,9 +102,9 @@ function Tasks(opts) {
         console.log("Current time: " + curTime + "ms");
         for (var i = 0; i < tasks.length; i++) {
             var t = tasks[i],
-                type = t.type || t.action.name,
+                type = t.data.type || t.action.name,
                 msg = t.time + "ms: " + t.id + " " + " [" + type + "]";
-            if (t.desc) { msg += " " + t.desc; }
+            if (t.data.desc) { msg += " " + t.data.desc; }
             console.log(msg);
         }
     };
@@ -132,8 +130,8 @@ function Tasks(opts) {
         if (opts.startCallback) {
             opts.startCallback(task);
         }
-        if (task.type) { msg += " [" + task.type + "]"; }
-        if (task.desc) { msg += " " + task.desc; }
+        if (task.data.type) { msg += " [" + task.data.type + "]"; }
+        if (task.data.desc) { msg += " " + task.data.desc; }
         if (opts.verbose) {
             console.log(msg);
         }

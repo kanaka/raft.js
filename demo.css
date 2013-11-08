@@ -5,7 +5,7 @@
 }
 #tasks {
     width: auto;
-    border: 1px dashed;
+    /*border: 1px dashed;*/
 }
 #messages {
     width: 100%;
@@ -32,6 +32,7 @@
     padding: 0px;
     position: absolute;
     width: 100px;
+    border: solid 2px;
     border-radius: 5px 5px 5px 5px;
 }
 

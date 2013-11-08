@@ -43,7 +43,7 @@ function RaftServerBase(id, opts) {
     setDefault(opts, 'serverMap',         {id: true});
     setDefault(opts, 'log',               function() {
         console.log.apply(console, arguments); });
-    setDefault(opts, 'schedule',          function(fn, ms, type, desc) {
+    setDefault(opts, 'schedule',          function(fn, ms, data) {
         return setTimeout(fn, ms); });
     setDefault(opts, 'unschedule',        function(id) {
         return clearTimeout(id); });
@@ -70,7 +70,7 @@ function RaftServerBase(id, opts) {
     self.stateMachine = opts.stateMachineStart;
     self.serverMap = opts.serverMap;  // all servers, us included
     self.newServerMap = null;  // set means joint consensus
-    self.commitIndex = 0; // highest index known to be committed
+    self.commitIndex = -1; // highest index known to be committed
     // all servers, persistant/durable
     self.currentTerm = -1;
     self.votedFor = null;
@@ -389,7 +389,7 @@ function RaftServerBase(id, opts) {
                 nterm = self.log[nindex].term,
                 nentries = self.log.slice(nindex+1);
             if (nentries.length > 0) {
-                dbg("sid:",sid,"sids:",sids,"nentries:",nentries);
+                dbg("sid:",sid,"sids:",sids,"nentries:", JSON.stringify(nentries));
             }
 
             opts.sendRPC(sid, 'appendEntries',
@@ -720,7 +720,7 @@ function RaftServerBase(id, opts) {
             step_down();
             reset_election_timer();
         });
-    }, 0, "Initialize");
+    }, 0, {type:"Initialize"});
 
 
     // Public API/RPCs

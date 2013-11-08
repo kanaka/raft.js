@@ -1,27 +1,13 @@
 var serverPool = local._serverPool;
-var idIdx = 0;
-/*
-var topts = {scheduleCallback: function(task) {
-                     console.log("Scheduled:", task);
-                },
-             cancelCallback: function(task) {
-                     console.log("Cancelled:", task);
-                },
-             finishCallback: function(task) {
-                     console.log("Finished:", task);
-                }
-            };
-*/
-var topts = {};
-var tqueue = tasks.Tasks(topts);
-
-var stepButton = document.getElementById('stepButton'),
-    taskList = document.getElementById('taskList'),
-    messages = document.getElementById('messages');
+var serverIdx = 0;
+var tqueueOpts = {};
+var tqueue = tasks.Tasks(tqueueOpts);
 
 
-function startServers(opts, n) {
+function startServers(opts, n, msgCallback) {
     n = n || 5;
+    msgCallback = msgCallback ||
+                  function(msg) { console.log.call(console, msg); };
     var serverOpts = {};
     for (var i=0; i < n; i++) {
         serverOpts[i] = local.copyMap(opts);
@@ -29,11 +15,13 @@ function startServers(opts, n) {
             var sidx = i,
                 sopts = serverOpts[i];
             sopts.verbose = true;
-            sopts.listenAddress = "Node " + (idIdx++);
-            sopts.schedule = function (action, time, type, desc) {
-                desc = desc || "";
-                desc += " / " + sopts.listenAddress;
-                return tqueue.schedule(action, time, type, desc);
+            sopts.listenAddress = "Node " + (serverIdx++);
+            sopts.schedule = function (action, time, data) {
+                data = data || {};
+                data.type = data.type || action.name;
+                data.id = sopts.listenAddress;
+                data.idx = sidx;
+                return tqueue.schedule(action, time, data);
             };
             sopts.unschedule = function (id) {
                 tqueue.cancel(id);
@@ -41,8 +29,7 @@ function startServers(opts, n) {
             sopts.log = function() {
                 var msg = Array.prototype.join.call(arguments, " ");
                 msg = msg.replace(/^[0-9]*:/, tqueue.currentTime() + ":");
-                messages.innerHTML += msg + "\n";
-                messages.scrollTop = messages.scrollHeight;
+                msgCallback(msg);
             };
         })();
     }
@@ -64,16 +51,26 @@ function startServers(opts, n) {
                     nargs = args,
                     ncallback;
                 ncallback = function (tid, cargs) {
+                    var data = {type: "RPC_Response",
+                                rpc: nrpc,
+                                src: tid,
+                                dst: sidx,
+                                desc:" from " + tid}
                     sopts.schedule(function() {
                         callback(tid, cargs);
-                    }, 10, nrpc+"_RPC_Response", " from " + tid);
+                    }, 10, data);
                 };
                 var newSendRPC = (function () {
                     return function () {
                         origSendRPC(nsid, nrpc, nargs, ncallback);
                     };
                 })();
-                sopts.schedule(newSendRPC, 10, rpc+"_RPC", "to " + sid);
+                var data = {type: "RPC",
+                            rpc: rpc,
+                            src: sidx,
+                            dst: nsid,
+                            desc: "to " + sid};
+                sopts.schedule(newSendRPC, 10, data);
             };
             sopts.saveFn = function (data, callback) {
                 var newSaveFn = (function () {
@@ -83,7 +80,7 @@ function startServers(opts, n) {
                         origSaveFn(ndata, ncallback);
                     };
                 })();
-                sopts.schedule(newSaveFn, 20, "saveFn");
+                sopts.schedule(newSaveFn, 20, {type:"saveFn"});
             };
         })();
     }
@@ -107,26 +104,3 @@ function getAll(attr) {
 function getLeaderId() {
     return test_common.getLeaderId(serverPool);
 }
-
-function updateTaskList() {
-    while (taskList.firstChild) {
-          taskList.removeChild(taskList.firstChild);
-    }
-    var tasks = tqueue.dump();
-    for (var i=0; i < tasks.length; i++) {
-        var li = document.createElement('li');
-        var t = tasks[i],
-            type = t.type || t.action.name,
-            msg = t.time + "ms: " + t.id + " " + " [" + type + "]";
-        if (t.desc) { msg += " " + t.desc; }
-        li.innerHTML = msg;
-        taskList.appendChild(li);
-    }
-}
-
-startServers({debug:true, verbose:true});
-stepButton.onclick = function () {
-    tqueue.step();
-    updateTaskList();
-};
-updateTaskList();
