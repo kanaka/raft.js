@@ -3,15 +3,17 @@
 <head>
     <meta http-equiv="Content-type" content="text/html; charset=utf-8">
     <title>Raft Visualization Demo</title>
-    <link rel="stylesheet" type="text/css" href="demo.css"/>
+    <link rel="stylesheet" type="text/css" href="web/demo.css"/>
 </head>
 <body>
+    <header><h1>Raft Distributed Consensus Algorithm Visualization</h1></header>
     <div class="two_column">
         <div id="viz">
             <svg id="svg"></svg>
             <div id="divs"></div>
         </div>
         <div id="tasks">
+            <header><h2>Timeline</h2></header>
             <input id='stepButton' value="Step" type='button' />
             <ul id='taskList'>
             </ul>
@@ -26,7 +28,7 @@
     <script type="text/javascript" src="test_common.js"></script>
     <script type="text/javascript" src="test_tasks.js"></script>
 
-    <script type="text/javascript" src="d3.v3.min.js"></script>
-    <script type="text/javascript" src="demo_render.js"></script>
+    <script type="text/javascript" src="web/d3.v3.min.js"></script>
+    <script type="text/javascript" src="web/demo_render.js"></script>
 </body>
 </html>
