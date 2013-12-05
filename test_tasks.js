@@ -52,6 +52,7 @@ function startServers(opts, n, msgCallback) {
                     ncallback;
                 ncallback = function (tid, cargs) {
                     var data = {type: "RPC_Response",
+                                args: cargs,
                                 rpc: nrpc,
                                 src: tid,
                                 dst: sidx,
@@ -66,6 +67,7 @@ function startServers(opts, n, msgCallback) {
                     };
                 })();
                 var data = {type: "RPC",
+                            args: args,
                             rpc: rpc,
                             src: sidx,
                             dst: nsid,

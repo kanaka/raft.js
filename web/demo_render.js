@@ -67,6 +67,7 @@ var force = d3.layout.force()
     .on("tick", tick);
 
 var path = svg.append("svg:g").selectAll("path"),
+    label = svg.selectAll("text"),
     node = divs.selectAll(".node");
 
 function tick() {
@@ -98,6 +99,15 @@ function tick() {
             ].join(" ");
         }
     });
+
+    label.attr("x", function(d) {
+                //return (d.source.x*2 + d.target.x)/3;
+                return (d.source.x*1.5 + d.target.x)/2.5;
+            })
+         .attr("y", function(d) {
+                //return (d.source.y*2 + d.target.y)/3;
+                return (d.source.y*1.5 + d.target.y)/2.5;
+            });
 }
 
 function updateD3() {
@@ -115,6 +125,47 @@ function updateD3() {
             });
     // Remove
     path.exit().remove();
+
+
+    // Links (connections and RPCs)
+    label = label.data(force.links());
+    // Add
+    label.enter().append("text");
+    label.attr("font-size", "0.75em")
+         .attr("fill", "black")
+         .text(function (d) {
+            if (!d.task || !'rpc' in d.task.data) { return ""; }
+            var tdata = d.task.data, targs = tdata.args,
+                txt = tdata.rpc;
+            switch (tdata.rpc + "_" + tdata.type) {
+            case 'requestVote_RPC':
+                txt += " (" + targs.term;
+                txt += "," + targs.candidateId;
+                txt += "," + targs.lastLogIndex;
+                txt += "," + targs.lastLogTerm + ")";
+                break;
+            case 'appendEntries_RPC':
+                txt += " (" + targs.term;
+                txt += "," + targs.leaderId;
+                txt += "," + targs.prevLogIndex;
+                txt += "," + targs.prevLogTerm;
+                txt += ",{" + targs.entries.length + "}";
+                txt += "," + targs.commitIndex + ")";
+                break;
+            case 'requestVote_RPC_Response':
+                txt += " Rsp (" + targs.term;
+                txt += "," + targs.voteGranted + ")";
+                break;
+            case 'appendEntries_RPC_Response':
+                txt += " Rsp (" + targs.term;
+                txt += "," + targs.success + ")";
+                break;
+            }
+            return txt;
+        })
+    // Remove
+    label.exit().remove();
+
 
 
     // Nodes
@@ -172,6 +223,7 @@ tqueueOpts.scheduleCallback = function(task) {
             type = "red";
         }
         links.push({task_id: task.id,
+                    task: task,
                     type: type,
                     source: src,
                     target: dst});
