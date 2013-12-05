@@ -548,7 +548,9 @@ function RaftServerBase(id, opts) {
         };
         api.clientRequest = function(cmd, callback) {
             dbg("Rejecting clientRequest(", cmd, ")");
-            callback({'status': 'error', 'msg': 'terminated'});
+            if (callback) {
+                callback({'status': 'error', 'msg': 'terminated'});
+            }
         };
     }
 
@@ -665,6 +667,7 @@ function RaftServerBase(id, opts) {
     //     immediately for a read-only cmd) and applied to the
     //     stateMachine
     function clientRequest(cmd, callback) {
+        callback = callback || function() {};
         if (self.state !== 'leader') {
             // tell the client to use a different server
             callback({'status': 'not_leader', 'leaderId': leaderId});
@@ -675,7 +678,7 @@ function RaftServerBase(id, opts) {
         // current state of the stateMachine (i.e. committed state)
         // and are not added to the log. Otherwise, the cmd is added
         // to the log and the client callback will be called when the
-        // cmdn is is committed. See 7.1
+        // cmd is is committed. See 8
         cmd = copyMap(cmd);
         if (cmd.ro) {
             var result = opts.applyCmd(self.stateMachine, cmd);
