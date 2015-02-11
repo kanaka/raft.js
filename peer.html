@@ -27,7 +27,7 @@ Log Messages:
                          port: location.port,
                          path: '/api'});
     peer.on('open', function(id) {
-        log('my peer ID:', id);
+        log('my ID:', id);
         my_id = id;
         // Load the peer list and connect
         jQuery.getJSON('/peers', function (peers) {
@@ -37,13 +37,16 @@ Log Messages:
                 if (peer_id === my_id) return true;
                 if (peer_id in connections) return true;
 
-                log("Connecting to peer ID:", peer_id);
+                log("Connecting to:", peer_id);
                 var conn = peer.connect(peer_id);
                 connections[peer_id] = conn;
                 conn.on('data', function(data) {
                     log("received from " + conn.peer + ": " + data);
                 });
-
+                conn.on('close', function(data) {
+                    log("Connection closed:" + conn.peer);
+                    delete connections[peer_id];
+                });
             });
         });
 
@@ -52,10 +55,14 @@ Log Messages:
         log('peer error:', e);
     });
     peer.on('connection', function(conn) {
-        log("got connection from peer ID:", conn.peer);
+        log("got connection from:", conn.peer);
         connections[conn.peer] = conn;
         conn.on('data', function(data) {
             log("received from " + conn.peer + ": " + data);
+        });
+        conn.on('close', function(data) {
+            log("Connection closed:" + conn.peer);
+            delete connections[conn.peer];
         });
     });
 </script>
