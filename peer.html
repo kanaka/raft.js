@@ -1,0 +1,63 @@
+<html>
+<style>
+#messages {
+    width: 100%;
+}
+</style>
+<body>
+
+Log Messages:
+<div>
+    <textarea id='messages' rows=20></textarea>
+</div>
+
+<script src="http://cdn.peerjs.com/0.3/peer.js"></script>
+<script src="jquery-2.1.3.min.js"></script>
+<script>
+    var messages = document.getElementById('messages');
+    function log() {
+        var msg = Array.prototype.slice.call(arguments, 0).join(' ');
+        messages.innerHTML += msg + "\n";
+        messages.scrollTop = messages.scrollHeight;
+    }
+
+    var my_id = null;
+    var connections = {};
+    var peer = new Peer({host: location.hostname,
+                         port: location.port,
+                         path: '/api'});
+    peer.on('open', function(id) {
+        log('my peer ID:', id);
+        my_id = id;
+        // Load the peer list and connect
+        jQuery.getJSON('/peers', function (peers) {
+            log("Peer list:", peers);
+            $.each(peers, function (idx, peer_id) {
+                // If it is us, or we are already connected, ignore
+                if (peer_id === my_id) return true;
+                if (peer_id in connections) return true;
+
+                log("Connecting to peer ID:", peer_id);
+                var conn = peer.connect(peer_id);
+                connections[peer_id] = conn;
+                conn.on('data', function(data) {
+                    log("received from " + conn.peer + ": " + data);
+                });
+
+            });
+        });
+
+    });
+    peer.on('error', function(e) {
+        log('peer error:', e);
+    });
+    peer.on('connection', function(conn) {
+        log("got connection from peer ID:", conn.peer);
+        connections[conn.peer] = conn;
+        conn.on('data', function(data) {
+            log("received from " + conn.peer + ": " + data);
+        });
+    });
+</script>
+</body>
+</html>

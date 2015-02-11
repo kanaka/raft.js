@@ -13,9 +13,14 @@
     "url": "git://github.com/kanaka/raft.js.git"
   },
   "main": "index.js",
-  "files": ["LICENSE.txt"],
+  "files": [
+    "LICENSE.txt"
+  ],
   "engines": {
     "node": ">=0.8.9"
+  },
+  "dependencies": {
+    "express": "~4.11.2",
+    "peer": "~0.2.8"
   }
 }
-
