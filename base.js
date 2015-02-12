@@ -333,54 +333,6 @@ function RaftServerBase(id, opts) {
     function leader_heartbeat() {
         if (self.state !== 'leader') { return; }
 
-        // close over the current last log index
-        var appendEntriesResponse = (function() {
-            var curAgreeIndex = self.log.length-1;
-            return function (sid, args) {
-                if (args.term > self.currentTerm) {
-                    step_down();
-                    return;
-                }
-                if (args.success) {
-                    // A log entry is considered committed if
-                    // it is stored on a majority of the servers;
-                    // also, at least one entry from the leader's
-                    // current term must also be stored on a majority
-                    // of the servers.
-                    matchIndex[sid] = curAgreeIndex;
-                    nextIndex[sid] = curAgreeIndex+1;
-                    var sids = Object.keys(self.serverMap),
-                        majorityIndex = getMajorityIndex(sids);
-                    // If newServerMap is set then we are in joint
-                    // consensus and entries must be on the majority
-                    // of both the old and new set of servers
-                    if (self.newServerMap) {
-                        var sids2 = Object.keys(self.newServerMap),
-                            newMajorityIndex = getMajorityIndex(sids2);
-                        if (newMajorityIndex < majorityIndex) {
-                            majorityIndex = newMajorityIndex;
-                        }
-                    }
-                    // Is our term stored on a majority of the servers
-                    if (majorityIndex > self.commitIndex) {
-                        var termStored = false;
-                        for (var idx=majorityIndex; idx < self.log.length; idx++) {
-                            if (self.log[idx].term === self.currentTerm) {
-                                termStored = true;
-                                break;
-                            }
-                        }
-                        if (termStored) {
-                            commitEntries(majorityIndex);
-                        }
-                    }
-                } else {
-                    nextIndex[sid] -= 1;
-                    // TODO: resend immediately
-                }
-            };
-        })();
-
         var sids = servers();
         for (var i=0; i < sids.length; i++) {
             var sid = sids[i];
@@ -389,7 +341,7 @@ function RaftServerBase(id, opts) {
                 nterm = self.log[nindex].term,
                 nentries = self.log.slice(nindex+1);
             if (nentries.length > 0) {
-                dbg("sid:",sid,"sids:",sids,"nentries:", JSON.stringify(nentries));
+                dbg("new entries to sid:",sid,"nentries:", JSON.stringify(nentries));
             }
 
             opts.sendRPC(sid, 'appendEntries',
@@ -398,7 +350,10 @@ function RaftServerBase(id, opts) {
                      prevLogIndex: nindex,
                      prevLogTerm: nterm,
                      entries: nentries,
-                     commitIndex: self.commitIndex},
+                     commitIndex: self.commitIndex,
+                    
+                     curAgreeIndex: self.log.length-1
+                    },
                 appendEntriesResponse);
         }
         // we may be called directly so cancel any outstanding timer
@@ -495,33 +450,6 @@ function RaftServerBase(id, opts) {
         // reset election timeout
         reset_election_timer();
 
-        var requestVoteResponse = function(other_id, args) {
-            if ((self.state !== 'candidate') ||
-                (args.term < self.currentTerm)) {
-                // ignore
-                return;
-            }
-            if (args.term > self.currentTerm) {
-                // Does this happen? How?
-                step_down();
-                return;
-            }
-            if (args.voteGranted) {
-                dbg("got vote from:", other_id);
-                votesGranted[other_id] = true;
-            }
-            dbg("current votes:", Object.keys(votesGranted));
-            // Check if we won the election
-            if (check_vote(self.serverMap, votesGranted)) {
-                // If self.newServerMap is set then we are in joint
-                // consensus so we must check votes for that server
-                // set too
-                if (!self.newServerMap ||
-                    check_vote(self.newServerMap, votesGranted)) {
-                    become_leader();
-                }
-            }
-        }
         // TODO: reissue 'requestVote' quickly to non-responders while candidate
         sendRPCs('requestVote',
                 {term: self.currentTerm,
@@ -597,6 +525,34 @@ function RaftServerBase(id, opts) {
         return;
     }
 
+    function requestVoteResponse(other_id, args) {
+        if ((self.state !== 'candidate') ||
+            (args.term < self.currentTerm)) {
+            // ignore
+            return;
+        }
+        if (args.term > self.currentTerm) {
+            // Does this happen? How?
+            step_down();
+            return;
+        }
+        if (args.voteGranted) {
+            dbg("got vote from:", other_id);
+            votesGranted[other_id] = true;
+        }
+        dbg("current votes:", Object.keys(votesGranted));
+        // Check if we won the election
+        if (check_vote(self.serverMap, votesGranted)) {
+            // If self.newServerMap is set then we are in joint
+            // consensus so we must check votes for that server
+            // set too
+            if (!self.newServerMap ||
+                check_vote(self.newServerMap, votesGranted)) {
+                become_leader();
+            }
+        }
+    }
+
     // appendEntries RPC
     //   args keys: term, leaderId, prevLogIndex, prevLogTerm,
     //              entries, commitIndex
@@ -605,7 +561,8 @@ function RaftServerBase(id, opts) {
         if (args.term < self.currentTerm) {
             // continue in same state
             saveBefore(function() {
-                callback({term:self.currentTerm, success:false});
+                callback({term:self.currentTerm, success:false,
+                          curAgreeIndex: args.curAgreeIndex});
             });
             return;
         }
@@ -629,7 +586,8 @@ function RaftServerBase(id, opts) {
         if ((self.log.length - 1 < args.prevLogIndex) ||
             (self.log[args.prevLogIndex].term !== args.prevLogTerm)) {
             saveBefore(function() {
-                callback({term:self.currentTerm, success:false});
+                callback({term:self.currentTerm, success:false,
+                          curAgreeIndex: args.curAgreeIndex});
             });
             return;
         }
@@ -652,8 +610,53 @@ function RaftServerBase(id, opts) {
         }
 
         saveBefore(function() {
-            callback({term:self.currentTerm, success:true});
+            callback({term:self.currentTerm, success:true,
+                      curAgreeIndex: args.curAgreeIndex});
         });
+    }
+
+    function appendEntriesResponse(sid, args) {
+        if (args.term > self.currentTerm) {
+            step_down();
+            return;
+        }
+        if (args.success) {
+            // A log entry is considered committed if
+            // it is stored on a majority of the servers;
+            // also, at least one entry from the leader's
+            // current term must also be stored on a majority
+            // of the servers.
+            matchIndex[sid] = args.curAgreeIndex;
+            nextIndex[sid] = args.curAgreeIndex+1;
+            var sids = Object.keys(self.serverMap),
+                majorityIndex = getMajorityIndex(sids);
+            // If newServerMap is set then we are in joint
+            // consensus and entries must be on the majority
+            // of both the old and new set of servers
+            if (self.newServerMap) {
+                var sids2 = Object.keys(self.newServerMap),
+                    newMajorityIndex = getMajorityIndex(sids2);
+                if (newMajorityIndex < majorityIndex) {
+                    majorityIndex = newMajorityIndex;
+                }
+            }
+            // Is our term stored on a majority of the servers
+            if (majorityIndex > self.commitIndex) {
+                var termStored = false;
+                for (var idx=majorityIndex; idx < self.log.length; idx++) {
+                    if (self.log[idx].term === self.currentTerm) {
+                        termStored = true;
+                        break;
+                    }
+                }
+                if (termStored) {
+                    commitEntries(majorityIndex);
+                }
+            }
+        } else {
+            nextIndex[sid] -= 1;
+            // TODO: resend immediately
+        }
     }
 
     // clientRequest
@@ -727,10 +730,12 @@ function RaftServerBase(id, opts) {
 
 
     // Public API/RPCs
-    api = {requestVote:      requestVote,
-           appendEntries:    appendEntries,
-           clientRequest:    clientRequest,
-           changeMembership: changeMembership};
+    api = {requestVote:           requestVote,
+           requestVoteResponse:   requestVoteResponse,
+           appendEntries:         appendEntries,
+           appendEntriesResponse: appendEntriesResponse,
+           clientRequest:         clientRequest,
+           changeMembership:      changeMembership};
     if (opts.debug) {
         api._self = self;
         api._step_down = step_down;
