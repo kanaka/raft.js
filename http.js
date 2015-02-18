@@ -24,22 +24,14 @@ function RaftServerHttp(id, opts) {
         throw new Error("opts.listenAddress is required");
     }
 
-    function sendRPC(targetId, rpcName, args, callback) {
+    function sendRPC(targetId, rpcName, args) {
         var saddr = opts.serverMap[targetId],
             ropts = url.parse("http://" + saddr);
         ropts.method = 'POST';
-        self.dbg("RPC to "  + targetId + "[" + saddr + "]: " + rpcName);
+        self.dbg("Send RPC to "  + targetId + " [" + saddr + "]: " + rpcName);
         var req = http.request(ropts, function (response) {
-            var dstr = "";
-            response.on('data', function (chunk) {
-                dstr += chunk;
-            });
-            response.on('end', function(){
-                // TODO: rewrite 'not_leader' results
-                var results = JSON.parse(dstr);
-                callback(targetId, results);
-            });
-
+            response.on('data', function (chunk) {});
+            response.on('end', function (chunk) {});
         });
         req.on('error', function(error) {
             self.info("got error:", error, targetId, rpcName);
@@ -54,15 +46,20 @@ function RaftServerHttp(id, opts) {
         request.on('data', function (chunk) {
             dstr += chunk;
         });
+        request.on('error', function(error) {
+            self.info("got error:", error, targetId, rpcName);
+        });
         request.on('end', function(){
             var data = JSON.parse(dstr),
                 rpcName = data[0],
                 args = data[1];
-            api[rpcName](args, function (results) {
-                response.write(JSON.stringify(results));
-                response.end();
-            });
+            self.dbg("Got RPC " + rpcName);
+            response.end();
+            api[rpcName](args);
         })
+    });
+    httpServer.on('close', function() {
+        console.log("Server closed");
     });
     var parts = opts.listenAddress.split(/:/),
         port = parts[parts.length-1],

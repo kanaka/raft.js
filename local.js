@@ -33,18 +33,14 @@ function RaftServerLocal(id, opts) {
     }
     base.setDefault(opts, 'durable', true);
     
-    function sendRPC(targetId, rpcName, args, callback) {
+    function sendRPC(targetId, rpcName, args) {
         self.dbg("RPC to "  + targetId + ": " + rpcName);
         if (!targetId in _serverPool) {
             console.log("Server id '" + targetId + "' does not exist");
             // No target, just drop RPC (no callback)
             return;
         }
-        _serverPool[targetId][rpcName](args,
-                function(results) {
-                    callback(targetId, results);
-                }
-        );
+        _serverPool[targetId][rpcName](args);
     }
 
     if (opts.durable && fs) {

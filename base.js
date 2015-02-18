@@ -25,9 +25,30 @@ function setDefault(o, k, v) {
 }
 
 function RaftServerBase(id, opts) {
-    var self = this,
-        api = {};
+    var self = this, api = {};
     self.id = id;
+
+    //
+    // Raft Algorithm State (explicit in Figure 3.1)
+    //
+
+    // Persistent/durable state on all servers (Figure 3.1)
+    self.currentTerm = -1;
+    self.votedFor = null;
+    self.log = [];  // [{term:TERM, comand:COMMAND}...]
+
+    // Volatile/ephemeral state on all servers (Figure 3.1)
+    self.commitIndex = -1; // highest index known to be committed
+    self.lastApplied = -1; // highext index known to be applied
+
+    // Volatile/ephemeral state on leaders only (Figure 3.1)
+    var nextIndex = {};   // index of next log entry to send to follower
+    var matchIndex = {}; // latest index known replicated to follower
+
+
+    //
+    // Options sanity checks and defaults
+    //
     opts = opts || {};
 
     if (typeof id === 'undefined' || !opts.sendRPC || !opts.applyCmd) {
@@ -61,28 +82,14 @@ function RaftServerBase(id, opts) {
         }
     }
 
-    //
-    // Raft State
-    //
-
     // all servers, ephemeral
     self.state = 'follower'; // follower, candidate, leader
     self.stateMachine = opts.stateMachineStart;
     self.serverMap = opts.serverMap;  // all servers, us included
-    self.newServerMap = null;  // set means joint consensus
-    self.commitIndex = -1; // highest index known to be committed
-    // all servers, persistant/durable
-    self.currentTerm = -1;
-    self.votedFor = null;
-    self.log = [];  // [{term:TERM, comand:COMMAND}...]
 
     // candidate servers only, ephemeral
     var votesResponded = {}; // servers that sent requestVote in this term
     var votesGranted = {}; // servers that gave us a vote in this term
-    // leader servers only, ephemeral
-    var nextIndex = {};   // index of next log entry to send to follower
-    var matchIndex = {}; // latest index known replicated to follower
-
 
     // Other server state, ephemeral
     var election_timer = null,
@@ -108,14 +115,9 @@ function RaftServerBase(id, opts) {
     // Internal implementation functions
     //
 
-    // Returns a list of all server IDs, basically intersection of IDs
-    // from self.serverMap and self.newServerMap.
+    // Returns a list of all server IDs.
     function servers() {
-        var sv = copyMap(self.serverMap);
-        for (var k in self.newServerMap) {
-            sv[k] = self.newServerMap[k];
-        }
-        return Object.keys(sv);
+        return Object.keys(self.serverMap);
     }
 
     // Reset the election timer to a random between value between
@@ -135,6 +137,7 @@ function RaftServerBase(id, opts) {
             new_term = self.currentTerm + 1;
         }
         self.currentTerm = new_term;
+        self.votedFor = null;
         pendingPersist = true;
         votesResponded = {};
         votesGranted = {};
@@ -154,14 +157,14 @@ function RaftServerBase(id, opts) {
     }
 
     // Send an RPC to each of the other servers
-    function sendRPCs(rpc, args, callback) {
+    function sendRPCs(rpc, args) {
         var sids = servers(); 
         for (var i=0; i < sids.length; i++) {
             var sid = sids[i];
             if (sid === id) {
                 continue;
             }
-            opts.sendRPC(sid, rpc, args, callback);
+            opts.sendRPC(sid, rpc, args);
         }
     }
 
@@ -208,16 +211,11 @@ function RaftServerBase(id, opts) {
             // TODO: is this correct if the log says we were in
             // joint consensus?
             self.serverMap = opts.serverMap;
-            self.newServerMap = null;
             callback();
         });
     }
 
-    // Add an array of entries to the log. Each entry is checked for
-    // membership change entries (Cold,new or Cnew) and self.serverMap
-    // and self.newServerMap are updated to reflect this (membership
-    // change entries come into effect as soon as we see them and not
-    // when they are committed)
+    // Add an array of entries to the log.
     function addEntries(entries, startup) {
         for (var i=0; i < entries.length; i++) {
             var entry = entries[i],
@@ -229,83 +227,43 @@ function RaftServerBase(id, opts) {
                 entry.command = null;
             }
 
-            // Check for membership changes. Cold,new and Cnew take effect
-            // as soon as we see them, not when they are committed
-            if (cmd && !startup) {
-                if (cmd.op === 'Cold,new') {
-                    // Joint consensus (Cold,new)
-                    self.serverMap = cmd.oldServerMap;
-                    self.newServerMap = cmd.newServerMap;
-                } else if (cmd.op === 'Cnew') {
-                    // Transition to Cnew
-                    self.serverMap = cmd.newServerMap;
-                    self.newServerMap = null;
-                }
-            }
             self.log[self.log.length] = entry;
         }
     }
 
-    // Commit log entries from self.commitIndex up to lastIdx by
-    // calling opts.applyCmd on the current state of
-    // self.stateMachine. Also handle log entries that are part of
-    // changing membership (joint consensus)
-    function commitEntries(lastIdx) {
-        var firstIdx = self.commitIndex+1,
-            result = null,
-            callbacks = {};
-        for (var idx=firstIdx; idx <= lastIdx; idx++) {
-            var entry = self.log[idx],
-                cmd = entry.command;
-            self.commitIndex = idx;
+    // Apply log entries from self.lastApplied up to self.commitIndex
+    // by calling opts.applyCmd on the current state of
+    // self.stateMachine.
+    // Figure 3.1, Rules for Servers, All Servers
+    function applyEntries() {
+        while (self.commitIndex > self.lastApplied) {
+            self.lastApplied += 1;
+            var entry = self.log[self.lastApplied],
+                cmd = entry.command,
+                callbacks = {},
+                result = null;
             if (!cmd) {
                 continue;
-
-            // TODO: should only do this for entries we didn't load
-            // from disk
-            } else if (cmd.op === 'Cold,new') {
-                result = "committed Cold,new";
-                if (self.state === 'leader') {
-                    // We are committing Cnew,old and adding Cnew.
-                    // Cnew takes effect as soon as a server has seen
-                    // Cnew and since we are the leader and adding it,
-                    // we have implicitly seen it.
-                    self.serverMap = cmd.newServerMap;
-                    self.newServerMap = null;
-                    var cmdNew = {op:           'Cnew',
-                                  newServerMap: cmd.newServerMap};
-                    addEntries([{command:cmdNew}]);
-                    result += ", adding Cnew";
-                }
-            } else if (cmd.op === 'Cnew') {
-                // We are committing Cnew. If we are not part of
-                // Cnew then we need step down and terminate
-                result = "committed Cnew";
-                if (!id in cmd.newServerMap) {
-                    step_down();
-                    terminate();
-                    result += ", removed from membership";
-                }
             } else {
                 dbg("Applying:", cmd);
                 // TODO: handle exceptions
                 result = opts.applyCmd(self.stateMachine, cmd);
             }
             // call client callback for the committed cmds
-            var clientCallback = clientCallbacks[idx];
+            var clientCallback = clientCallbacks[self.lastApplied];
             if (clientCallback) {
-                callbacks[idx] = [clientCallback, result];
-                delete clientCallbacks[idx];
+                callbacks[self.lastApplied] = [clientCallback, result];
+                delete clientCallbacks[self.lastApplied];
             }
+            saveBefore(function() {
+                for (var idx in callbacks) {
+                    var callback = callbacks[idx][0],
+                        result =   callbacks[idx][1];
+                    callback({'status': 'success',
+                              'result': result});
+                }
+            });
         }
-        saveBefore(function() {
-            for (var idx in callbacks) {
-                var callback = callbacks[idx][0],
-                    result =   callbacks[idx][1];
-                callback({'status': 'success',
-                          'result': result});
-            }
-        });
     }
 
     // Return the log index that is stored on a majority of the
@@ -350,11 +308,9 @@ function RaftServerBase(id, opts) {
                      prevLogIndex: nindex,
                      prevLogTerm: nterm,
                      entries: nentries,
-                     commitIndex: self.commitIndex,
+                     leaderCommit: self.commitIndex,
                     
-                     curAgreeIndex: self.log.length-1
-                    },
-                appendEntriesResponse);
+                     curAgreeIndex: self.log.length-1});
         }
         // we may be called directly so cancel any outstanding timer
         opts.unschedule(heartbeat_timer);
@@ -366,13 +322,10 @@ function RaftServerBase(id, opts) {
 
     // Checks a vote map against a server map. Return true if more
     // than half of the servers in server map have votes in the vote
-    // map.  During joint consensus we need to check all of Cold,new
-    // which means checking Cold (self.serverMap) and Cnew
-    // (self.newServerMap) separately. Only if both have a majority is
-    // an election successful.
+    // map. Only if we have a majority is an election successful.
     function check_vote(serverMap, voteMap) {
-        var sids = Object.keys(serverMap),
-            need = Math.round((sids.length+1)/2), // more than half
+        var scnt = Object.keys(serverMap).length,
+            need = Math.round((scnt+1)/2), // more than half
             votes = {};
         for (var k in serverMap) {
             if (k in voteMap) {
@@ -437,7 +390,7 @@ function RaftServerBase(id, opts) {
         saveBefore(leader_heartbeat);
     }
 
-    // Section 5.2 Leader Election
+    // Section 3.4 Leader Election
     function start_election() {
         if (self.state === 'leader') { return; }
         info("new state 'candidate'");
@@ -455,8 +408,7 @@ function RaftServerBase(id, opts) {
                 {term: self.currentTerm,
                  candidateId: id, 
                  lastLogIndex: self.log.length-1,
-                 lastLogTerm: self.log[self.log.length-1].term},
-            requestVoteResponse);
+                 lastLogTerm: self.log[self.log.length-1].term});
     }
 
     // We are terminating either as a result of being removed by
@@ -488,22 +440,31 @@ function RaftServerBase(id, opts) {
 
     // requestVote RPC
     //   args keys: term, candidateId, lastLogIndex, lastLogTerm
-    function requestVote(args, callback) {
-        // 1. reply flase if term < currentTerm
-        if (args.term < self.currentTerm) {
-            saveBefore(function() {
-                callback({term:self.currentTerm, voteGranted:false});
-            });
-            return;
-        }
-        // if term > currentTerm, set currentTerm to term
+    function requestVote(args) {
+        self.dbg("requestVote:", JSON.stringify(args));
+
+        // if term > currentTerm, set currentTerm to term (rules for
+        // all servers)
         if (args.term > self.currentTerm) {
             update_term(args.term);
             step_down(); // step down from candidate or leader
         }
+        // 1. reply false if term < currentTerm (3.3)
+        if (args.term < self.currentTerm) {
+            saveBefore(function() {
+                opts.sendRPC(args.candidateId, "requestVoteResponse",
+                    {term: self.currentTerm,
+                     voteGranted: false,
+                     // addition
+                     sourceId: id});
+            });
+            return;
+        }
         // 2. if votedFor is null or candidateId, and candidate's log
-        // candidate's log is at least as complete as local log, grant
-        // vote and reset election timeout
+        //    is at least as up-to-date as receiver's log, grant vote
+        //    (3.4, 3.6)
+        //    - Also reset election timeout (TODO, is reset still
+        //      correct?)
         if ((self.votedFor === null || self.votedFor === args.candidateId) &&
                 (args.lastLogTerm >= self.log[self.log.length-1].term || 
                  (args.lastLogTerm === self.log[self.log.length-1].term &&
@@ -514,26 +475,41 @@ function RaftServerBase(id, opts) {
             pendingPersist = true;
             reset_election_timer();
             saveBefore(function() {
-                callback({term:self.currentTerm, voteGranted:true});
+                opts.sendRPC(args.candidateId, "requestVoteResponse",
+                    {term: self.currentTerm,
+                     voteGranted: true,
+                     // addition
+                     sourceId: id});
             });
             return;
         }
 
         saveBefore(function() {
-            callback({term:self.currentTerm, voteGranted:false});
+            opts.sendRPC(args.candidateId, "requestVoteResponse",
+                {term: self.currentTerm,
+                 voteGranted: false,
+                 // addition
+                 sourceId: id});
         });
         return;
     }
 
-    function requestVoteResponse(other_id, args) {
+    function requestVoteResponse(args) {
+        self.dbg("requestVoteResponse:", JSON.stringify(args));
+
+        // if term > currentTerm, set currentTerm to term (rules for
+        // all servers)
+        if (args.term > self.currentTerm) {
+            // Does this happen? How?
+            update_term(args.term);
+            step_down(); // step down from candidate or leader
+            return;
+        }
+
+        var other_id = args.sourceId;
         if ((self.state !== 'candidate') ||
             (args.term < self.currentTerm)) {
             // ignore
-            return;
-        }
-        if (args.term > self.currentTerm) {
-            // Does this happen? How?
-            step_down();
             return;
         }
         if (args.voteGranted) {
@@ -543,36 +519,42 @@ function RaftServerBase(id, opts) {
         dbg("current votes:", Object.keys(votesGranted));
         // Check if we won the election
         if (check_vote(self.serverMap, votesGranted)) {
-            // If self.newServerMap is set then we are in joint
-            // consensus so we must check votes for that server
-            // set too
-            if (!self.newServerMap ||
-                check_vote(self.newServerMap, votesGranted)) {
-                become_leader();
-            }
+            become_leader();
         }
     }
 
-    // appendEntries RPC
+    // appendEntries RPC (Figure 3.2)
     //   args keys: term, leaderId, prevLogIndex, prevLogTerm,
     //              entries, commitIndex
-    function appendEntries(args, callback) {
+    function appendEntries(args) {
+        self.dbg("appendEntries:", JSON.stringify(args));
+
+        // if term > currentTerm, set currentTerm to term (rules for
+        // all servers)
+        if (args.term > self.currentTerm) {
+            update_term(args.term);
+            step_down(); // step down from candidate or leader
+        }
+
         // 1. reply false if term < currentTerm
         if (args.term < self.currentTerm) {
             // continue in same state
             saveBefore(function() {
-                callback({term:self.currentTerm, success:false,
-                          curAgreeIndex: args.curAgreeIndex});
+                opts.sendRPC(args.leaderId, "appendEntriesResponse",
+                    {term: self.currentTerm,
+                     success: false,
+                     // These are additions
+                     sourceId: id,
+                     curAgreeIndex: args.curAgreeIndex});
             });
             return;
         }
-        // if term > currentTerm, set currentTerm to term
-        if (args.term > self.currentTerm) {
-            update_term(args.term);
-        }
         // if candidate or leader, step down
         step_down(); // step down from candidate or leader
-        leaderId = args.leaderId;
+        if (leaderId !== args.leaderId) {
+            leaderId = args.leaderId;
+            self.info("new leader: " + leaderId);
+        }
 
         // reset election timeout
         reset_election_timer();
@@ -586,14 +568,19 @@ function RaftServerBase(id, opts) {
         if ((self.log.length - 1 < args.prevLogIndex) ||
             (self.log[args.prevLogIndex].term !== args.prevLogTerm)) {
             saveBefore(function() {
-                callback({term:self.currentTerm, success:false,
-                          curAgreeIndex: args.curAgreeIndex});
+                opts.sendRPC(args.leaderId, "appendEntriesResponse",
+                    {term: self.currentTerm,
+                     success: false,
+                     // These are additions
+                     sourceId: id,
+                     curAgreeIndex: args.curAgreeIndex});
             });
             return;
         }
-        // 3. If existing entries conflict with new entries,
-        // delete all existing entries starting with first conflicting
-        // entry
+        // 3. If existing entry conflicts with new entry (same index
+        //    but different terms), delete the existing entry
+        //    and all that follow. TODO: make this match the
+        //    description.
         if (args.prevLogIndex+1 < self.log.length) {
             self.log.splice(args.prevLogIndex+1, self.log.length);
         }
@@ -603,23 +590,36 @@ function RaftServerBase(id, opts) {
             pendingPersist = true;
         }
 
-        // 5. if leader commitIndex > commitIndex, apply newly
-        // committed entries to the state machine
-        if (self.commitIndex < args.commitIndex) {
-            commitEntries(args.commitIndex);
+        // 5. if leaderCommit > commitIndex, set
+        //    commitIndex = min(leaderCommit, index of last new entry)
+        if (args.leaderCommit > self.commitIndex) {
+            self.commitIndex = Math.min(args.leaderCommit,
+                                        self.log.length-1);
+            applyEntries();
         }
 
         saveBefore(function() {
-            callback({term:self.currentTerm, success:true,
-                      curAgreeIndex: args.curAgreeIndex});
+            opts.sendRPC(args.leaderId, "appendEntriesResponse",
+                {term: self.currentTerm,
+                 success: true,
+                 // These are additions
+                 sourceId: id,
+                 curAgreeIndex: args.curAgreeIndex});
         });
     }
 
-    function appendEntriesResponse(sid, args) {
+    function appendEntriesResponse(args) {
+        self.dbg("appendEntriesResponse:", JSON.stringify(args));
+        // if term > currentTerm, set currentTerm to term (rules for
+        // all servers)
         if (args.term > self.currentTerm) {
-            step_down();
+            // Does this happen? How?
+            update_term(args.term);
+            step_down(); // step down from candidate or leader
             return;
         }
+
+        var sid = args.sourceId;
         if (args.success) {
             // A log entry is considered committed if
             // it is stored on a majority of the servers;
@@ -630,16 +630,6 @@ function RaftServerBase(id, opts) {
             nextIndex[sid] = args.curAgreeIndex+1;
             var sids = Object.keys(self.serverMap),
                 majorityIndex = getMajorityIndex(sids);
-            // If newServerMap is set then we are in joint
-            // consensus and entries must be on the majority
-            // of both the old and new set of servers
-            if (self.newServerMap) {
-                var sids2 = Object.keys(self.newServerMap),
-                    newMajorityIndex = getMajorityIndex(sids2);
-                if (newMajorityIndex < majorityIndex) {
-                    majorityIndex = newMajorityIndex;
-                }
-            }
             // Is our term stored on a majority of the servers
             if (majorityIndex > self.commitIndex) {
                 var termStored = false;
@@ -650,7 +640,9 @@ function RaftServerBase(id, opts) {
                     }
                 }
                 if (termStored) {
-                    commitEntries(majorityIndex);
+                    self.commitIndex = Math.min(majorityIndex,
+                                                self.log.length-1);
+                    applyEntries(majorityIndex);
                 }
             }
         } else {
@@ -663,9 +655,7 @@ function RaftServerBase(id, opts) {
     //   - cmd is map that is opaque for the most part but may contain
     //     a "ro" key (read-only) that when truthy implies the cmd is
     //     a read operation that will not change the stateMachine and
-    //     is called with the stateMachine immediately. It may also
-    //     contain a 'newServerMap' key with a map of the target
-    //     server configuration (same format as opts.serverMap)
+    //     is called with the stateMachine immediately.
     //   - callback is called after the cmd is committed (or
     //     immediately for a read-only cmd) and applied to the
     //     stateMachine
@@ -690,29 +680,10 @@ function RaftServerBase(id, opts) {
         } else {
             clientCallbacks[self.log.length] = callback;
             addEntries([{command:cmd}]);
-            if (cmd.op === 'Cold,new' || cmd.op === 'Cnew') {
-                update_indexes();
-            }
             pendingPersist = true;
             // trigger leader heartbeat
             setTimeout(leader_heartbeat,1);
         }
-    }
-
-    // changeMembership
-    //   - newServerMap is the new map of server IDs to addresses for
-    //     the new membership. This is really just a wrapper around
-    //     clientRequest that adds a 'Cold,new' command.
-    //   - callback is called after joint consensus (Cold,new) is
-    //     committed (not when Cnew is committed)
-    function changeMembership(newServerMap, callback) {
-        // Create Cold,new joint consensus state
-        // TODO: check that newServerMap overlaps enough with
-        // self.serverMap
-        var cmd = {op:          'Cold,new',
-                   oldServerMap: self.serverMap,
-                   newServerMap: newServerMap};
-        clientRequest(cmd, callback);
     }
 
 
@@ -734,8 +705,8 @@ function RaftServerBase(id, opts) {
            requestVoteResponse:   requestVoteResponse,
            appendEntries:         appendEntries,
            appendEntriesResponse: appendEntriesResponse,
-           clientRequest:         clientRequest,
-           changeMembership:      changeMembership};
+           clientRequest:         clientRequest};
+           //changeMembership:      changeMembership};
     if (opts.debug) {
         api._self = self;
         api._step_down = step_down;

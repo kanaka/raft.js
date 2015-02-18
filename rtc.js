@@ -1,7 +1,7 @@
 "use strict";
 
 // Parmeters
-var verbose = true,
+var verbose = false,
     debug = true,
     electionTimeout = 1000,
     nodeCnt = 3,
@@ -25,10 +25,6 @@ function log() {
 //
 // Send and receive functions
 //
-var rpcResponseMap = {
-    requestVote: 'requestVoteResponse',
-    appendEntries: 'appendEntriesResponse'};
-
 function rtcSend(targetId, rpcName, args, callback) {
     // Callback is ignored (no session tracked request/response with RTC)
     var conn = nodeMap[targetId],
@@ -40,18 +36,10 @@ function rtcReceive(json) {
     var resp = JSON.parse(json),
         rpcName = resp[0],
         otherNodeId = resp[1],
-        args = resp[2],
-        rpcRespName = rpcResponseMap[rpcName];
+        args = resp[2];
     
     // Call the rpc indicated
-    //log("rtcReceive:", rpcName, rpcRespName, otherNodeId, json);
-    if (rpcRespName) {
-        node[rpcName](args, function(respArgs) {
-            rtcSend(otherNodeId, rpcRespName, respArgs, null);
-        });
-    } else {
-        node[rpcName](otherNodeId, args);
-    }
+    node[rpcName](args);
 }
 
 //

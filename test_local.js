@@ -1,5 +1,5 @@
 if (typeof module !== 'undefined') {
-    var test_common = require('./test_common');
+    var common = require('./test_common');
     var local = require('./local');
 } else {
     var test_local = {},
@@ -16,32 +16,49 @@ function startServers(opts, n) {
         serverOpts[i] = local.copyMap(opts);
         serverOpts[i].listenAddress = "local:" + (idIdx++);
     }
-    return test_common.startServers(serverPool, serverOpts,
+    return common.startServers(serverPool, serverOpts,
                                     local.RaftServerLocal);
 }
 
 function addServer(sid, opts) {
     opts = local.copyMap(opts);
     opts.listenAddress = "local:" + sid;
-    return test_common.addServer(serverPool, sid, opts,
+    return common.addServer(serverPool, sid, opts,
                                  local.RaftServerLocal);
 }
 
 function removeServer(sid) {
-    test_common.removeServer(serverPool, sid);
+    common.removeServer(serverPool, sid);
 }
 
 function getAll(attr) {
-    return test_common.getAll(serverPool, attr);
+    return common.getAll(serverPool, attr);
 }
  
 function getLeaderId() {
-    return test_common.getLeaderId(serverPool);
+    return common.getLeaderId(serverPool);
 }
 
 
 if (typeof require !== 'undefined' && require.main === module) {
+    //startServers({verbose: true});
     startServers();
+    console.log("Waiting 2 seconds for leader election");
+    setTimeout(function () {
+        var lid = getLeaderId();
+        console.log("leader: " + lid);
+        common.validateState(serverPool);
+        serverPool[lid].clientRequest({op:"set",key:'a',value:1});
+        serverPool[lid].clientRequest({op:"set",key:'b',value:2});
+        serverPool[lid].clientRequest({op:"set",key:'a',value:3});
+        console.log("Waiting 1 second log propagation");
+        setTimeout(function () {
+            console.log("stateMachines:", JSON.stringify(getAll('stateMachine'), null, 2));
+            //console.log("logs:", JSON.stringify(getAll('log'), null, 2));
+            common.validateState(serverPool);
+            console.log("Validated server pool state");
+        }, 1000);
+    }, 2000);
 } else {
     exports.local = local;
     exports.startServers = startServers;
