@@ -5,19 +5,63 @@ if (typeof module === 'undefined') {
 
 serverMap = {};
 
+pendingServerMap = {};
+
 function startServers (spool, serverOpts, klass) {
     for (var sid in serverOpts) {
         var addr = serverOpts[sid].listenAddress;
         serverMap[sid] = addr;
     }
-    for (var sid in serverOpts) {
+    var sids = Object.keys(serverOpts);
+    for (var idx = 0; idx < sids.length; idx++) {
+        sid = sids[idx];
         // force debug so _self is exposed for get* functions
         serverOpts[sid].debug = true;
-        serverOpts[sid].serverMap = serverMap;
+        serverOpts[sid].verbose = 1;
+        serverOpts[sid].serverData = serverMap;
+        if (idx === 0) {
+            // Tell the first server to initialize
+            serverOpts[sid].firstServer = true;
+        } else {
+            // Add the other servers to the add list
+            pendingServerMap[sid] = serverOpts[sid].listenAddress;
+        }
         spool[sid] = new klass(sid.toString(), serverOpts[sid]);
+    }
+    addServersAsync(spool);
+}
+
+// Call leader addServer RPC to add list of new servers.
+function addServersAsync(spool) {
+    var sids = Object.keys(pendingServerMap);
+    console.log("addServersAsync (remaining: " + sids.length + ")");
+
+    // Determine the leader
+    if (sids.length > 0) {
+        var lid = getLeaderId(spool);
+        if (lid) {
+            var sid = sids[0];
+            console.log("addServersAsync attempting addServer: " + sid);
+            spool[lid].addServer({newServer: [sid, pendingServerMap[sid]]},
+                    function (result) {
+                        //console.log("result:", result);
+                        if (result.status === 'OK') {
+                            delete pendingServerMap[sid];
+                        } else if (result.status === 'ALREADY_A_MEMBER') {
+                            console.log("addServersAsync: " + result.status);
+                            delete pendingServerMap[sid];
+                        } else {
+                            console.log("addServersAsync: coud not add server: " + result.status);
+                        }
+                    });
+        } else {
+            console.log("addServersAsync: no leader yet, delaying");
+        }
+        setTimeout(function() { addServersAsync(spool); }, 250);
     }
 }
 
+/*
 function addServer (spool, sid, opts, klass) {
     if (sid in serverMap) {
         throw new Error("Server " + sid + " already exists");
@@ -30,7 +74,7 @@ function addServer (spool, sid, opts, klass) {
     serverMap[sid] = addr;
     opts.serverMap = serverMap;
     spool[sid] = new klass(sid.toString(), opts);
-    spool[lid].changeMembership(serverMap,
+    spool[lid].addServer({newServer: [sid, addr]},
             function(res) {
                 console.log("addServer result:", res);
             });
@@ -45,12 +89,13 @@ function removeServer(spool, sid) {
         throw new Error("Could not determine current leader");
     }
     delete serverMap[sid];
-    spool[lid].changeMembership(serverMap,
+    spool[lid].removeServer(serverMap,
             function(res) {
                 console.log("removeServer result:", res);
             });
 
 }
+*/
 
 function getAll(spool, attr) {
     var results = {};
@@ -190,6 +235,18 @@ function deepCompare () {
 }
 
 
+function showState(spool) {
+    var logs = [], sms = [];
+    console.log("Logs:");
+    for (var sid in spool) {
+        console.log(sid + ": " + JSON.stringify(spool[sid]._self.log));
+    }
+    console.log("State Machines:");
+    for (var sid in spool) {
+        console.log(sid + ": " + JSON.stringify(spool[sid]._self.stateMachine));
+    }
+}
+
 function validateState(spool) {
     // Validate that there is one and only one leader
     var leaderIds = Object.keys(spool);
@@ -214,9 +271,11 @@ function validateState(spool) {
     }
 
     if (!deepCompare.apply(null, logs)) {
+        showState(spool);
         throw new Error("Logs do not all match");
     }
     if (!deepCompare.apply(null, sms)) {
+        showState(spool);
         throw new Error("stateMachines do not all match");
     }
 
@@ -224,7 +283,8 @@ function validateState(spool) {
 }
 
 exports.startServers = startServers;
-exports.addServer = addServer;
+//exports.addServer = addServer;
 exports.getAll = getAll;
 exports.getLeaderId = getLeaderId;
+exports.showState = showState;
 exports.validateState = validateState;

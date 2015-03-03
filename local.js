@@ -28,8 +28,8 @@ function RaftServerLocal(id, opts) {
     if (id in _serverPool) {
         throw new Error("Server id '" + id + "' already exists");
     }
-    if (!opts.serverMap) {
-        throw new Error("opts.serverMap is required");
+    if (!opts.serverData) {
+        throw new Error("opts.serverData is required");
     }
     base.setDefault(opts, 'durable', true);
     

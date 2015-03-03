@@ -33,13 +33,13 @@ function RaftServerBase(id, opts) {
     //
 
     // Persistent/durable state on all servers (Figure 3.1)
-    self.currentTerm = -1;
+    self.currentTerm = 0;
     self.votedFor = null;
-    self.log = [];  // [{term:TERM, comand:COMMAND}...]
+    self.log = [{term:0, command:null}];  // [{term:TERM, comand:COMMAND}...]
 
     // Volatile/ephemeral state on all servers (Figure 3.1)
-    self.commitIndex = -1; // highest index known to be committed
-    self.lastApplied = -1; // highext index known to be applied
+    self.commitIndex = 0; // highest index known to be committed
+    self.lastApplied = 0; // highext index known to be applied
 
     // Volatile/ephemeral state on leaders only (Figure 3.1)
     var nextIndex = {};   // index of next log entry to send to follower
@@ -61,9 +61,13 @@ function RaftServerBase(id, opts) {
     setDefault(opts, 'electionTimeout',   300);
     setDefault(opts, 'heartbeatTime',     opts.electionTimeout/5);
     setDefault(opts, 'stateMachineStart', {});
-    setDefault(opts, 'serverMap',         {id: true});
+    setDefault(opts, 'firstServer',       false);
+    setDefault(opts, 'serverData',        {id: true});
+    setDefault(opts, 'verbose',           1);
     setDefault(opts, 'log',               function() {
         console.log.apply(console, arguments); });
+    setDefault(opts, 'error',             function() {
+        console.error.apply(console, arguments); });
     setDefault(opts, 'schedule',          function(fn, ms, data) {
         return setTimeout(fn, ms); });
     setDefault(opts, 'unschedule',        function(id) {
@@ -85,7 +89,7 @@ function RaftServerBase(id, opts) {
     // all servers, ephemeral
     self.state = 'follower'; // follower, candidate, leader
     self.stateMachine = opts.stateMachineStart;
-    self.serverMap = opts.serverMap;  // all servers, us included
+    self.serverMap = {};  // servers that are part of the cluster
 
     // candidate servers only, ephemeral
     var votesResponded = {}; // servers that sent requestVote in this term
@@ -96,19 +100,27 @@ function RaftServerBase(id, opts) {
         heartbeat_timer = null,
         leaderId = null,
         clientCallbacks = {}, // client callbacks keyed by log index
-        pendingPersist = false;
+        pendingPersist = false,
+        pendingConfigChange = false;
 
     // Utility functions
-    var info = self.info = function() {
+    var msg = self.msg = function(args, logger) {
         var now = (new Date()).getTime(),
-            prefix = now + ": " + id + " [" + self.currentTerm + "]:",
-            args = Array.prototype.slice.call(arguments);
-        opts.log.apply(null, [prefix].concat(args));
+            prefix = now + ": " + id + " [" + self.currentTerm + "]:";
+        logger.apply(null, [prefix].concat(args));
     }
     var dbg = self.dbg = function () {
-        if (opts.verbose) {
-            self.info.apply(null, arguments);
+        if (opts.verbose > 1) {
+            self.msg(Array.prototype.slice.call(arguments), opts.log);
         }
+    }
+    var info = self.info = function () {
+        if (opts.verbose > 0) {
+            self.msg(Array.prototype.slice.call(arguments), opts.log);
+        }
+    }
+    var error = self.error = function () {
+        self.msg(Array.prototype.slice.call(arguments), opts.error);
     }
 
     //
@@ -120,14 +132,18 @@ function RaftServerBase(id, opts) {
         return Object.keys(self.serverMap);
     }
 
+    // Clear/cancel any existing election timer
+    function clear_election_timer() {
+        if (election_timer) {
+            election_timer = opts.unschedule(election_timer);
+        }
+    }
     // Reset the election timer to a random between value between
     // electionTimeout -> electionTimeout*2
     function reset_election_timer() {
         var randTimeout = opts.electionTimeout +
                           parseInt(Math.random()*opts.electionTimeout);
-        if (election_timer) {
-            election_timer = opts.unschedule(election_timer);
-        }
+        clear_election_timer();
         election_timer = opts.schedule(start_election, randTimeout);
     }
 
@@ -136,6 +152,7 @@ function RaftServerBase(id, opts) {
         if (typeof new_term === 'undefined') {
             new_term = self.currentTerm + 1;
         }
+        dbg("set term to: " + new_term);
         self.currentTerm = new_term;
         self.votedFor = null;
         pendingPersist = true;
@@ -179,7 +196,7 @@ function RaftServerBase(id, opts) {
             pendingPersist = false;
             opts.saveFn(data, function(success){
                 if (!success) {
-                    console.error("Failed to persist state");
+                    error("Failed to persist state");
                 }
                 callback()
             });
@@ -194,23 +211,44 @@ function RaftServerBase(id, opts) {
     // Also initialize voting related state, then call callback.
     function loadBefore(callback) {
         opts.loadFn(function (success, data) {
+            if (success && opts.firstServer) {
+                opts.firstServer = false;
+                error("firstServer ignored because loadFn return true");
+            }
             if (success) {
+                // update state from the loaded data
+                dbg("load stored data: ", data);
                 self.currentTerm = data.currentTerm;
                 self.votedFor = data.votedFor;
                 addEntries(data.log, true);
-            } else {
-                // set some defaults if nothing found
+
+                info("Loaded durable state, starting election timer");
+                // start as follower by default
+                step_down();
+                reset_election_timer();
+            } else if (opts.firstServer) {
+                // if no loaded data but we are the first server then
+                // start with ourselves as the only member.
+                dbg("started as first server");
                 self.currentTerm = 0;
                 self.votedFor = null;
-                addEntries([{term:0, command:null}], true);
+                // Start with ourselves
+                addEntries([{newServer: [self.id, opts.serverData[self.id]],
+                             oldConfig: {}}], true);
+
+                info("First server, assuming leadership");
+                become_leader();
+            } else {
+                // if no loaded data and we are not the first server,
+                // then we will have an empty log
+                self.currentTerm = -1;
+                self.votedFor = null;
+
+                info("Not first server, waiting for initial RPC");
+                clear_election_timer();
             }
             votesResponded = {};
             votesGranted = {};
-            // We are starting up/reseting our state, assume that
-            // opts.serverMap is our current membership.
-            // TODO: is this correct if the log says we were in
-            // joint consensus?
-            self.serverMap = opts.serverMap;
             callback();
         });
     }
@@ -218,14 +256,25 @@ function RaftServerBase(id, opts) {
     // Add an array of entries to the log.
     function addEntries(entries, startup) {
         for (var i=0; i < entries.length; i++) {
-            var entry = entries[i],
-                cmd = entry.command;
+            var entry = entries[i];
             if (typeof entry.term === 'undefined') {
                 entry.term = self.currentTerm;
             }
-            if (!cmd) {
+            if (typeof entry.command === 'undefined') {
                 entry.command = null;
             }
+
+            if (entry.newServer) {
+                dbg("adding newServer entry:", entry.newServer);
+                self.serverMap[entry.newServer[0]] = entry.newServer[1];
+            } else if (entry.oldServer) {
+                dbg("removing oldServer entry:", entry.oldServer);
+                delete self.serverMap[entry.oldServer];
+            }
+
+            // Update the opts map so that our information is visible
+            // externally
+            opts.serverMap = self.serverMap;
 
             self.log[self.log.length] = entry;
         }
@@ -242,10 +291,8 @@ function RaftServerBase(id, opts) {
                 cmd = entry.command,
                 callbacks = {},
                 result = null;
-            if (!cmd) {
-                continue;
-            } else {
-                dbg("Applying:", cmd);
+            if (cmd) {
+                dbg("applying:", cmd);
                 // TODO: handle exceptions
                 result = opts.applyCmd(self.stateMachine, cmd);
             }
@@ -381,11 +428,11 @@ function RaftServerBase(id, opts) {
         // considered committed. Otherwise, read-only commands after
         // an election would return stale data until somebody does
         // an update command.
-        addEntries([{newLeaderId:id}]);
+        addEntries([{newLeaderId: id}]);
 
         update_indexes(true);
 
-        election_timer = opts.unschedule(election_timer);
+        clear_election_timer();
         // start sending heartbeats (appendEntries) until we step down
         saveBefore(leader_heartbeat);
     }
@@ -418,7 +465,7 @@ function RaftServerBase(id, opts) {
         info("terminating");
         // Disable any timers
         heartbeat_timer = opts.unschedule(heartbeat_timer);
-        election_timer = opts.unschedule(election_timer);
+        clear_election_timer();
         // Ignore or reject RPC/API calls
         api.requestVote = function(args) {
             dbg("Ignoring clientRequest(", args, ")");
@@ -651,6 +698,112 @@ function RaftServerBase(id, opts) {
         }
     }
 
+    // addServer (Figure 4.1)
+    //   args keys: newServer ([id, connection_info])
+    //   response: status, leaderHint
+    function addServer(args, callback) {
+        self.dbg("addServer:", JSON.stringify(args));
+        // 1. Reply NOT_LEADER if not leader (6.2)
+        if (self.state !== 'leader') {
+            callback({status: 'NOT_LEADER',
+                      leaderHint: leaderId});
+            return;
+        }
+
+        // NOTE: this is an addition to the Raft algorithm:
+        // Instead of doing steps 2 and 3, just reject config
+        // changes while an existing one is pending.
+
+        // 2. Catch up new server for a fixed number of rounds. Reply
+        //    TIMEOUT if new server does not make progress for an
+        //    election timeout or if the last round takes longer than
+        //    the election timeout (4.2.1)
+        // 3. Wait until previous configuration in the log is
+        //    committed (4.1)
+        if (pendingConfigChange) {
+            callback({status: 'PENDING_CONFIG_CHANGE',
+                      leaderHint: leaderId});
+            return;
+        }
+
+        // NOTE: addition to Raft algorithm. If server is already
+        // a member, reject it.
+        if (args.newServer[0] in self.serverMap) {
+            callback({status: 'ALREADY_A_MEMBER',
+                      leaderHint: leaderId});
+            return;
+        }
+
+        // 4. Append new configuration entry to the log (old
+        //    configuration plus newServer), commit it using majority
+        //    of new configuration (4.1)
+        pendingConfigChange = true;
+        addEntries([{oldConfig: copyMap(self.serverMap),
+                     newServer: args.newServer}]);
+        clientCallbacks[self.log.length-1] = function() {
+            pendingConfigChange = false;
+            // 5. Reply OK
+            callback({status: 'OK',
+                      leaderHint: leaderId});
+        };
+        update_indexes();
+        pendingPersist = true;
+        // trigger leader heartbeat
+        setTimeout(leader_heartbeat,1);
+    }
+
+    // removeServer (Figure 4.1)
+    //   args keys: oldServer (id)
+    //   response: status, leaderHint
+    function removeServer(args) {
+        self.dbg("removeServer:", JSON.stringify(args));
+        // 1. Reply NOT_LEADER if not leader (6.2)
+        if (self.state !== 'leader') {
+            callback({status: 'NOT_LEADER',
+                      leaderHint: leaderId});
+            return;
+        }
+
+        // NOTE: this is an addition to the Raft algorithm:
+        // Instead of doing step 2, just reject config changes while
+        // an existing one is pending.
+
+        // 2. Wait until previous configuration in the log is
+        //    committed (4.1)
+        if (pendingConfigChange) {
+            callback({status: 'PENDING_CONFIG_CHANGE',
+                      leaderHint: leaderId});
+            return;
+        }
+
+        // NOTE: addition to Raft algorithm. If server is not in the
+        // map, reject it.
+        if (!args.oldServer[0] in self.serverMap) {
+            callback({status: 'NOT_A_MEMBER',
+                      leaderHint: leaderId});
+            return;
+        }
+
+        // 3. Append new configuration entry to the log (old
+        //    configuration without oldServer), commit it using
+        //    majority of new configuration (4.1)
+        pendingConfigChange = true;
+        addEntries([{oldConfig: copyMap(self.serverMap),
+                     oldServer: args.oldServer}]);
+        clientCallbacks[self.log.length-1] = function() {
+            pendingConfigChange = false;
+            // 4. Reply OK, and if this server was removed, step down
+            //    (4.2.2)
+            // TODO: step down and terminate
+            callback({status: 'OK',
+                      leaderHint: leaderId});
+        };
+        update_indexes();
+        pendingPersist = true;
+        // trigger leader heartbeat
+        setTimeout(leader_heartbeat,1);
+    }
+
     // clientRequest
     //   - cmd is map that is opaque for the most part but may contain
     //     a "ro" key (read-only) that when truthy implies the cmd is
@@ -663,7 +816,8 @@ function RaftServerBase(id, opts) {
         callback = callback || function() {};
         if (self.state !== 'leader') {
             // tell the client to use a different server
-            callback({'status': 'not_leader', 'leaderId': leaderId});
+            callback({'status': 'NOT_LEADER',
+                      'leaderHint': leaderId});
             return;
         }
         // NOTE: this is an addition to the basic Raft algorithm:
@@ -679,7 +833,7 @@ function RaftServerBase(id, opts) {
                       result: result});
         } else {
             clientCallbacks[self.log.length] = callback;
-            addEntries([{command:cmd}]);
+            addEntries([{command: cmd}]);
             pendingPersist = true;
             // trigger leader heartbeat
             setTimeout(leader_heartbeat,1);
@@ -693,9 +847,7 @@ function RaftServerBase(id, opts) {
     opts.schedule(function() {
         info("Initializing");
         loadBefore(function() {
-            // start as follower by default
-            step_down();
-            reset_election_timer();
+            info("Initialized");
         });
     }, 0, {type:"Initialize"});
 
@@ -705,6 +857,8 @@ function RaftServerBase(id, opts) {
            requestVoteResponse:   requestVoteResponse,
            appendEntries:         appendEntries,
            appendEntriesResponse: appendEntriesResponse,
+           addServer:             addServer,
+           removeServer:          removeServer,
            clientRequest:         clientRequest};
            //changeMembership:      changeMembership};
     if (opts.debug) {

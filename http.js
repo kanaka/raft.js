@@ -17,15 +17,15 @@ function RaftServerHttp(id, opts) {
     var self = this,
         api;
 
-    if (!opts.serverMap) {
-        throw new Error("opts.serverMap is required");
+    if (!opts.serverData) {
+        throw new Error("opts.serverData is required");
     }
     if (!opts.listenAddress) {
         throw new Error("opts.listenAddress is required");
     }
 
     function sendRPC(targetId, rpcName, args) {
-        var saddr = opts.serverMap[targetId],
+        var saddr = opts.serverData[targetId],
             ropts = url.parse("http://" + saddr);
         ropts.method = 'POST';
         self.dbg("Send RPC to "  + targetId + " [" + saddr + "]: " + rpcName);

@@ -20,6 +20,7 @@ function startServers(opts, n) {
                                     local.RaftServerLocal);
 }
 
+/*
 function addServer(sid, opts) {
     opts = local.copyMap(opts);
     opts.listenAddress = "local:" + sid;
@@ -30,6 +31,7 @@ function addServer(sid, opts) {
 function removeServer(sid) {
     common.removeServer(serverPool, sid);
 }
+*/
 
 function getAll(attr) {
     return common.getAll(serverPool, attr);
@@ -51,18 +53,18 @@ if (typeof require !== 'undefined' && require.main === module) {
         serverPool[lid].clientRequest({op:"set",key:'a',value:1});
         serverPool[lid].clientRequest({op:"set",key:'b',value:2});
         serverPool[lid].clientRequest({op:"set",key:'a',value:3});
-        console.log("Waiting 1 second log propagation");
+        console.log("Waiting 1 second for log propagation");
         setTimeout(function () {
-            console.log("stateMachines:", JSON.stringify(getAll('stateMachine'), null, 2));
-            //console.log("logs:", JSON.stringify(getAll('log'), null, 2));
             common.validateState(serverPool);
+            common.showState(serverPool);
             console.log("Validated server pool state");
+            process.exit(0);
         }, 1000);
     }, 2000);
 } else {
     exports.local = local;
     exports.startServers = startServers;
-    exports.addServer = addServer;
+    //exports.addServer = addServer;
     exports.serverPool = serverPool;
     exports.getAll = getAll;
     exports.getLeaderId = getLeaderId;
