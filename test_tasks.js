@@ -1,4 +1,5 @@
 var serverPool = local._serverPool;
+var serverStore = local._serverStore;
 var serverIdx = 0;
 var tqueueOpts = {};
 var tqueue = tasks.Tasks(tqueueOpts);
@@ -14,7 +15,6 @@ function startServers(opts, n, msgCallback) {
         (function () {
             var sidx = i,
                 sopts = serverOpts[i];
-            sopts.verbose = true;
             sopts.listenAddress = "Node " + (serverIdx++);
             sopts.schedule = function (action, time, data) {
                 data = data || {};
@@ -31,8 +31,29 @@ function startServers(opts, n, msgCallback) {
                 msg = msg.replace(/^[0-9]*:/, tqueue.currentTime() + ":");
                 msgCallback(msg);
             };
+
+;
         })();
     }
+
+    // Start the servers with a full cluster config by pre-configuring
+    // the full configuration in the log so that each node will be
+    // aware of it on start. Normally the cluster would start with
+    // a single member and add one server at a time.
+    var startLog = [{"term":0,"command":null}];
+    var oldServers = [];
+    for (var i=0; i < n; i++) {
+        startLog.push({term: 0,
+                       oldServers: oldServers.slice(0),
+                       newServer: i});
+        oldServers.push(i);
+    }
+    for (var i=0; i < n; i++) {
+        serverStore[i] = {"currentTerm": 0,
+                          "votedFor":    null,
+                          "log":         startLog};
+    }
+
     // Create the servers
     var ret = test_common.startServers(serverPool, serverOpts,
                                        local.RaftServerLocal);
@@ -48,22 +69,10 @@ function startServers(opts, n, msgCallback) {
             sopts.sendRPC = function (sid, rpc, args, callback) {
                 var nsid = sid,
                     nrpc = rpc,
-                    nargs = args,
-                    ncallback;
-                ncallback = function (tid, cargs) {
-                    var data = {type: "RPC_Response",
-                                args: cargs,
-                                rpc: nrpc,
-                                src: tid,
-                                dst: sidx,
-                                desc:" from " + tid}
-                    sopts.schedule(function() {
-                        callback(tid, cargs);
-                    }, 10, data);
-                };
+                    nargs = args;
                 var newSendRPC = (function () {
                     return function () {
-                        origSendRPC(nsid, nrpc, nargs, ncallback);
+                        origSendRPC(nsid, nrpc, nargs);
                     };
                 })();
                 var data = {type: "RPC",
@@ -88,6 +97,7 @@ function startServers(opts, n, msgCallback) {
     }
 }
 
+/*
 function addServer(sid, opts) {
     opts = local.copyMap(opts);
     opts.listenAddress = "local:" + sid;
@@ -98,6 +108,7 @@ function addServer(sid, opts) {
 function removeServer(sid) {
     test_common.removeServer(serverPool, sid);
 }
+*/
 
 function getAll(attr) {
     return test_common.getAll(serverPool, attr);

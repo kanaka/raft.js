@@ -216,7 +216,6 @@ tqueueOpts.scheduleCallback = function(task) {
         var src = serverPool[task.data.src]._self,
             dst = serverPool[task.data.dst]._self,
             type;
-        console.log("tdtype:", task.data.type);
         if (task.data.type === 'RPC') {
             type = "green";
         } else {
@@ -243,7 +242,7 @@ tqueueOpts.finishCallback = function(task) {
 };
 tqueueOpts.cancelCallback = tqueueOpts.finishCallback;
 
-startServers({debug:true, verbose:true}, 5, function (msg) {
+startServers({debug:true, verbose:1}, 5, function (msg) {
     messages.innerHTML += msg + "\n";
     messages.scrollTop = messages.scrollHeight;
 });

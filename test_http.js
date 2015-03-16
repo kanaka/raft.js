@@ -14,6 +14,9 @@ function startServers(opts, n) {
     return common.startServers(serverPool, serverOpts,
                                   http.RaftServerHttp);
 }
+function addServersAsync() {
+    return common.addServersAsync(serverPool);
+}
 
 /*
 function addServer(sid, opts) {
@@ -36,6 +39,7 @@ function getLeaderId() {
 if (typeof require !== 'undefined' && require.main === module) {
     //startServers({verbose: true});
     startServers();
+    addServersAsync();
     console.log("Waiting 2 seconds for leader election");
     setTimeout(function () {
         var lid = getLeaderId();

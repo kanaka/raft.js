@@ -1,6 +1,6 @@
 /*
  * raft.js: Raft consensus algorithm in JavaScript
- * Copyright (C) 2013 Joel Martin
+ * Copyright (C) 2015 Joel Martin
  * Licensed under MPL 2.0 (see LICENSE.txt)
  *
  * See README.md for description and usage instructions.
@@ -47,7 +47,7 @@ function RaftServerBase(id, opts) {
 
 
     //
-    // Options sanity checks and defaults
+    // Sanity check options and set defaults
     //
     opts = opts || {};
 
@@ -66,8 +66,7 @@ function RaftServerBase(id, opts) {
     setDefault(opts, 'verbose',           1);
     setDefault(opts, 'log',               function() {
         console.log.apply(console, arguments); });
-    setDefault(opts, 'error',             function() {
-        console.error.apply(console, arguments); });
+    setDefault(opts, 'error',             opts.log);
     setDefault(opts, 'schedule',          function(fn, ms, data) {
         return setTimeout(fn, ms); });
     setDefault(opts, 'unschedule',        function(id) {
@@ -217,7 +216,7 @@ function RaftServerBase(id, opts) {
             }
             if (success) {
                 // update state from the loaded data
-                dbg("load stored data: ", data);
+                dbg("load stored data:", JSON.stringify(data));
                 self.currentTerm = data.currentTerm;
                 self.votedFor = data.votedFor;
                 addEntries(data.log, true);
@@ -233,8 +232,8 @@ function RaftServerBase(id, opts) {
                 self.currentTerm = 0;
                 self.votedFor = null;
                 // Start with ourselves
-                addEntries([{newServer: [self.id, opts.serverData[self.id]],
-                             oldConfig: {}}], true);
+                addEntries([{newServer: self.id,
+                             oldServers: []}], true);
 
                 info("First server, assuming leadership");
                 become_leader();
@@ -264,20 +263,18 @@ function RaftServerBase(id, opts) {
                 entry.command = null;
             }
 
-            if (entry.newServer) {
+            if ('newServer' in entry) {
                 dbg("adding newServer entry:", entry.newServer);
-                self.serverMap[entry.newServer[0]] = entry.newServer[1];
+                self.serverMap[entry.newServer] = opts.serverData[entry.newServer];
             } else if (entry.oldServer) {
                 dbg("removing oldServer entry:", entry.oldServer);
                 delete self.serverMap[entry.oldServer];
             }
 
-            // Update the opts map so that our information is visible
-            // externally
-            opts.serverMap = self.serverMap;
-
             self.log[self.log.length] = entry;
         }
+        // TODO: check that all entries in serverMap have connection
+        // information in opts.serverData
     }
 
     // Apply log entries from self.lastApplied up to self.commitIndex
@@ -342,6 +339,7 @@ function RaftServerBase(id, opts) {
         for (var i=0; i < sids.length; i++) {
             var sid = sids[i];
             if (sid === id) { continue; }
+            //info("*** sid,nextIndex-1,commitIndex:", sid, nextIndex[sid]-1, self.commitIndex);
             var nindex = nextIndex[sid]-1,
                 nterm = self.log[nindex].term,
                 nentries = self.log.slice(nindex+1);
@@ -371,7 +369,7 @@ function RaftServerBase(id, opts) {
     // than half of the servers in server map have votes in the vote
     // map. Only if we have a majority is an election successful.
     function check_vote(serverMap, voteMap) {
-        var scnt = Object.keys(serverMap).length,
+        var scnt = servers().length,
             need = Math.round((scnt+1)/2), // more than half
             votes = {};
         for (var k in serverMap) {
@@ -675,7 +673,7 @@ function RaftServerBase(id, opts) {
             // of the servers.
             matchIndex[sid] = args.curAgreeIndex;
             nextIndex[sid] = args.curAgreeIndex+1;
-            var sids = Object.keys(self.serverMap),
+            var sids = servers(),
                 majorityIndex = getMajorityIndex(sids);
             // Is our term stored on a majority of the servers
             if (majorityIndex > self.commitIndex) {
@@ -699,7 +697,7 @@ function RaftServerBase(id, opts) {
     }
 
     // addServer (Figure 4.1)
-    //   args keys: newServer ([id, connection_info])
+    //   args keys: newServer (id)
     //   response: status, leaderHint
     function addServer(args, callback) {
         self.dbg("addServer:", JSON.stringify(args));
@@ -726,9 +724,17 @@ function RaftServerBase(id, opts) {
             return;
         }
 
+        // NOTE: addition to Raft algorithm. If server is not in
+        // serverData we cannot connect to it so reject it.
+        if (!(args.newServer in opts.serverData)) {
+            callback({status: 'NO_CONNECTION_INFO',
+                      leaderHint: leaderId});
+            return;
+        }
+
         // NOTE: addition to Raft algorithm. If server is already
         // a member, reject it.
-        if (args.newServer[0] in self.serverMap) {
+        if (args.newServer in self.serverMap) {
             callback({status: 'ALREADY_A_MEMBER',
                       leaderHint: leaderId});
             return;
@@ -738,7 +744,7 @@ function RaftServerBase(id, opts) {
         //    configuration plus newServer), commit it using majority
         //    of new configuration (4.1)
         pendingConfigChange = true;
-        addEntries([{oldConfig: copyMap(self.serverMap),
+        addEntries([{oldServers: servers(),
                      newServer: args.newServer}]);
         clientCallbacks[self.log.length-1] = function() {
             pendingConfigChange = false;
@@ -778,7 +784,7 @@ function RaftServerBase(id, opts) {
 
         // NOTE: addition to Raft algorithm. If server is not in the
         // map, reject it.
-        if (!args.oldServer[0] in self.serverMap) {
+        if (!args.oldServer in self.serverMap) {
             callback({status: 'NOT_A_MEMBER',
                       leaderHint: leaderId});
             return;
@@ -788,7 +794,7 @@ function RaftServerBase(id, opts) {
         //    configuration without oldServer), commit it using
         //    majority of new configuration (4.1)
         pendingConfigChange = true;
-        addEntries([{oldConfig: copyMap(self.serverMap),
+        addEntries([{oldServers: servers(),
                      oldServer: args.oldServer}]);
         clientCallbacks[self.log.length-1] = function() {
             pendingConfigChange = false;

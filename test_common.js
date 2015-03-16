@@ -3,22 +3,21 @@ if (typeof module === 'undefined') {
         exports = test_common;
 }
 
-serverMap = {};
+serverData = {};
 
 pendingServerMap = {};
 
 function startServers (spool, serverOpts, klass) {
     for (var sid in serverOpts) {
         var addr = serverOpts[sid].listenAddress;
-        serverMap[sid] = addr;
+        serverData[sid] = addr;
     }
     var sids = Object.keys(serverOpts);
     for (var idx = 0; idx < sids.length; idx++) {
         sid = sids[idx];
         // force debug so _self is exposed for get* functions
         serverOpts[sid].debug = true;
-        serverOpts[sid].verbose = 1;
-        serverOpts[sid].serverData = serverMap;
+        serverOpts[sid].serverData = serverData;
         if (idx === 0) {
             // Tell the first server to initialize
             serverOpts[sid].firstServer = true;
@@ -28,7 +27,6 @@ function startServers (spool, serverOpts, klass) {
         }
         spool[sid] = new klass(sid.toString(), serverOpts[sid]);
     }
-    addServersAsync(spool);
 }
 
 // Call leader addServer RPC to add list of new servers.
@@ -36,13 +34,13 @@ function addServersAsync(spool) {
     var sids = Object.keys(pendingServerMap);
     console.log("addServersAsync (remaining: " + sids.length + ")");
 
-    // Determine the leader
     if (sids.length > 0) {
+        // Determine the leader
         var lid = getLeaderId(spool);
         if (lid) {
             var sid = sids[0];
             console.log("addServersAsync attempting addServer: " + sid);
-            spool[lid].addServer({newServer: [sid, pendingServerMap[sid]]},
+            spool[lid].addServer({newServer: sid},
                     function (result) {
                         //console.log("result:", result);
                         if (result.status === 'OK') {
@@ -63,7 +61,7 @@ function addServersAsync(spool) {
 
 /*
 function addServer (spool, sid, opts, klass) {
-    if (sid in serverMap) {
+    if (sid in serverData) {
         throw new Error("Server " + sid + " already exists");
     }
     var lid = getLeaderId(spool);
@@ -71,8 +69,8 @@ function addServer (spool, sid, opts, klass) {
         throw new Error("Could not determine current leader");
     }
     var addr = opts.listenAddress;
-    serverMap[sid] = addr;
-    opts.serverMap = serverMap;
+    serverData[sid] = addr;
+    opts.serverData = serverData;
     spool[sid] = new klass(sid.toString(), opts);
     spool[lid].addServer({newServer: [sid, addr]},
             function(res) {
@@ -81,15 +79,15 @@ function addServer (spool, sid, opts, klass) {
 }
 
 function removeServer(spool, sid) {
-    if (!sid in serverMap) {
+    if (!sid in serverData) {
         throw new Error("Server " + sid + " does not exists");
     }
     var lid = getLeaderId(spool);
     if (!lid) {
         throw new Error("Could not determine current leader");
     }
-    delete serverMap[sid];
-    spool[lid].removeServer(serverMap,
+    delete serverData[sid];
+    spool[lid].removeServer(serverData,
             function(res) {
                 console.log("removeServer result:", res);
             });
@@ -283,6 +281,7 @@ function validateState(spool) {
 }
 
 exports.startServers = startServers;
+exports.addServersAsync = addServersAsync;
 //exports.addServer = addServer;
 exports.getAll = getAll;
 exports.getLeaderId = getLeaderId;

@@ -1,18 +1,38 @@
 "use strict";
 
 // Parmeters
-var verbose = false,
+var verbose = 1,
     debug = true,
     electionTimeout = 1000,
-    nodeCnt = 3,
     connPollDelay = 3000;
 
 // Global state
 var messages = document.getElementById('messages'),
+    node_link = document.getElementById('node_link'),
+    channel = null,
     nodeId = null,
     node = null,
     nodeMap = {};
 
+function getParameterByName(name) {
+    name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+        results = regex.exec(location.search);
+    return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+}
+
+// Get the channel
+channel = getParameterByName('channel');
+
+// Setup the new node link
+node_link.href = location.origin + location.pathname + location.search;
+node_link.innerHTML = node_link.href;
+// Set firstServer from the hash, then unset the hash
+var firstServer = false;
+if (location.hash === "#firstServer") {
+    firstServer = true;
+    location.hash = "";
+}
 
 // Logging
 function log() {
@@ -47,23 +67,25 @@ function rtcReceive(json) {
 //
 var peer = new Peer({host: location.hostname,
                      port: location.port,
-                     path: '/api'});
+                     path: '/api/' + channel});
 peer.on('open', function(id) {
-    log('my ID:', id);
+    log('my RTC ID:', id);
     nodeId = id;
+    // Put ourself into the map
+    nodeMap[nodeId] = null;
+
     // Load the peer list and connect
-    jQuery.getJSON('/peers', function (peers) {
-        log("Peer list:", peers);
+    jQuery.getJSON('/peers/' + channel, function (peers) {
+        log("RTC peer list:", peers);
         $.each(peers, function (idx, peer_id) {
             // If it is us, or we are already connected, ignore
             if (peer_id in nodeMap) return true;
             if (peer_id === nodeId) {
-                // Put self into the map
-                nodeMap[peer_id] = null;
+                // Ignore
                 return true;
             }
 
-            log("Connecting to:", peer_id);
+            log("Connecting to RTC peer:", peer_id);
             var conn = peer.connect(peer_id);
             nodeMap[peer_id] = conn;
             conn.on('data', function(data) {
@@ -71,49 +93,39 @@ peer.on('open', function(id) {
                 rtcReceive(data);
             });
             conn.on('close', function(data) {
-                log("Connection closed:" + conn.peer);
+                log("RTC connection closed:" + conn.peer);
                 delete nodeMap[peer_id];
             });
         });
     });
 
+    // Create the local raft.js node
+    log("Starting Raft node");
+    var opts = {verbose: verbose,
+                debug: debug,
+                log: log,
+                serverData: nodeMap,
+                firstServer: firstServer,
+                sendRPC: rtcSend,
+                electionTimeout: electionTimeout};
+
+    node = new local.RaftServerLocal(nodeId, opts);
+
 });
+
 peer.on('error', function(e) {
     log('peer error:', e);
 });
 peer.on('connection', function(conn) {
-    log("got connection from:", conn.peer);
+    log("Got RTC connection from:", conn.peer);
     nodeMap[conn.peer] = conn;
     conn.on('data', function(data) {
         //log("received from " + conn.peer + ": " + data);
         rtcReceive(data);
     });
     conn.on('close', function(data) {
-        log("Connection closed:" + conn.peer);
+        log("RTC connection closed:" + conn.peer);
         delete nodeMap[conn.peer];
     });
 });
-
-//
-// Raft nodes setup
-//
-// TODO: Do this once nodeMap reaches 3
-function startRaft() {
-    var curNodeCnt = Object.keys(nodeMap).length;
-    if (curNodeCnt >= nodeCnt) {
-        log("Starting Raft cluster");
-        var opts = {verbose: verbose,
-                    debug: debug,
-                    log: log,
-                    serverMap: nodeMap,
-                    sendRPC: rtcSend,
-                    electionTimeout: electionTimeout};
-
-        node = new local.RaftServerLocal(nodeId, opts);
-    } else {
-        log("Waiing: " + curNodeCnt + "/" + nodeCnt + " nodes present");
-        setTimeout(startRaft, connPollDelay);
-    }
-}
-startRaft();
 
