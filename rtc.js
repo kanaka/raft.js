@@ -50,7 +50,11 @@ function rtcSend(targetId, rpcName, args, callback) {
     var conn = nodeMap[targetId],
         json = JSON.stringify([rpcName, nodeId, args]);
     //log("rtcSend:", targetId, json);
-    conn.send(json);
+    if (conn) {
+        conn.send(json);
+    } else {
+        // TODO: server went away
+    }
 }
 function rtcReceive(json) {
     var resp = JSON.parse(json),
@@ -65,6 +69,31 @@ function rtcReceive(json) {
 //
 // Setup PeerJS connections
 //
+
+function addServersAsync() {
+    if (node && node._self.state === 'leader') {
+        // Scan to see if there are new servers in the nodeMap that
+        // are not in the current node serverMap
+        var peerIds = Object.keys(nodeMap);
+        //log("addServersAsync, peerIds: " + peerIds + ", serverMap: " + Object.keys(node._self.serverMap));
+        for (var i=0; i<peerIds.length; i++) {
+            var peerId = peerIds[i];
+            if (!(peerId in node._self.serverMap)) {
+                log("adding server: " + peerId);
+                node.addServer({newServer: peerId}, function(res) {
+                    if (res.status === 'OK') {
+                        log("added server: " + peerId);
+                    } else {
+                        log("could not add server " +
+                            peerId + ": " + res.status);
+                    }
+                });
+            }
+        }
+    }
+    setTimeout(addServersAsync, 1000);
+}
+
 var peer = new Peer({host: location.hostname,
                      port: location.port,
                      path: '/api/' + channel});
@@ -111,6 +140,8 @@ peer.on('open', function(id) {
 
     node = new local.RaftServerLocal(nodeId, opts);
 
+    // Start scanning for new servers
+    addServersAsync();
 });
 
 peer.on('error', function(e) {
