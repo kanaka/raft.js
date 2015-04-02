@@ -761,7 +761,7 @@ function RaftServerBase(id, opts) {
     // removeServer (Figure 4.1)
     //   args keys: oldServer (id)
     //   response: status, leaderHint
-    function removeServer(args) {
+    function removeServer(args, callback) {
         self.dbg("removeServer:", JSON.stringify(args));
         // 1. Reply NOT_LEADER if not leader (6.2)
         if (self.state !== 'leader') {
