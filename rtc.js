@@ -70,28 +70,55 @@ function rtcReceive(json) {
 // Setup PeerJS connections
 //
 
-function addServersAsync() {
+function addRemoveServersAsync() {
+    var changes = 0;
+
     if (node && node._self.state === 'leader') {
-        // Scan to see if there are new servers in the nodeMap that
-        // are not in the current node serverMap
-        var peerIds = Object.keys(nodeMap);
-        //log("addServersAsync, peerIds: " + peerIds + ", serverMap: " + Object.keys(node._self.serverMap));
-        for (var i=0; i<peerIds.length; i++) {
-            var peerId = peerIds[i];
-            if (!(peerId in node._self.serverMap)) {
-                log("adding server: " + peerId);
-                node.addServer({newServer: peerId}, function(res) {
-                    if (res.status === 'OK') {
-                        log("added server: " + peerId);
-                    } else {
-                        log("could not add server " +
-                            peerId + ": " + res.status);
-                    }
-                });
+        //log("addRemoveServersAsync, nodeMap IDs: " + Object.keys(nodeMap) + 
+        //    ", serverMap IDs: " + Object.keys(node._self.serverMap));
+
+        // If an ID is in map1 but not in map2 then call rpc with
+        // {argKey: ID} as the argument. However, only one change will
+        // be requested at a time.
+        var diffNodes = function(map1, map2, rpc, argKey) {
+            var peerIds = Object.keys(map1);
+            for (var i=0; i<peerIds.length; i++) {
+                var peerId = peerIds[i];
+                if (!(peerId in map2)) {
+                    changes += 1;
+                    // Only make one modification each round
+                    if (changes > 1) continue;
+
+                    log(rpc + " of " + peerId);
+                    var args = {};
+                    args[argKey] = peerId;
+                    node[rpc](args, function(res) {
+                        if (res.status === 'OK') {
+                            log("finished " + rpc + " of " + peerId);
+                        } else {
+                            log("could not " + rpc + " of " +
+                                peerId + ": " + res.status);
+                        }
+                    });
+                }
             }
         }
+
+        // Scan to see if there are new servers in the nodeMap that
+        // are not in the current node erverMap and add them
+        diffNodes(nodeMap, node._self.serverMap, "addServer", "newServer");
+
+        // Scan to see if there are servers in the current node
+        // serverMap that are not in the nodeMap and remove them
+        diffNodes(node._self.serverMap, nodeMap, "removeServer", "oldServer");
     }
-    setTimeout(addServersAsync, 1000);
+
+    if (changes > 1) {
+        // If there is still pending changes then cycle around faster
+        setTimeout(addRemoveServersAsync, 50);
+    } else {
+        setTimeout(addRemoveServersAsync, 500);
+    }
 }
 
 var peer = new Peer({host: location.hostname,
@@ -141,7 +168,7 @@ peer.on('open', function(id) {
     node = new local.RaftServerLocal(nodeId, opts);
 
     // Start scanning for new servers
-    addServersAsync();
+    addRemoveServersAsync();
 });
 
 peer.on('error', function(e) {
