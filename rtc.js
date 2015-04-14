@@ -9,10 +9,23 @@ var verbose = 1,
 // Global state
 var messages = document.getElementById('messages'),
     node_link = document.getElementById('node_link'),
+    Tterm = document.getElementById('term'),
+    Tstate = document.getElementById('state'),
+    Tcluster_size = document.getElementById('cluster_size'),
+    Tlog_length = document.getElementById('log_length'),
+    Trv_count = document.getElementById('rv_count'),
+    Trvr_count = document.getElementById('rvr_count'),
+    Tae_count = document.getElementById('ae_count'),
+    Taer_count = document.getElementById('aer_count'),
     channel = null,
     nodeId = null,
     node = null,
-    nodeMap = {};
+    nodeMap = {},
+    rpcCounts = {
+        requestVote: 0,
+        requestVoteResponse: 0,
+        appendEntries: 0,
+        appendEntriesResponse: 0};
 
 function getParameterByName(name) {
     name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
@@ -41,6 +54,16 @@ function log() {
     messages.scrollTop = messages.scrollHeight;
 }
 
+function updateStats() {
+    Tterm.innerText = node._self.currentTerm;
+    Tstate.innerText = node._self.state;
+    Tcluster_size.innerText = Object.keys(node._self.serverMap).length;
+    Tlog_length.innerText = node._self.log.length;
+    Trv_count.innerText = rpcCounts['requestVote'] + "/" + rpcCounts['requestVoteResponse'];
+    Tae_count.innerText = rpcCounts['appendEntries'] + "/" + rpcCounts['appendEntriesResponse'];
+    requestAnimationFrame(updateStats);
+}
+
 
 //
 // Send and receive functions
@@ -50,6 +73,7 @@ function rtcSend(targetId, rpcName, args, callback) {
     var conn = nodeMap[targetId],
         json = JSON.stringify([rpcName, nodeId, args]);
     //log("rtcSend:", targetId, json);
+    rpcCounts[rpcName]++;
     if (conn) {
         conn.send(json);
     } else {
@@ -61,6 +85,7 @@ function rtcReceive(json) {
         rpcName = resp[0],
         otherNodeId = resp[1],
         args = resp[2];
+    rpcCounts[rpcName]++;
     
     // Call the rpc indicated
     node[rpcName](args);
@@ -169,6 +194,7 @@ peer.on('open', function(id) {
 
     // Start scanning for new servers
     addRemoveServersAsync();
+    updateStats();
 });
 
 peer.on('error', function(e) {
