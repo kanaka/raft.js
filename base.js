@@ -570,7 +570,7 @@ function RaftServerBase(id, opts) {
 
     // appendEntries RPC (Figure 3.2)
     //   args keys: term, leaderId, prevLogIndex, prevLogTerm,
-    //              entries, commitIndex
+    //              entries, leaderCommit
     function appendEntries(args) {
         self.dbg("appendEntries:", JSON.stringify(args));
 
