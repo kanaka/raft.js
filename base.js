@@ -588,7 +588,7 @@ function RaftServerBase(id, opts) {
                 opts.sendRPC(args.leaderId, "appendEntriesResponse",
                     {term: self.currentTerm,
                      success: false,
-                     // These are additions
+                     // NOTE: These are additions to the basic Raft algorithm
                      sourceId: id,
                      curAgreeIndex: args.curAgreeIndex});
             });
@@ -616,7 +616,7 @@ function RaftServerBase(id, opts) {
                 opts.sendRPC(args.leaderId, "appendEntriesResponse",
                     {term: self.currentTerm,
                      success: false,
-                     // These are additions
+                     // NOTE: These are additions to the basic Raft algorithm.
                      sourceId: id,
                      curAgreeIndex: args.curAgreeIndex});
             });
@@ -647,7 +647,8 @@ function RaftServerBase(id, opts) {
             opts.sendRPC(args.leaderId, "appendEntriesResponse",
                 {term: self.currentTerm,
                  success: true,
-                 // These are additions
+                 // NOTE: These are additions to the basic Raft
+                 // algorithm
                  sourceId: id,
                  curAgreeIndex: args.curAgreeIndex});
         });
@@ -866,7 +867,6 @@ function RaftServerBase(id, opts) {
            addServer:             addServer,
            removeServer:          removeServer,
            clientRequest:         clientRequest};
-           //changeMembership:      changeMembership};
     if (opts.debug) {
         api._self = self;
         api._step_down = step_down;
