@@ -289,23 +289,48 @@ capability of sending RPCs over the WebRTC Data Channel.
 
 ### 3.3 WebRTC ###
 
+WebRTC is name of a collection of browser APIs and network protocols
+that are currently being standardized the W3C and IETF respectively.
+Collectively, these APIs and protocols work together to enable
+real-time peer-to-peer video, audio and data communication between
+browsers.
 
-#### 3.3.1 Peer-to-Peer ####
+#### 3.3.1 WebRTC APIs ####
 
-- STUN
-- TURN
+- RTCPeerConnection
+    http://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
-#### 3.3.2 Signaling ####
+- RTCDataChannel
+    http://www.w3.org/TR/webrtc/#rtcdatachannel
 
-- SDP
-- ORTC
+- MediaStream (aka getUserMedia)
+    
+  
+These APIs are for creating synchronized streams of media (video and
+audio). MediaStreams are the primary use case that led to the creation
+of the WebRTC APIs and protocols, but they are not relevant for Raft
+over WebRTC.
 
-#### 3.3.3 DataChannel ####
 
-- Data Channel
-- getUserMedia
+#### 3.3.2 WebRTC Protocol ####
+
+- Peer-to-Peer setup
+    - STUN
+    - TURN
+
+- Signaling
+    - SDP
+    - ORTC
+
 
 ### 3.4 PeerJS ###
+
+PeerJS is a project that provides a simplified abstration for using
+WebRTC. The first component of PeerJS is a node.js server library that
+implements a WebRTC signaling server. The second component is
+a JavaScript library that interacts with that signaling server and
+also provides a simpler interface for using the WebRTC APIs.
+
 
 #### 3.4.1 PeerJS Server ####
 
@@ -360,5 +385,7 @@ capability of sending RPCs over the WebRTC Data Channel.
 ### 9 References ###
 
 - Ongaro papers/dissertation
-- Raft Reloaded paper
+    https://github.com/ongardie/dissertation/blob/master/online.pdf?raw=true
+- Raft Refloated paper
+     http://www.cl.cam.ac.uk/~ms705/pub/papers/2015-osr-raft.pdf
 - Lamport paper(s)
