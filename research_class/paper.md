@@ -244,10 +244,6 @@ to run in either a browser environment or within node.js (server-side
 JavaScript). Raft.js implements the Raft algorithm as described in
 "Consensus", Ongaro (dissertation TODO/CITE).
 
-The full algorithm is implemented except for log compaction and full
-client linearizability (clients and client requests are not yet
-assigned unique IDs). These features are planned for the future.
-
 #### 3.2.1 Modular Design ####
 
 The implementation of the Raft algorithm is implemented in the
@@ -274,18 +270,52 @@ between Raft nodes.
 For this paper, the RaftServerLocal class was extended with the
 capability of sending RPCs over the WebRTC Data Channel.
 
-#### 3.2.2 Differences from Raft
+#### 3.2.2 Differences between Raft and Raft.js
 
-- reject config changes if one is already in progress (push complexity
-  out of the cluster algorithm itself)
-- WebRTC is messages based, rather than request/repsonse. Turn
-  response RPC into full RPCs (pass sender as part of response so it
-  can be correlated properly).
-- the Raft paper/protocol has undergone some revisions (including
-  incorporation of suggestions by myself): cluster membership
-  simplifications, separating commit and apply concepts, etc.
-- does not implement log compaction
-- does not assign client and transaction IDs yet.
+The current Raft.js implemenation is based on "Consensus", Ongaro and
+implements most of the Raft algorithm including: leader election, log
+replication, safety, membership changes, client interaction, and
+read-only operation optimizations. Log compaction and full client
+linearizability are not currently implemented (clients and client
+transactions are not assigned unique IDs). These author intends to
+implement these functions in the future, however these do not have
+a significant impact on the ability to test Raft combined with WebRTC.
+
+The Raft protocol description in "Consensus", Ongaro, has undergone
+some revisions since the original draft paper (including incorporation
+of suggestions by the author of this paper). These changes include
+cluster membership simplifications, separating the concepts of
+committing entries to the log and applying entries to the state
+machine, etc. As part of the work for implementing Raft
+over WebRTC, the Raft.js implementation was updated to reflect the
+most recent Raft paper.
+
+The are also some other differences between Raft.js and the Ongaro
+paper:
+
+* The paper describes the Raft RPCs in terms of the traditional
+  request/response model where requests and reponses are automatically
+  correlated together by a lower level of the software stack. For
+  example with HTTP 1.0 a separate network session is established for
+  each request/response pair (HTTP 1.0). Other examples including
+  using a unique per session ID to correlate request and response.
+  WebRTC DataChannel connections are message based rather than
+  request/response based. The original Raft definition of RPC and RPC
+  response messages almost contain enough information to function
+  correctly in an environment without builtin request/response
+  correlation. Raft.js includes a small modification to the response
+  RPCs for requestVote and appendEntries to add a 'sourceId' field. 
+* The Raft paper is clear that each membership change must be delayed
+  until all the previous membership change is committed (sequential).
+  It is implied that the leader node should track all pending
+  membership change requests and apply them one at a time. However, in
+  Raft.js, if a client requests a membership change while another
+  change request is pending (uncommitted), the leader will reject the
+  change request with a status of 'PENDING_CONFIG_CHANGE'. This
+  keeps the core Raft implementation simpler with the trade-off being
+  that the client implementation of membership change requests is
+  slightly more complex.
+
 
 ### 3.3 WebRTC ###
 
@@ -296,6 +326,9 @@ real-time peer-to-peer video, audio and data communication between
 browsers.
 
 #### 3.3.1 WebRTC APIs ####
+
+The WebRTC browser APIs are currently being standardized by the W3C
+organization.
 
 - RTCPeerConnection
     http://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
@@ -331,12 +364,66 @@ implements a WebRTC signaling server. The second component is
 a JavaScript library that interacts with that signaling server and
 also provides a simpler interface for using the WebRTC APIs.
 
+The JavaScript interface use for establishing the initial connection
+(signaling) in the WebRTC 1.0 standard is somewhat complicated.
+A competeing standard called Obejct Real-time Communication (ORTC) is
+working to define a simpler and more modular JavaScript API for WebRTC
+signaling. However, at the time of this work, the ORTC interface was
+not yet widely supported and still in a state of flux.  The use of
+PeerJS provides a suitable abstraction in the meantime (and will
+likely be modified to support ORTC).
 
 #### 3.4.1 PeerJS Server ####
 
 #### 3.4.2 PeerJS Client Library ####
 
 ### 4 Implementation / Design ###
+
+Five incremental steps:
+
+1. Simple WebRTC messaging: implement a small JavaScript application
+   that uses the PeerJS client library and an unmodified PeerJS
+   signalling server. Demonstrate communication over WebRTC
+   DataChannel using two browser instances (or browser tabs).
+
+2. Raft.js over WebRTC: combine the existing Raft.js implementation
+   with the small JavaScript application above to demonstrate Raft
+   over WebRTC. This step uses a statically configured three node
+   cluster (three browser tabs). The PeerJS signalling server is
+   polled to retrieve the list and other clients and the Raft cluster
+   is started when the number of PeerJS clients reaches three.
+
+3. Updated Raft.js: update the Raft.js implementation to match the
+   latest description of the Raft protocol (as described in
+   "Consensus", Ongaro dissertation). This includes the implementation
+   of the simplified membership change algorithm (sequential changes)
+   and the separation of the log commit and state machine apply
+   concepts. [Additionally, the new Raft.js implementation always
+   starts a new Raft cluster as a cluster with a single node and
+   additional nodes are dynamically added to the cluster (as suggested
+   in section 4.4 of the paper).]
+
+4. Dynamic Raft.js over WebRTC: 
+    * namespace different clusters
+        * provide landing location
+    * clients need to communicate and detect add/removes
+    * automatically add new clients
+    - timeout and remove unresponsive clients
+    - visual representation of current node
+        - node state
+        - node term
+        - current cluster size (maybe ID list)
+        - log size and committed log entries
+        - number of RPCs sent received of each type
+
+5. Visual representation
+
+6. Server as Raft.js peer:
+
+Steps 1-5 were successfully implemented for this paper. Step
+6 was not implemented because the PeerJS project does not have
+a working server-side implementation of the client libraries due to an
+incomplete implementation of the WebRTC APIs for Node.js.
 
 #### 4.1 Server ####
 
@@ -389,3 +476,5 @@ also provides a simpler interface for using the WebRTC APIs.
 - Raft Refloated paper
      http://www.cl.cam.ac.uk/~ms705/pub/papers/2015-osr-raft.pdf
 - Lamport paper(s)
+- IETF WebRTC
+    https://tools.ietf.org/html/draft-ietf-rtcweb-overview-13
