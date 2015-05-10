@@ -327,6 +327,8 @@ browsers.
 
 #### 3.3.1 WebRTC APIs ####
 
+*TODO*
+
 The WebRTC browser APIs are currently being standardized by the W3C
 organization.
 
@@ -347,6 +349,8 @@ over WebRTC.
 
 #### 3.3.2 WebRTC Protocol ####
 
+*TODO*
+
 - Peer-to-Peer setup
     - STUN
     - TURN
@@ -354,6 +358,7 @@ over WebRTC.
 - Signaling
     - SDP
     - ORTC
+    - DLTS
 
 
 ### 3.4 PeerJS ###
@@ -375,11 +380,20 @@ likely be modified to support ORTC).
 
 #### 3.4.1 PeerJS Server ####
 
+*TODO*
+
 #### 3.4.2 PeerJS Client Library ####
 
-### 4 Implementation / Design ###
+*TODO*
 
-Five incremental steps:
+### 4 Design and Implementation Process ###
+
+![Raft over RTC Architecture](raft_rtc_architecture)
+
+#### 4.1 Incremental Steps ####
+
+During the planning phase, the project was broken down into six
+incremental steps:
 
 1. Simple WebRTC messaging: implement a small JavaScript application
    that uses the PeerJS client library and an unmodified PeerJS
@@ -403,45 +417,57 @@ Five incremental steps:
    additional nodes are dynamically added to the cluster (as suggested
    in section 4.4 of the paper).]
 
-4. Dynamic Raft.js over WebRTC: 
-    * namespace different clusters
-        * provide landing location
-    * clients need to communicate and detect add/removes
-    * automatically add new clients
-    - timeout and remove unresponsive clients
-    - visual representation of current node
-        - node state
-        - node term
-        - current cluster size (maybe ID list)
-        - log size and committed log entries
-        - number of RPCs sent received of each type
+4. Dynamic Raft.js over WebRTC: enhance the signaling server with
+   support for sessions/channels to enable multiple separate Raft
+   clusters. Start each cluster with a single node and automatically
+   add and remove Raft nodes as they come and go.
 
-5. Visual representation
+5. Visual representation: display Raft node state and RPC statistics
+   in addition to the internal Raft log messages.
 
-6. Server as Raft.js peer:
+6. Server as Raft.js peer (aspirational): enable server nodes (Raft.js
+   running on Node.js) to fully participate as Raft cluster nodes.
 
-Steps 1-5 were successfully implemented for this paper. Step
-6 was not implemented because the PeerJS project does not have
-a working server-side implementation of the client libraries due to an
-incomplete implementation of the WebRTC APIs for Node.js.
+Steps 1-5 were successfully implemented for this paper. Step 6 was an
+aspirational goal because this functionality is not yet supported in
+PeerJS although it is being tracked by issue report:
+https://github.com/peers/peerjs/issues/103
 
-#### 4.1 Server ####
+#### 4.2 Server ####
+
+*TODO*
 
 - bootstrapping: well known address to create a new cluster/channel
     - new channel
     - first server
 
-#### 4.2 Client ####
+#### 4.3 Client ####
+
+*TODO*
 
 - addRemoveServersAsync
   - should removes or adds be prioritized?
 
+- provide link for adding new node to a cluster, basically the server
+  channel (can be sent to a remote party)
+
+   the first Raft node connects
+    * namespace different clusters
+      * provide landing location
+    * clients need to communicate and detect add/removes
+    * automatically add new clients
+    * timeout and remove unresponsive clients
+
 ### 5 Results ###
+
+*TODO*
 
 - adding and removing
 - setTimer/requestAnimantionFrame slower in background frames
 
 ### 6 Next Steps ###
+
+*TODO*
 
 - Use alternate WebRTC modes (e.g. out of order and/or non-guaranteed
   delivery)
@@ -463,13 +489,19 @@ incomplete implementation of the WebRTC APIs for Node.js.
 
 ### 7 Conclusions ###
 
+*TODO*
+
 - open source
 
 ### 8 Acknowledgements ###
 
+*TODO*
+
 - Ongaro / Ousterhout
 
 ### 9 References ###
+
+*TODO*
 
 - Ongaro papers/dissertation
     https://github.com/ongardie/dissertation/blob/master/online.pdf?raw=true
@@ -478,3 +510,5 @@ incomplete implementation of the WebRTC APIs for Node.js.
 - Lamport paper(s)
 - IETF WebRTC
     https://tools.ietf.org/html/draft-ietf-rtcweb-overview-13
+- PeerJS client in Node.js:
+    https://github.com/peers/peerjs/issues/103
