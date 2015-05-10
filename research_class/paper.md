@@ -304,7 +304,7 @@ paper:
   response messages almost contain enough information to function
   correctly in an environment without builtin request/response
   correlation. Raft.js includes a small modification to the response
-  RPCs for requestVote and appendEntries to add a 'sourceId' field. 
+  RPCs for requestVote and appendEntries to add a 'sourceId' field.
 * The Raft paper is clear that each membership change must be delayed
   until all the previous membership change is committed (sequential).
   It is implied that the leader node should track all pending
@@ -325,7 +325,29 @@ Collectively, these APIs and protocols work together to enable
 real-time peer-to-peer video, audio and data communication between
 browsers.
 
-#### 3.3.1 WebRTC APIs ####
+#### 3.3.1 WebRTC Discovery and Signaling ####
+
+One of the challenges with browser-to-browser communication (and
+direct peer-to-peer communication in general) is that the web browser
+environment or user agent (UA) is usually running behind a firewall in
+a private internet subnet. This complicates direct communication in
+several ways: the public Internet address of the user agent is unknown
+and dynamic, inbound connections are denied by default, and outbound
+connections are network address translated (NATed).
+
+To establish a direct communication channel between browers, WebRTC
+uses mechanism that is similar to the Session Initiation Protocol
+(SIP) commonly used for Voice-over-IP (VoIP) communication. This
+involves a third party server known as a signaling server. Each user
+agent (browser) connects to this server at a well known address in
+order to establish a direct connection to other user agents. The
+signaling server is also uses to communicate session control messages
+(open, close, error) and to negotiate meda capabilities. The signaling
+server may optionally provide other services such as higher level
+session management, HTTP serving of the web application, address book
+service, client presence/availability, etc.
+
+#### 3.3.2 WebRTC APIs ####
 
 *TODO*
 
@@ -339,24 +361,33 @@ organization.
     http://www.w3.org/TR/webrtc/#rtcdatachannel
 
 - MediaStream (aka getUserMedia)
-    
-  
+
+
 These APIs are for creating synchronized streams of media (video and
 audio). MediaStreams are the primary use case that led to the creation
 of the WebRTC APIs and protocols, but they are not relevant for Raft
 over WebRTC.
 
 
-#### 3.3.2 WebRTC Protocol ####
+#### 3.3.3 WebRTC Protocol ####
 
 *TODO*
 
-- Peer-to-Peer setup
-    - STUN
-    - TURN
+WebRTC defines protocols for the peer-to-peer communication in WebRTC,
+however, the signaling methods are not defined by WebRTC. This is
+often up to the application designer.
 
-- Signaling
-    - SDP
+The signaling server is able to determine the public Internet address
+and port of each user agent. Actual signaling protocol often uses
+WebSockets for transport.
+
+- Protocol soup:
+    - Interactive Connectivity Establishment (ICE) framework
+        - STUN
+        - TURN
+    - JSEP
+        - SDP
+            - the message format exchanged via the signaling server
     - ORTC
     - DLTS
 
@@ -380,15 +411,23 @@ likely be modified to support ORTC).
 
 #### 3.4.1 PeerJS Server ####
 
+The PeerJS project provides a simple WebRTC signaling server called
+PeerServer. This server uses HTTP and WebSockets transport protocols
+to perform WebRTC signaling on behalf of browser clients. The
+PeerServer server is also extensible so that more advanced services
+can be built with it.
+
 *TODO*
 
 #### 3.4.2 PeerJS Client Library ####
 
 *TODO*
 
-### 4 Design and Implementation Process ###
+### 4 Design and Implementation ###
 
-![Raft over RTC Architecture](raft_rtc_architecture.png)
+![Raft over RTC Architecture](raft_rtc_architecture.png "Figure 1: Raft over RTC Architecture")
+
+**Figure 1: Raft over RTC Architecture**
 
 #### 4.1 Incremental Steps ####
 
@@ -512,3 +551,9 @@ https://github.com/peers/peerjs/issues/103
     https://tools.ietf.org/html/draft-ietf-rtcweb-overview-13
 - PeerJS client in Node.js:
     https://github.com/peers/peerjs/issues/103
+- PeerJS server:
+    https://github.com/peers/peerjs-server
+- WebRTC basics:
+    http://www.html5rocks.com/en/tutorials/webrtc/basics/
+- WebRTC infrastructure:
+    http://www.html5rocks.com/en/tutorials/webrtc/infrastructure/
