@@ -388,7 +388,7 @@ likely be modified to support ORTC).
 
 ### 4 Design and Implementation Process ###
 
-![Raft over RTC Architecture](raft_rtc_architecture)
+![Raft over RTC Architecture](raft_rtc_architecture.png)
 
 #### 4.1 Incremental Steps ####
 
