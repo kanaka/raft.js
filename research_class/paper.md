@@ -51,15 +51,15 @@ and state management.
 However, it is not always desirable for application messages and state
 to traverse the server back-end for various reasons including the
 following:
-- security (privacy): application state and user messages may need to
+- **security (privacy)**: application state and user messages may need to
   traverse directly from browser to browser rather than traversing
   through a server.
-- locality: the nature of the application may allow clusters of
+- **locality**: the nature of the application may allow clusters of
   applications that are nearby on a network (e.g. intranet) to
   communicate and coordinate directly rather than passing all messages
   and state through a server back-end which may be considerable more
   remote.
-- bandwidth and scale: a distributed browser based application may be
+- **bandwidth and scale**: a distributed browser based application may be
   able to avoid expensive bandwidth into and out of the backend
   data-center by passing messages and state directly between browsers.
   Depending on the design of the appication this may also enable
@@ -67,18 +67,18 @@ following:
 
 Here are some specific use cases in which Raft over WebRTC may be
 applicable:
-- Consistent order secure chat: a chat room system where all users see
+- **Consistent order secure chat**: a chat room system where all users see
   the same message order but messages never traverse through a central
   server even though the application code itself is delivered from
   a central web service.
-- Private multi-user document editing/whiteboard system: Google
+- **Private multi-user document editing/whiteboard system**: Google
   Docs among other systems has demonstrated a powerful model for
   collaborative document creation. However, these systems all user
   central web services to coordinate shared state and handle
   brower-to-browser communication. Using a Raft over WebRTC could
   enable tools with similar functionality but without the central
   coordnation and communication.
-- Browser based network games: most network games have certain states
+- **Browser based network games**: most network games have certain states
   that must be agreed upon by all nodes (e.g. avatar dead or alive,
   etc). This can be achieved with Raft over WebRTC without requiring
   any data to traverse a central server. In addition to reducing
@@ -354,6 +354,8 @@ service, client presence/availability, etc.
 The WebRTC browser APIs are currently being standardized by the W3C
 organization.
 
+http://www.w3.org/TR/webrtc/
+
 - RTCPeerConnection
     http://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
 
@@ -361,6 +363,7 @@ organization.
     http://www.w3.org/TR/webrtc/#rtcdatachannel
 
 - MediaStream (aka getUserMedia)
+    http://www.w3.org/TR/webrtc/#media-stream-api-extensions-for-network-use
 
 
 These APIs are for creating synchronized streams of media (video and
@@ -525,6 +528,9 @@ https://github.com/peers/peerjs/issues/103
 - separate the consensus data from the latency sensitive or bulky
   data. Might have consensus data use hashes to the real data for
   consensus with performance.
+- Dynamically adjust timeout values to account for changing network
+  conditions: original members of cluster may have very different
+  network conditions from current members.
 
 ### 7 Conclusions ###
 
