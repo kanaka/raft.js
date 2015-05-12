@@ -349,27 +349,45 @@ service, client presence/availability, etc.
 
 #### 3.3.2 WebRTC APIs ####
 
-*TODO*
+The WebRTC browser APIs enable web applications written in JavaScript
+to establish browser-to-browser network connectivity in order to
+stream real-time video, audio and data communication. These APIs are
+currently in the process of being standardized by the W3C organization
+(TODO/CITE: http://www.w3.org/TR/webrtc/)
 
-The WebRTC browser APIs are currently being standardized by the W3C
-organization.
+There are three primary WebRTC API definitions:
 
-http://www.w3.org/TR/webrtc/
+- [RTCPeerConnection](http://www.w3.org/TR/webrtc/#rtcpeerconnection-interface):
+  The RTCPeerConnection API represents a direct connection between two
+  browsers. Each RTCPeerConnection object has an associated
+  Interactive Connectivity Establishment (ICE) agent that is used to
+  establish nework connectivity through firewalls and NAT services.
 
-- RTCPeerConnection
-    http://www.w3.org/TR/webrtc/#rtcpeerconnection-interface
+- [MediaStream (aka
+  getUserMedia)](http://www.w3.org/TR/webrtc/#media-stream-api-extensions-for-network-use):
+  The MediaStream API represents a stream of audio or video data.
+  MediaStreams can easily be sent and received over
+  RTCPeerConnections. The MediaStream API defintion provides
+  a mechanism that allows JavaScript to enumerate the native
+  MediaStreams that are provided by the browser such as a local web
+  camera or a live video stream of the desktop (for desktop sharing).
+  Although support for MediaStreams was the original impetus for the
+  creation of the WebRTC APIs and protocols, the Raft over WebRTC
+  implementation does not make use of the MediaStream API.
 
-- RTCDataChannel
-    http://www.w3.org/TR/webrtc/#rtcdatachannel
-
-- MediaStream (aka getUserMedia)
-    http://www.w3.org/TR/webrtc/#media-stream-api-extensions-for-network-use
-
-
-These APIs are for creating synchronized streams of media (video and
-audio). MediaStreams are the primary use case that led to the creation
-of the WebRTC APIs and protocols, but they are not relevant for Raft
-over WebRTC.
+- [RTCDataChannel](http://www.w3.org/TR/webrtc/#rtcdatachannel): The
+  RTCDataChannel API provides a mechanism for sending and receiving
+  generic data. A single RTCPeerConnection can contain multiple
+  RTCDataChannels. The RTCDataChannel API is modeled after the
+  WebSocket API, however, unlike the WebSocket API which is reliable
+  and guaranteed order transport (like TCP), each RTCDataChannel can
+  be configured with different reliability and ordering settings. For
+  example, by relaxing the reliability and ordering constraints on
+  a RTCDataChannel, the average latency and jitter per message can be
+  decreased even though some messages may be dropped or arrive out of
+  order. The Raft protocol is specifically designed to support dropped
+  or out-of-order messages so the transport options available with
+  RTCDataChannel can be used to gain extra efficiency.
 
 
 #### 3.3.3 WebRTC Protocol ####
@@ -381,8 +399,8 @@ however, the signaling methods are not defined by WebRTC. This is
 often up to the application designer.
 
 The signaling server is able to determine the public Internet address
-and port of each user agent. Actual signaling protocol often uses
-WebSockets for transport.
+and port of each browser user agent. Actual signaling protocol often
+uses WebSockets for transport.
 
 - Protocol soup:
     - Interactive Connectivity Establishment (ICE) framework
