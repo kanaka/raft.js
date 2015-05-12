@@ -1,14 +1,9 @@
-# Use Blue Modern style
-
-
-title Raft over WebRTC
-
 Browser A->rtc_server.js: GET /
 note right of rtc_server.js: create channel 1
 rtc_server.js->Browser A: redirect /rtc.html?channel=1#firstserver
 
 Browser A->rtc_server.js: GET /rtc.html?channel=1#firstServer
-rtc_server.js->Browser A: rtc.html
+rtc_server.js->Browser A: \"<html>...\"
 
 Browser A<-->rtc_server.js: Signaling WebSocket
 
@@ -17,7 +12,7 @@ rtc_server.js->Browser A: [ PEER1 ]
 
 
 Browser B->rtc_server.js: GET /rtc.html?channel=1
-rtc_server.js->Browser B: rtc.html
+rtc_server.js->Browser B: \"<html>...\"
 
 Browser B<-->rtc_server.js: Signaling WebSocket
 
