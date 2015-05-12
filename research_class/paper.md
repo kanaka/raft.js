@@ -436,16 +436,29 @@ The PeerJS project provides a simple WebRTC signaling server called
 PeerServer. This server uses HTTP and WebSockets transport protocols
 to perform WebRTC signaling on behalf of browser clients. The
 PeerServer server is also extensible so that more advanced services
-can be built with it.
-
-- ExpressPeerServer: Express node.js web application framework
-  combined with PeerJS signaling server.
-
-*TODO*
+can be built with it. The PeerJS project includes an extension to
+PeerServer called ExpressPeerServer that combines a PeerJS signaling
+server with the Node.js based Express web application framework
+(TODO/CITE). 
 
 #### 3.4.2 PeerJS Client Library ####
 
-*TODO*
+The PeerJS client library provides an simple abstraction over the
+native browser WebRTC APIs. The WebRTC API standards are not yet
+finalized and so different browsers and browser releases may support
+different versions of the WebRTC draft APIs. The PeerJS client library
+abstracts over these differences and provides a common interface so
+that the application developer does not have to deal directly with
+browser differences.
+
+The PeerJS client library also provides a default signaling mechanism
+that is designed to operate with a PeerJS signaling server. This is
+particularly helpful because much of the WebRTC signaling transport
+and protocol is not defined as part of the WebRTC standardization
+effort. The PeerJS organization provides a cloud-hosted version of
+a PeerJS compatible signaling server, however an application developer
+can also run their own PeerJS signaling service using the PeerServer
+server described above.
 
 ### 4 Design and Implementation ###
 
@@ -600,6 +613,8 @@ following services:
     https://github.com/peers/peerjs/issues/103
 - PeerJS server:
     https://github.com/peers/peerjs-server
+- Node.js Express web application framework:
+    http://expressjs.com/
 - WebRTC basics:
     http://www.html5rocks.com/en/tutorials/webrtc/basics/
 - WebRTC infrastructure:
