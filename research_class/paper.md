@@ -395,8 +395,8 @@ There are three primary WebRTC API definitions:
 *TODO*
 
 WebRTC defines protocols for the peer-to-peer communication in WebRTC,
-however, the signaling methods are not defined by WebRTC. This is
-often up to the application designer.
+however, the signaling transport is not defined as part of WebRTC.
+This is up to the application designer.
 
 The signaling server is able to determine the public Internet address
 and port of each browser user agent. Actual signaling protocol often
@@ -437,6 +437,9 @@ PeerServer. This server uses HTTP and WebSockets transport protocols
 to perform WebRTC signaling on behalf of browser clients. The
 PeerServer server is also extensible so that more advanced services
 can be built with it.
+
+- ExpressPeerServer: Express node.js web application framework
+  combined with PeerJS signaling server.
 
 *TODO*
 
@@ -494,6 +497,18 @@ PeerJS although it is being tracked by issue report:
 https://github.com/peers/peerjs/issues/103
 
 #### 4.2 Server ####
+
+The file `rtc_server.js` implements the signaling server for the Raft
+over WebRTC application. The server extends the PeerJS
+`ExpressPeerServer` object in order to provide WebRTC signaling. In
+addition to the signaling function, the server also provides the
+following services:
+
+* Static web service:
+
+* Peer list endpoint:
+
+* New channel endpoint: new Raft cluster
 
 *TODO*
 

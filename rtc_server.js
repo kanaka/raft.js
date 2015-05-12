@@ -15,7 +15,7 @@ var options = {
 function newPeerServerChannel(channel) {
     var peerServer = ExpressPeerServer(server, options);
 
-    // Attach PeerJS serer to Express server
+    // Attach PeerJS server to Express server
     app.use('/api/' + channel, peerServer);
 
     // PeerJS event handlers
