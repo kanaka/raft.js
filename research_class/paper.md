@@ -449,9 +449,9 @@ can be built with it.
 
 ### 4 Design and Implementation ###
 
-![Raft over RTC Architecture](raft_rtc_architecture.png "Figure 1: Raft over RTC Architecture")
+![Raft over RTC Architecture](raft_rtc_architecture.png "Diagram 1: Raft over RTC Architecture")
 
-**Figure 1: Raft over RTC Architecture**
+**Diagram 1: Raft over RTC Architecture**
 
 #### 4.1 Incremental Steps ####
 
@@ -498,23 +498,30 @@ https://github.com/peers/peerjs/issues/103
 
 #### 4.2 Server ####
 
+![Raft over RTC Sequence Diagram](raft_rtc_sequence.png "Diagram 2: Raft over RTC Sequence Diagram")
+
+**Diagram 2: Raft over RTC Sequence Diagram**
+
 The file `rtc_server.js` implements the signaling server for the Raft
 over WebRTC application. The server extends the PeerJS
 `ExpressPeerServer` object in order to provide WebRTC signaling. In
 addition to the signaling function, the server also provides the
 following services:
 
-* Static web service:
+* Static web service: this serves the static HTML, CSS and JavaScript
+  that make up the Raft over WebRTC web application.
 
-* Peer list endpoint:
+* New channel endpoint: when a browser loads this endpoint, a new
+  PeerJS channel is created and the browser is redirected to a URL for
+  loading the main application (via static file service above).  The
+  redirect URL has a query string appended that contains the channel
+  ID. In addition the redirect URL has a fragment identifier
+  (hash/history) that communicates to the web application that this is
+  the first server in the channel.
 
-* New channel endpoint: new Raft cluster
-
-*TODO*
-
-- bootstrapping: well known address to create a new cluster/channel
-    - new channel
-    - first server
+* Peer list endpoint: this endpoint takes a channel ID and returns the
+  list of WebRTC peers (browser user agents) that are currently
+  registered in that channel.
 
 #### 4.3 Client ####
 
@@ -597,3 +604,5 @@ following services:
     http://www.html5rocks.com/en/tutorials/webrtc/basics/
 - WebRTC infrastructure:
     http://www.html5rocks.com/en/tutorials/webrtc/infrastructure/
+- Web Sequence Diagrams:
+    https://www.websequencediagrams.com/
