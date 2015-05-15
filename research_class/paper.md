@@ -392,25 +392,72 @@ There are three primary WebRTC API definitions:
 
 #### 3.3.3 WebRTC Protocol ####
 
-*TODO*
+There is a large suite of protocols that are required for a working
+WebRTC system. The Internet Engineering Task Force (IETF) organization
+is responsible for specifying and/or standardizing (where necessary)
+the protocols that are part of WebRTC. In many cases an existing
+protocol is applicable and is referenced or extended as part of the
+WebRTC suite.
 
-WebRTC defines protocols for the peer-to-peer communication in WebRTC,
-however, the signaling transport is not defined as part of WebRTC.
+Describing all the protocols that make up the WebRTC suite is beyond
+the scope of the this document. However, here is a (incomplete) list
+of WebRTC protocols drafts and related protocols that are
+part of WebRTC:
+
+* General:
+  * [WebRTC: Overview](https://tools.ietf.org/html/draft-ietf-rtcweb-overview-13)
+  * [WebRTC: Security Architecture](https://tools.ietf.org/html/draft-ietf-rtcweb-security-arch-11)
+  * [WebRTC: Security Considerations](https://tools.ietf.org/html/draft-ietf-rtcweb-security-08)
+
+* [Data transport](https://tools.ietf.org/html/draft-ietf-rtcweb-transports-08):
+  * [WebRTC: DSCP and other packet markings for RTCWeb QoS](https://tools.ietf.org/html/draft-ietf-tsvwg-rtcweb-qos-03)
+  * [DTLS Encapsulation of SCTP Packets](https://tools.ietf.org/html/draft-ietf-tsvwg-sctp-dtls-encaps-09)
+  * [Stream Control Transmission Protocol (SCTP)-Based Media Transport in the Session Description Protocol (SDP)](https://tools.ietf.org/html/draft-ietf-mmusic-sctp-sdp-14)
+  * [Stream Schedulers and a New Data Chunk for the Stream Control Transmission Protocol](https://tools.ietf.org/html/draft-ietf-tsvwg-sctp-ndata-02)
+  * [WebRTC: Media Transport and Use of RTP](https://tools.ietf.org/html/draft-ietf-rtcweb-rtp-usage-23)
+  * [WebRTC: Data Channels](https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13)
+  * [WebRTC: Data Channel Establishment Protocol](https://tools.ietf.org/html/draft-ietf-rtcweb-data-protocol-09)
+  * [WebRTC: Application Layer Protocol Negotiation for Web Real-Time Communications (WebRTC)](https://tools.ietf.org/html/draft-ietf-rtcweb-alpn-01)
+  * [RFC5245: Interactive Connectivity Establishment (ICE)](https://tools.ietf.org/html/rfc5245)
+  * [RFC5128: Peer-to-Peer (P2P) Communication across Network Address Translators (NATs)](https://tools.ietf.org/html/rfc5128)
+  * [RFC5389: Session Traversal Utilities for NAT (STUN)](https://tools.ietf.org/html/rfc5389)
+  * [RFC3489: STUN - Simple Traversal of User Datagram Protocol (UDP) Through Network Address Translators (NATs)](https://tools.ietf.org/html/rfc3489)
+  * [RFC5766: Traversal Using Relays around NAT (TURN)](https://tools.ietf.org/html/rfc5766)
+  * [RFC6156: Traversal Using Relays around NAT (TURN) Extension for IPv6](https://tools.ietf.org/html/rfc6156)
+  * [RFC6544: TCP Candidates with Interactive Connectivity  Establishment (ICE)](https://tools.ietf.org/html/rfc6544)
+  * [RFC4571: Framing Real-time Transport Protocol (RTP) and RTP Control Protocol (RTCP) Packets over Connection-Oriented Transport](https://tools.ietf.org/html/RFC4571)
+  * [RFC5764: Datagram Transport Layer Security (DTLS) Extension to Establish Keys for the Secure Real-time Transport Protocol (SRTP)](https://tools.ietf.org/html/rfc5764)
+
+* Data framing and security
+  * [RFC3550: Real-time Transport Protocol (RTP)](https://tools.ietf.org/html/rfc3550)
+  * [RFC3711: Secure Real-time Transport Protocol (SRTP)](https://tools.ietf.org/html/rfc3711)
+  * [WebRTC: Media Transport and Use of RTP](https://tools.ietf.org/html/draft-ietf-rtcweb-rtp-usage-23)
+  * [WebRTC: Data Channels](https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13)
+  * [WebRTC: Data Channel Establishment Protocol](https://tools.ietf.org/html/draft-ietf-rtcweb-data-protocol-09)
+
+* Data formats (audio)
+  * [WebRTC: WebRTC Codec and Media Processing Requirements](https://tools.ietf.org/html/draft-cbran-rtcweb-codec-02)
+  * [WebRTC: Audio Codec and Processing Requirements](https://tools.ietf.org/html/draft-ietf-rtcweb-audio-07)
+  * [RFC6716: Opus Audio Codec](https://tools.ietf.org/html/rfc6716)
+  * [RTP Payload Format for Opus Speech and Audio Codec](https://tools.ietf.org/html/draft-ietf-payload-rtp-opus-11)
+  * [RFC3551: RTP Profile for Audio and Video Conference](https://tools.ietf.org/html/rfc3551)
+  * [RFC4733: RTP Payload for DTMF Digits, Telephony Tones, and Telephony Signals](https://tools.ietf.org/html/rfc4733)
+  * [WebRTC: Additional WebRTC audio codecs for interoperability with legacy networks](https://tools.ietf.org/html/draft-ietf-rtcweb-audio-codecs-for-interop-01)
+  * [WebRTC: Video Processing and Codec Requirements](https://tools.ietf.org/html/draft-ietf-rtcweb-video-05)
+  * [RFC6386: VP8 Data Format and Decoding Guide](https://tools.ietf.org/html/rfc6386)
+  * [ITU H.264: Advanced video coding for generic audiovisual services](http://www.itu.int/rec/T-REC-H.264)
+  * [RTP Payload Format for VP8 Video](https://tools.ietf.org/html/draft-ietf-payload-vp8-15)
+  * [RFC6236: Negotiation of Generic Image Attributes in the Session Description Protocol (SDP)](https://tools.ietf.org/html/rfc6236)
+
+* Connection management
+  * [RFC3264: An Offer/Answer Model with the Session Description Protocol (SDP)](https://tools.ietf.org/html/rfc3264)
+  * [RFC2327: SDP: Session Description Protocol](https://tools.ietf.org/html/rfc2327)
+  * [WebRTC: Javascript Session Establishment Protocol (JSEP)](https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-09)
+  * [RFC5245: Interactive Connectivity Establishment (ICE)](https://tools.ietf.org/html/rfc5245)
+  * [RFC5763: Trickle ICE: Incremental Provisioning of Candidates for the Interactiv Connectivity Establishment (ICE) Protocol](https://tools.ietf.org/html/draft-ietf-mmusic-trickle-ice-02)
+
+Note: the signaling transport itself is not defined as part of WebRTC.
 This is up to the application designer.
-
-The signaling server is able to determine the public Internet address
-and port of each browser user agent. Actual signaling protocol often
-uses WebSockets for transport.
-
-- Protocol soup:
-    - Interactive Connectivity Establishment (ICE) framework
-        - STUN
-        - TURN
-    - JSEP
-        - SDP
-            - the message format exchanged via the signaling server
-    - ORTC
-    - DLTS
 
 
 ### 3.4 PeerJS ###
@@ -511,17 +558,13 @@ https://github.com/peers/peerjs/issues/103
 
 #### 4.2 Server ####
 
-![Raft over RTC Sequence Diagram](raft_rtc_sequence.png "Diagram 2: Raft over RTC Sequence Diagram")
-
-**Diagram 2: Raft over RTC Sequence Diagram**
-
 The file `rtc_server.js` implements the signaling server for the Raft
 over WebRTC application. The server extends the PeerJS
 `ExpressPeerServer` object in order to provide WebRTC signaling. In
 addition to the signaling function, the server also provides the
-following services:
+following service endpoints:
 
-* Static web service: this serves the static HTML, CSS and JavaScript
+* Static web service endpoint: this serves the static HTML, CSS and JavaScript
   that make up the Raft over WebRTC web application.
 
 * New channel endpoint: when a browser loads this endpoint, a new
@@ -536,29 +579,145 @@ following services:
   list of WebRTC peers (browser user agents) that are currently
   registered in that channel.
 
+Refer to the "4.3 Client" section for a description of how these
+endpoints interact.
+
 #### 4.3 Client ####
 
-*TODO*
+![Raft over RTC Sequence Diagram](raft_rtc_sequence.png "Diagram 2: Raft over RTC Sequence Diagram")
 
-- addRemoveServersAsync
-  - should removes or adds be prioritized?
+**Diagram 2: Raft over RTC Sequence Diagram**
 
-- provide link for adding new node to a cluster, basically the server
-  channel (can be sent to a remote party)
+The Raft over WebRTC testing application is designed as a single web
+page (`rtc.html`). The application has different starting behavior
+depending on the value of the URL query string (the URL component
+following the "?" and up to the "#") and the fragment identifier (the
+URL component after the "#").
 
-   the first Raft node connects
-    * namespace different clusters
-      * provide landing location
-    * clients need to communicate and detect add/removes
-    * automatically add new clients
-    * timeout and remove unresponsive clients
+When a new Raft cluster is created, the browser (user agent) connects
+to the server new channel endpoint. This endpoint causes the server to
+create a new channel for PeerJS signaling. Once this is complete the
+server responds to the browser with a redirect message that contains
+the new channel identifier in the query parameter and an indication
+that this is the very first Raft cluster node in the fragment
+identifier.
 
-### 5 Results ###
+The browser follows the redirect and loads the static web application
+at the static file endpoint provided by the server. This includes the
+main application page (`rtc.html`), the core raft algorithm
+(`base.js` and `local.js`), the PeerJS client libary (`peer.js`), the
+actual Raft over WebRTC implementation (`rtc.js`), and a layout
+stylesheet (`web/demo.css`).
+
+If the URL fragment identifier is set to "firstServer", then this Raft
+node is initialized as the leader of a single node cluster and all
+normal timers are started. The fragment identifier is then unset. The
+query parameter contains the ID of this cluster (the PeerJS channel).
+
+Subsequent nodes are added to the same Raft cluster by starting a new
+browser context (separate browser, browser window, or browser tab) and
+loading the same URL (which no longer has the "firstServer" fragment
+identifier). There is a convenience link provided in the application
+page that opens a new window with a new cluster node.
+
+When the page first loads, a PeerJS signaling connection is
+established with the server. Once this connection is established, the
+application will be notified when any PeerJS clients connect to or
+disconnect from the server. After the PeerJS signaling connection is
+established, the client immediately queries the Peer list endpoint to
+discover any clients that were connected prior to when this node
+connected to the server.
+
+The web application also begins a periodic async polling function
+(`addRemoveServersAsync`) when the page loads. When the node is a Raft
+leader, the function compares the current active list of PeerJS clients to
+the Raft cluster node list. If there are any differences between the
+two lists, then any new clients are added to the Raft cluster and
+missing clients are removed from the Raft cluster one at a time using
+the `addServer` and `removeServer` RPC calls. Servers additions are
+prioritized before removals (as recommended in Ongaro 4.4 TODO/CITE)
+in order to maximize availability.
+
+When an instance of the web application starts that is not
+a "firstServer", the normal Raft timers are not automatically enabled
+until the server receives an RPC. The prevents the server from
+possibly becoming a leader before it is incorporated into the cluster
+by an appendEntries RPC from the "true" leader.
+
+In addition to the low level Raft message log, the following
+statistics are shown in the application:
+* **Term**: the current Raft leadership term.
+* **State**: the current Raft node state (follower, candidate, or
+  leader)
+* **Cluster Size**: a count of the current Raft cluster membership
+  (number of nodes currently participating in the cluster)
+* **Log Length**: number of entries in the transaction log.
+* **Request Votes Sent/Received**: the number of `requestVote` RPCs
+  that have been sent from and received by this node.
+* **Append Entries Sent/Received**: the number of `appendEntries` RPCs
+  that have been sent from and received by this node.
+
+
+### 5 Outcome ###
+
+#### 5.1 Testing ####
+
+The initial way that the application was tested was by loading the
+initial landing page to create a Raft over WebRTC cluster with
+a single leader. Here is a screenshot of the browser after the first
+node is created:
+
+![Raft over WebRTC Browser with One Node](browser_1.png "Figure 1: Raft over WebRTC Browser with One Node")
+
+**Figure 1: Raft over WebRTC Browser with One Node**
+
+Then four more Raft nodes were then added to the cluster by clicking
+on the embedded "create a node" link in the application. Here is
+a screenshot of the browser once four new nodes are added to the
+cluster (5 total):
+
+![Raft over WebRTC Browser with Five Nodes](browser_2.png "Figure 2: Raft over WebRTC Browser with Five Nodes")
+
+**Figure 1: Raft over WebRTC Browser with Five Nodes**
+
+After every change was made to the cluster all the nodes were checked
+to ensure that the following steady state properties were observed:
+* only a single leader
+* all nodes have the same term and transaction log count
+* all non-leader nodes are receiving `appendEntries` RPCs from the leader
+* all nodes have the same perception of the cluster size
+* the transaction log entries are identical on all nodes
+* the state machine is identical on all nodes
+
+The current leader was then terminated. The other nodes were checked
+for the steady state properties. This was repeated until only two
+nodes remained in the cluster.
+
+After the five node cluster was brought up, state machine commands
+were manually sent to leader to add to the transaction log. This was
+done using the JavaScript console as there is not yet a way to do this
+via the interface. Again the nodes were checked for the steady state
+properties.
+
+Then the application was tested was by loading the initial cluster
+creation landing page in a browser tab. Then nodes were randomly added
+to the cluster (by clicking on the link embedded in the page) or
+removed from the cluster (by closing a tab). After each change the
+steady state properties were checked.
+
+Similar testing to the above was done with browser instances on two
+separate computers. In addition, cross-browser functionality was
+verified by running nodes from the same cluster running simultaneously
+in Chrome 42 and Firefox 37.
+
+#### 5.2 Results / Discoveries ####
 
 *TODO*
 
 - adding and removing
 - setTimer/requestAnimantionFrame slower in background frames
+- cannot go from 2 to 1: initial start is dangerous, if falls below 2,
+  then cluster is dead
 
 ### 6 Next Steps ###
 
@@ -566,11 +725,18 @@ following services:
 
 - Use alternate WebRTC modes (e.g. out of order and/or non-guaranteed
   delivery)
-- Have server be a peer and participate
+- Better way to add commands to the transaction log and view the
+  result in the state machine.
+- Quantatative and real-world testing
+- Testing in more varied network environments. How reliable is the
+  ability to establish direct browser-to-browser communication? Do
+  corporate firewalls make this as difficult as is implied in some of
+  the documentation and standards texts.
 - what about going from 2 nodes to 1 node? Asymmetric with going from
   1 to 2 nodes.
     - 2 nodes -> 1 node: tie breaker (non-equal votes?)
 - Timeout and remove nodes without server notification
+    * timeout and remove unresponsive clients
 - Forward client requests rather than redirect (since client would
   need to go over WebRTC channel anyways)
 - Implement a chat system
@@ -584,6 +750,7 @@ following services:
 - Dynamically adjust timeout values to account for changing network
   conditions: original members of cluster may have very different
   network conditions from current members.
+- Have server be a peer and participate
 
 ### 7 Conclusions ###
 
