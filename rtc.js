@@ -55,12 +55,13 @@ function log() {
 }
 
 function updateStats() {
-    Tterm.innerText = node._self.currentTerm;
-    Tstate.innerText = node._self.state;
-    Tcluster_size.innerText = Object.keys(node._self.serverMap).length;
-    Tlog_length.innerText = node._self.log.length;
-    Trv_count.innerText = rpcCounts['requestVote'] + "/" + rpcCounts['requestVoteResponse'];
-    Tae_count.innerText = rpcCounts['appendEntries'] + "/" + rpcCounts['appendEntriesResponse'];
+    console.log("here1:", node._self.currentTerm, node._self.state);
+    Tterm.innerHTML = node._self.currentTerm;
+    Tstate.innerHTML = node._self.state;
+    Tcluster_size.innerHTML = Object.keys(node._self.serverMap).length;
+    Tlog_length.innerHTML = node._self.log.length;
+    Trv_count.innerHTML = rpcCounts['requestVote'] + "/" + rpcCounts['requestVoteResponse'];
+    Tae_count.innerHTML = rpcCounts['appendEntries'] + "/" + rpcCounts['appendEntriesResponse'];
     requestAnimationFrame(updateStats);
 }
 
