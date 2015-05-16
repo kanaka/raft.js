@@ -15,7 +15,7 @@ class citizens.
 
 These new browser capabilities also bring with them the traditional
 challenges of building reliable distributed applications such as:
-concurency, security, scalability, naming, discovery, replication,
+concurrency, security, scalability, naming, discovery, replication,
 relocation, etc. The solutions to many of these challenges involve
 the proper management of distributed state. Distributed consensus is
 one category of distributed state management in which multiple nodes
@@ -62,7 +62,7 @@ following:
 - **bandwidth and scale**: a distributed browser based application may be
   able to avoid expensive bandwidth into and out of the backend
   data-center by passing messages and state directly between browsers.
-  Depending on the design of the appication this may also enable
+  Depending on the design of the application this may also enable
   better scalability then a more centralized model.
 
 Here are some specific use cases in which Raft over WebRTC may be
@@ -71,13 +71,13 @@ applicable:
   the same message order but messages never traverse through a central
   server even though the application code itself is delivered from
   a central web service.
-- **Private multi-user document editing/whiteboard system**: Google
+- **Private multiuser document editing/whiteboard system**: Google
   Docs among other systems has demonstrated a powerful model for
   collaborative document creation. However, these systems all user
   central web services to coordinate shared state and handle
-  brower-to-browser communication. Using a Raft over WebRTC could
+  browser-to-browser communication. Using a Raft over WebRTC could
   enable tools with similar functionality but without the central
-  coordnation and communication.
+  coordination and communication.
 - **Browser based network games**: most network games have certain states
   that must be agreed upon by all nodes (e.g. avatar dead or alive,
   etc). This can be achieved with Raft over WebRTC without requiring
@@ -101,7 +101,7 @@ compaction, and client interaction. The Raft algorithm implemented and
 discussed in this paper is based on "Consensus: Bridging Theory and
 Practice" by Diego Ongaro (PhD Dissertation) TODO/CITE.
 
-The Raft protocol is based on the concept of a distrubted transaction
+The Raft protocol is based on the concept of a distributed transaction
 log. Entries in the log represent a sequence of changes to an internal
 state machine. If all members of the Raft cluster have the same log
 entries, then their state machine on each node will have exactly the
@@ -151,7 +151,7 @@ date. The next appendEntries RPC that the leader sends to that
 node will contain the next oldest index and term. This will continue
 until the leader discovers the latest log entry which is agreement
 (the node may not have any entries if it is new). Then the leader will
-begin to propogate entries to the node in subsequent appendEntries
+begin to propagate entries to the node in subsequent appendEntries
 RPCs until the node is caught up. The leader continues sending
 empty appendEntries as heartbeat RPCs to all the nodes until it
 receives a new entry in its transaction log from a client.
@@ -210,7 +210,7 @@ too old (e.g. when a new node is added).
 #### 3.1.6 Client Interaction ####
 
 Clients of the Raft cluster are able to interact with the distributed
-tate machine by sending RPCs to the leader in order to add command
+state machine by sending RPCs to the leader in order to add command
 entries to the transaction log. Clients first find the address of any
 node in the cluster either via broadcast or via an external directory
 service. Once the client discovers a node of the cluster, that node
@@ -220,7 +220,7 @@ indicating the address of the leader for the client to redirect to.
 
 The Raft protocol should also provide strict linearizable semantics for
 client commands/requests (reads and writes). In order to accomplish
-this, each client is given a unqiue ID, and the client assigns
+this, each client is given a unique ID, and the client assigns
 a unique serial number to each command. This prevents a single client
 command from being applied twice to the state machine (in case of
 a leader crash, or network duplication).
@@ -248,13 +248,13 @@ JavaScript). Raft.js implements the Raft algorithm as described in
 
 The implementation of the Raft algorithm is implemented in the
 RaftServerBase class (in base.js). The base class does not directly
-implement stateful functions such as RPC communcation, durable
+implement stateful functions such as RPC communication, durable
 storage, scheduling/timeouts, or state machine command/management. In
 order to create a working implementation these functions must be
 provided either as configuration parameters when the class is
 instantiated or by sub-classing the class.
 
-The modular design of the Raft.js implemenation allows it to be easily
+The modular design of the Raft.js implementation allows it to be easily
 used in several different contexts. For example, the RaftServerLocal
 class (local.js) implements RPC calls using plain JavaScript function
 calls between different instances of the class (nodes) in the same
@@ -263,7 +263,7 @@ http://kanaka.github.io/raft.js/ uses the RaftServerLocal class and
 instantiates it using a scheduling functions that fire when the user
 clicks on the "Step" button rather than due to the passage of time.
 
-The RaftServerHttp class (http.js) embeds a simple web server into
+The RaftServerHttp class (`http.js`) embeds a simple web server into
 each Raft node and then uses normal HTTP requests to send RPC messages
 between Raft nodes.
 
@@ -272,7 +272,7 @@ capability of sending RPCs over the WebRTC Data Channel.
 
 #### 3.2.2 Differences between Raft and Raft.js
 
-The current Raft.js implemenation is based on "Consensus", Ongaro and
+The current Raft.js implementation is based on "Consensus", Ongaro and
 implements most of the Raft algorithm including: leader election, log
 replication, safety, membership changes, client interaction, and
 read-only operation optimizations. Log compaction and full client
@@ -294,7 +294,7 @@ The are also some other differences between Raft.js and the Ongaro
 paper:
 
 * The paper describes the Raft RPCs in terms of the traditional
-  request/response model where requests and reponses are automatically
+  request/response model where requests and responses are automatically
   correlated together by a lower level of the software stack. For
   example with HTTP 1.0 a separate network session is established for
   each request/response pair (HTTP 1.0). Other examples including
@@ -335,14 +335,14 @@ several ways: the public Internet address of the user agent is unknown
 and dynamic, inbound connections are denied by default, and outbound
 connections are network address translated (NATed).
 
-To establish a direct communication channel between browers, WebRTC
+To establish a direct communication channel between browsers, WebRTC
 uses mechanism that is similar to the Session Initiation Protocol
 (SIP) commonly used for Voice-over-IP (VoIP) communication. This
 involves a third party server known as a signaling server. Each user
 agent (browser) connects to this server at a well known address in
 order to establish a direct connection to other user agents. The
 signaling server is also uses to communicate session control messages
-(open, close, error) and to negotiate meda capabilities. The signaling
+(open, close, error) and to negotiate media capabilities. The signaling
 server may optionally provide other services such as higher level
 session management, HTTP serving of the web application, address book
 service, client presence/availability, etc.
@@ -361,13 +361,13 @@ There are three primary WebRTC API definitions:
   The RTCPeerConnection API represents a direct connection between two
   browsers. Each RTCPeerConnection object has an associated
   Interactive Connectivity Establishment (ICE) agent that is used to
-  establish nework connectivity through firewalls and NAT services.
+  establish network connectivity through firewalls and NAT services.
 
 - [MediaStream (aka
   getUserMedia)](http://www.w3.org/TR/webrtc/#media-stream-api-extensions-for-network-use):
   The MediaStream API represents a stream of audio or video data.
   MediaStreams can easily be sent and received over
-  RTCPeerConnections. The MediaStream API defintion provides
+  RTCPeerConnections. The MediaStream API definition provides
   a mechanism that allows JavaScript to enumerate the native
   MediaStreams that are provided by the browser such as a local web
   camera or a live video stream of the desktop (for desktop sharing).
@@ -455,7 +455,7 @@ part of WebRTC:
   * [RFC2327: SDP: Session Description Protocol](https://tools.ietf.org/html/rfc2327)
   * [WebRTC: Javascript Session Establishment Protocol (JSEP)](https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-09)
   * [RFC5245: Interactive Connectivity Establishment (ICE)](https://tools.ietf.org/html/rfc5245)
-  * [RFC5763: Trickle ICE: Incremental Provisioning of Candidates for the Interactiv Connectivity Establishment (ICE) Protocol](https://tools.ietf.org/html/draft-ietf-mmusic-trickle-ice-02)
+  * [RFC5763: Trickle ICE: Incremental Provisioning of Candidates for the Interactive Connectivity Establishment (ICE) Protocol](https://tools.ietf.org/html/draft-ietf-mmusic-trickle-ice-02)
 
 Note: the signaling transport itself is not defined as part of WebRTC.
 This is up to the application designer.
@@ -463,7 +463,7 @@ This is up to the application designer.
 
 ### 3.4 PeerJS ###
 
-PeerJS is a project that provides a simplified abstration for using
+PeerJS is a project that provides a simplified abstraction for using
 WebRTC. The first component of PeerJS is a node.js server library that
 implements a WebRTC signaling server. The second component is
 a JavaScript library that interacts with that signaling server and
@@ -471,7 +471,7 @@ also provides a simpler interface for using the WebRTC APIs.
 
 The JavaScript interface use for establishing the initial connection
 (signaling) in the WebRTC 1.0 standard is somewhat complicated.
-A competeing standard called Obejct Real-time Communication (ORTC) is
+A competing standard called Object Real-time Communication (ORTC) is
 working to define a simpler and more modular JavaScript API for WebRTC
 signaling. However, at the time of this work, the ORTC interface was
 not yet widely supported and still in a state of flux.  The use of
@@ -521,13 +521,13 @@ incremental steps:
 
 1. Simple WebRTC messaging: implement a small JavaScript application
    that uses the PeerJS client library and an unmodified PeerJS
-   signalling server. Demonstrate communication over WebRTC
+   signaling server. Demonstrate communication over WebRTC
    DataChannel using two browser instances (or browser tabs).
 
 2. Raft.js over WebRTC: combine the existing Raft.js implementation
    with the small JavaScript application above to demonstrate Raft
    over WebRTC. This step uses a statically configured three node
-   cluster (three browser tabs). The PeerJS signalling server is
+   cluster (three browser tabs). The PeerJS signaling server is
    polled to retrieve the list and other clients and the Raft cluster
    is started when the number of PeerJS clients reaches three.
 
@@ -606,7 +606,7 @@ identifier.
 The browser follows the redirect and loads the static web application
 at the static file endpoint provided by the server. This includes the
 main application page (`rtc.html`), the core raft algorithm
-(`base.js` and `local.js`), the PeerJS client libary (`peer.js`), the
+(`base.js` and `local.js`), the PeerJS client library (`peer.js`), the
 actual Raft over WebRTC implementation (`rtc.js`), and a layout
 stylesheet (`web/demo.css`).
 
@@ -812,7 +812,7 @@ Here are some interesting areas for further exploration:
   requests to originate from any node of the cluster and be redirected
   automatically to the leader (rather than the current manual
   process).
-- Perform quantatative and real-world testing to better characterize
+- Perform quantitative and real-world testing to better characterize
   the performance, availability and scalability characteristics of the
   system.
 - Implement a user interface for sending commands to the transaction
@@ -821,7 +821,7 @@ Here are some interesting areas for further exploration:
   two nodes down to one node. Can usefulness and availability be
   improved without sacrificing Raft safety constraints.
 - Test the system in more various network environments. Determine the
-  reliabiliy of establishing direct browser-to-browser communication.
+  reliability of establishing direct browser-to-browser communication.
   Determine if corporate firewalls make this as difficult as is
   implied in some of the documentation and standards texts.
 - Explore models for timing out and automatically removing nodes
@@ -842,14 +842,14 @@ Here are some interesting areas for further exploration:
   [103](https://github.com/peers/peerjs/issues/103) must be resolved
   for this to be feasible. 
 - Explore a design where some nodes of the cluster are non-voting and
-  are not counted as part of transaction commit quorom. However, these
+  are not counted as part of transaction commit quorum. However, these
   nodes would still be included in the log replication algorithm. One
   model this would enable would be a configuration where a small group
   of voting nodes serve as the hub for a larger group of non-voting
   nodes. This may enable higher scaling of the system. It also enables
   interesting applications such as a logging or backup nodes.
 
-### 7 Acknowledgements ###
+### 7 Acknowledgments ###
 
 I would like to thank my academic supervisor, David Levine, for his
 excellent input and oversight of this project. I would also like to
@@ -864,26 +864,26 @@ weekends I spent on this project. Thanks!
 ### 8 References ###
 
 - Ongaro papers/dissertation
-    https://github.com/ongardie/dissertation/blob/master/online.pdf?raw=true
+    - https://github.com/ongardie/dissertation/blob/master/online.pdf?raw=true
 - Raft Refloated paper
-     http://www.cl.cam.ac.uk/~ms705/pub/papers/2015-osr-raft.pdf
+     - http://www.cl.cam.ac.uk/~ms705/pub/papers/2015-osr-raft.pdf
 - Lamport paper(s)
-    http://research.microsoft.com/en-us/um/people/lamport/pubs/paxos-simple.pdf
-    http://research.microsoft.com/apps/pubs/default.aspx?id=64624
-    http://research.microsoft.com/apps/pubs/default.aspx?id=64631
+    - http://research.microsoft.com/en-us/um/people/lamport/pubs/paxos-simple.pdf
+    - http://research.microsoft.com/apps/pubs/default.aspx?id=64624
+    - http://research.microsoft.com/apps/pubs/default.aspx?id=64631
 - W3C WebRTC
-    http://www.w3.org/TR/webrtc/
+    - http://www.w3.org/TR/webrtc/
 - IETF WebRTC
-    https://tools.ietf.org/html/draft-ietf-rtcweb-overview-13
+    - https://tools.ietf.org/html/draft-ietf-rtcweb-overview-13
 - PeerJS client in Node.js issue:
-    https://github.com/peers/peerjs/issues/103
+    - https://github.com/peers/peerjs/issues/103
 - PeerJS server:
-    https://github.com/peers/peerjs-server
+    - https://github.com/peers/peerjs-server
 - Node.js Express web application framework:
-    http://expressjs.com/
+    - http://expressjs.com/
 - WebRTC basics:
-    http://www.html5rocks.com/en/tutorials/webrtc/basics/
+    - http://www.html5rocks.com/en/tutorials/webrtc/basics/
 - WebRTC infrastructure:
-    http://www.html5rocks.com/en/tutorials/webrtc/infrastructure/
+    - http://www.html5rocks.com/en/tutorials/webrtc/infrastructure/
 - Web Sequence Diagrams:
-    https://www.websequencediagrams.com/
+    - https://www.websequencediagrams.com/
