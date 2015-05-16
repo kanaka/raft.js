@@ -409,7 +409,8 @@ part of WebRTC:
   * [WebRTC: Security Architecture](https://tools.ietf.org/html/draft-ietf-rtcweb-security-arch-11)
   * [WebRTC: Security Considerations](https://tools.ietf.org/html/draft-ietf-rtcweb-security-08)
 
-* [Data transport](https://tools.ietf.org/html/draft-ietf-rtcweb-transports-08):
+* Data transport
+  * [WebRTC: Data transport overview](https://tools.ietf.org/html/draft-ietf-rtcweb-transports-08)
   * [WebRTC: DSCP and other packet markings for RTCWeb QoS](https://tools.ietf.org/html/draft-ietf-tsvwg-rtcweb-qos-03)
   * [DTLS Encapsulation of SCTP Packets](https://tools.ietf.org/html/draft-ietf-tsvwg-sctp-dtls-encaps-09)
   * [Stream Control Transmission Protocol (SCTP)-Based Media Transport in the Session Description Protocol (SDP)](https://tools.ietf.org/html/draft-ietf-mmusic-sctp-sdp-14)
@@ -710,73 +711,171 @@ separate computers. In addition, cross-browser functionality was
 verified by running nodes from the same cluster running simultaneously
 in Chrome 42 and Firefox 37.
 
-#### 5.2 Results / Discoveries ####
+#### 5.2 Results ####
 
-*TODO*
+The results of the manual testing above showed that Raft over WebRTC
+was able to perform leader elections correctly, the log and state
+machine was replicated correctly to all nodes, and the safety
+properties were maintained. During testing the membership of the
+cluster was changed numerous times (both node additions and removals)
+and the Raft properties were maintained throughout. In addition,
+client interaction was tested although the application does not
+provide a friendly interface for doing so.
 
-- adding and removing
-- setTimer/requestAnimantionFrame slower in background frames
-- cannot go from 2 to 1: initial start is dangerous, if falls below 2,
-  then cluster is dead
+One limitation of the system is that the if the cluster membership
+drops from two nodes to one node then the cluster will become
+unavailable without manual intervention. This is because when there
+are two nodes in the cluster, both nodes are required for for
+a majority vote and when one member is forcible shutdown then the
+remaining cluster node will be unable to commit transaction entries
+and the cluster will become unavailable. There are several options to
+get around this problem:
+* The node can ask the leader to be removed and then wait for the
+  transaction to become effective before it disconnects.  This may not
+  always be an option especially in a browser context where the user
+  may immediately kill the window/tab without giving the application
+  a change to remove itself from the cluster.
+* The signaling server can serve as a tie-breaker. This would allow
+  the remaining leader successfully commit the removal of the other
+  node. In the case of a partition, the signaling server must only
+  vote for one of the nodes.
+* The node with the lower ID could have an implicit tie-breaker vote.
+  This would allow one node of the partition to continue in the case
+  of a network partition. If a node dies or is killed, this would only
+  allow the cluster to continue to operate if the node that dies
+  happens to have the higher ID.
+* The system could allow manual user intervention. However, this is
+  only likely to work correctly in the case where the user of the last
+  remaining node can be certain that the other node will never return
+  otherwise they is the risk of data-corruption.
+
+Running a Raft cluster in a browser context leads to some level of
+timer instability. The JavaScript execution context is a fully event
+driven environment with a single thread of execution for a given
+JavaScript context. JavaScript code is run when browser (or Node.js)
+events trigger JavaScript code that is registered to that event. In
+order to implement logic that runs periodically, JavaScript code
+is register as a callback timer using the setTimer, setInterval or
+requestAnimationFrame APIs. However, none of these mechanisms is
+a precise timer. When a timer fires, the callback code they refer to
+is added to the JavaScript event queue and events on the queue are
+processed in the order they arrive. This means callbacks may be
+delayed by other code that is already running or queued first.
+
+However, there is another browser mechanism that is less well known 
+but that causes even larger delays in timer code execution. Modern
+browsers often have dozens or even hundreds of windows and/or tabs
+open simultaneously. In order to reduce CPU load, increase user
+responsiveness and improve battery life, most modern browsers will
+throttle the JavaScript callback timers for all windows and tabs that
+are hidden or have not been directly interacted with for some period
+of time. This throttling can cause timers to slow down by an order of
+magnitude or more.
+
+In the context of Raft over WebRTC, the slowdown of background page
+timers means that whenever the leader node is residing on a page that
+is in the background, the propagation of transaction log entries slows
+down substantially. This also means that other nodes which are in the
+foreground are more likely to have an election timeout timer fire and
+they are more likely to become a leader because they are more likely
+to be able to send and receive votes quickly than nodes that are in
+the background. In this sense the problem is self-correcting because
+over the long term because higher performing nodes more are likely to
+start and win elections. This also indicates dynamic adjustment of
+timeout values may be a fruitful area of further study.
 
 ### 6 Next Steps ###
 
-*TODO*
+One of the useful outcomes of this project was that it brought to
+light many areas where further study of Raft, WebRTC, and Raft over
+WebRTC should be pursued.
 
-- Use alternate WebRTC modes (e.g. out of order and/or non-guaranteed
-  delivery)
-- Better way to add commands to the transaction log and view the
-  result in the state machine.
-- Quantatative and real-world testing
-- Testing in more varied network environments. How reliable is the
-  ability to establish direct browser-to-browser communication? Do
-  corporate firewalls make this as difficult as is implied in some of
-  the documentation and standards texts.
-- what about going from 2 nodes to 1 node? Asymmetric with going from
-  1 to 2 nodes.
-    - 2 nodes -> 1 node: tie breaker (non-equal votes?)
-- Timeout and remove nodes without server notification
-    * timeout and remove unresponsive clients
-- Forward client requests rather than redirect (since client would
-  need to go over WebRTC channel anyways)
-- Implement a chat system
-- Test system survival without presence of server
-- Larger scale deployments on multiple systems
-- Cross-browser testing
-- Raft log compaction
-- separate the consensus data from the latency sensitive or bulky
-  data. Might have consensus data use hashes to the real data for
-  consensus with performance.
-- Dynamically adjust timeout values to account for changing network
-  conditions: original members of cluster may have very different
-  network conditions from current members.
-- Have server be a peer and participate
+Here are some interesting areas for further exploration:
 
-### 7 Conclusions ###
+* Explore the use of alternate WebRTC transport modes for relaxing
+  ordering constraints and delivery guarantees. Since the Raft
+  protocol is tolerant of out-of-order and dropped messages, it is
+  possible that Raft over WebRTC could be more efficient with these
+  one or both of these constraints relaxed.
+- Test the survivability of the cluster when the signaling server is
+  becomes completely unresponsive or just very slow.
+- Implement a full online chat system with linearizable guarantees for
+  the chat message ordering.
+- Explore models for dynamically adjusting Raft timeout values to
+  account for changing network and browser conditions.
+- Test the ability of the system to catch up stale nodes by
+  disconnecting one or more nodes, run the cluster for some period
+  time with transactions created periodically, and then reconnect the stale
+  clients.
+- Implement and test forwarding client requests rather than default
+  redirecting the client to the leader. In other words, allow client
+  requests to originate from any node of the cluster and be redirected
+  automatically to the leader (rather than the current manual
+  process).
+- Perform quantatative and real-world testing to better characterize
+  the performance, availability and scalability characteristics of the
+  system.
+- Implement a user interface for sending commands to the transaction
+  log and for viewing the current state of the Raft state machine.
+- Explore models for dealing with the case where the cluster goes from
+  two nodes down to one node. Can usefulness and availability be
+  improved without sacrificing Raft safety constraints.
+- Test the system in more various network environments. Determine the
+  reliabiliy of establishing direct browser-to-browser communication.
+  Determine if corporate firewalls make this as difficult as is
+  implied in some of the documentation and standards texts.
+- Explore models for timing out and automatically removing nodes
+  when they become unresponsive without needing to be notified by the
+  signaling server that the nodes have disconnected.
+- Test larger scale deployments across multiple systems. Determine the
+  factors that affect scalability and characterize scaling limits.
+- Perform wider cross-browser testing including Internet Explorer and
+  Opera.
+- Implement Raft log compaction.
+- Explore models that allow for a combination of strict shared state
+  and high performance bulk data such as media or object blobs. For
+  example, the data with full consensus might contain hashes that to
+  the refer to bulk data.
+- Implement a Node.js based Raft over WebRTC application. This would
+  allow non-browser contexts to participate in the Raft cluster
+  together with the browser clients. PeerJS issue
+  [103](https://github.com/peers/peerjs/issues/103) must be resolved
+  for this to be feasible. 
+- Explore a design where some nodes of the cluster are non-voting and
+  are not counted as part of transaction commit quorom. However, these
+  nodes would still be included in the log replication algorithm. One
+  model this would enable would be a configuration where a small group
+  of voting nodes serve as the hub for a larger group of non-voting
+  nodes. This may enable higher scaling of the system. It also enables
+  interesting applications such as a logging or backup nodes.
 
-*TODO*
+### 7 Acknowledgements ###
 
-- open source
+I would like to thank my academic supervisor, David Levine, for his
+excellent input and oversight of this project. I would also like to
+thank Diego Ongaro for his amazing work on the Raft protocol and paper
+which made implementing a Raft implementation a pleasure. There are
+too many people involved in the creation and standardization of WebRTC
+but I would like to thank them for their tireless work to make
+browser-to-browser communication possible. Last but not least, I would
+like to thank my family for putting up with the long nights and
+weekends I spent on this project. Thanks!
 
-### 8 Acknowledgements ###
-
-*TODO*
-
-- David Levine - supervisor
-- Ongaro / Ousterhout
-
-### 9 References ###
-
-*TODO*
+### 8 References ###
 
 - Ongaro papers/dissertation
     https://github.com/ongardie/dissertation/blob/master/online.pdf?raw=true
 - Raft Refloated paper
      http://www.cl.cam.ac.uk/~ms705/pub/papers/2015-osr-raft.pdf
 - Lamport paper(s)
+    http://research.microsoft.com/en-us/um/people/lamport/pubs/paxos-simple.pdf
+    http://research.microsoft.com/apps/pubs/default.aspx?id=64624
+    http://research.microsoft.com/apps/pubs/default.aspx?id=64631
+- W3C WebRTC
+    http://www.w3.org/TR/webrtc/
 - IETF WebRTC
     https://tools.ietf.org/html/draft-ietf-rtcweb-overview-13
-- PeerJS client in Node.js:
+- PeerJS client in Node.js issue:
     https://github.com/peers/peerjs/issues/103
 - PeerJS server:
     https://github.com/peers/peerjs-server
