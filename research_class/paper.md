@@ -863,27 +863,27 @@ weekends I spent on this project. Thanks!
 
 ### 8 References ###
 
-- Ongaro papers/dissertation
-    - https://github.com/ongardie/dissertation/blob/master/online.pdf?raw=true
-- Raft Refloated paper
-     - http://www.cl.cam.ac.uk/~ms705/pub/papers/2015-osr-raft.pdf
-- Lamport paper(s)
-    - http://research.microsoft.com/en-us/um/people/lamport/pubs/paxos-simple.pdf
-    - http://research.microsoft.com/apps/pubs/default.aspx?id=64624
-    - http://research.microsoft.com/apps/pubs/default.aspx?id=64631
-- W3C WebRTC
-    - http://www.w3.org/TR/webrtc/
-- IETF WebRTC
-    - https://tools.ietf.org/html/draft-ietf-rtcweb-overview-13
-- PeerJS client in Node.js issue:
-    - https://github.com/peers/peerjs/issues/103
-- PeerJS server:
-    - https://github.com/peers/peerjs-server
-- Node.js Express web application framework:
-    - http://expressjs.com/
-- WebRTC basics:
-    - http://www.html5rocks.com/en/tutorials/webrtc/basics/
-- WebRTC infrastructure:
-    - http://www.html5rocks.com/en/tutorials/webrtc/infrastructure/
-- Web Sequence Diagrams:
-    - https://www.websequencediagrams.com/
+* Ongaro papers/dissertation
+    * https://github.com/ongardie/dissertation/blob/master/online.pdf?raw=true
+* Raft Refloated paper
+     * http://www.cl.cam.ac.uk/~ms705/pub/papers/2015-osr-raft.pdf
+* Lamport paper(s)
+    * http://research.microsoft.com/en-us/um/people/lamport/pubs/paxos-simple.pdf
+    * http://research.microsoft.com/apps/pubs/default.aspx?id=64624
+    * http://research.microsoft.com/apps/pubs/default.aspx?id=64631
+* W3C WebRTC
+    * http://www.w3.org/TR/webrtc/
+* IETF WebRTC
+    * https://tools.ietf.org/html/draft-ietf-rtcweb-overview-13
+* PeerJS client in Node.js issue:
+    * https://github.com/peers/peerjs/issues/103
+* PeerJS server:
+    * https://github.com/peers/peerjs-server
+* Node.js Express web application framework:
+    * http://expressjs.com/
+* WebRTC basics:
+    * http://www.html5rocks.com/en/tutorials/webrtc/basics/
+* WebRTC infrastructure:
+    * http://www.html5rocks.com/en/tutorials/webrtc/infrastructure/
+* Web Sequence Diagrams:
+    * https://www.websequencediagrams.com/
