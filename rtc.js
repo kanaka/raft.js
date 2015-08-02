@@ -35,7 +35,8 @@ function getParameterByName(name) {
 }
 
 // Get the channel
-channel = getParameterByName('channel');
+var channel = getParameterByName('channel');
+var console_logging = getParameterByName('console_logging');
 
 // Setup the new node link
 node_link.href = location.origin + location.pathname + location.search;
@@ -50,12 +51,15 @@ if (location.hash === "#firstServer") {
 // Logging
 function log() {
     var msg = Array.prototype.slice.call(arguments, 0).join(' ');
+    if (console_logging) {
+        console.log(msg);
+    }
     messages.innerHTML += msg + "\n";
     messages.scrollTop = messages.scrollHeight;
 }
 
 function updateStats() {
-    console.log("here1:", node._self.currentTerm, node._self.state);
+    //console.log("here1:", node._self.currentTerm, node._self.state);
     Tterm.innerHTML = node._self.currentTerm;
     Tstate.innerHTML = node._self.state;
     Tcluster_size.innerHTML = Object.keys(node._self.serverMap).length;
@@ -147,6 +151,8 @@ function addRemoveServersAsync() {
     }
 }
 
+window.onload = function() {
+
 var peer = new Peer({host: location.hostname,
                      port: location.port,
                      path: '/api/' + channel});
@@ -214,3 +220,4 @@ peer.on('connection', function(conn) {
     });
 });
 
+}
