@@ -330,6 +330,26 @@ function RaftServerBase(id, opts) {
         return majorityIndex;
     }
 
+    function checkCommits() {
+        var sids = servers(),
+            majorityIndex = getMajorityIndex(sids);
+        // Is our term stored on a majority of the servers
+        if (majorityIndex > self.commitIndex) {
+            var termStored = false;
+            for (var idx=majorityIndex; idx < self.log.length; idx++) {
+                if (self.log[idx].term === self.currentTerm) {
+                    termStored = true;
+                    break;
+                }
+            }
+            if (termStored) {
+                self.commitIndex = Math.min(majorityIndex,
+                                            self.log.length-1);
+                applyEntries();
+            }
+        }
+    }
+
     // The core of the leader/log replication algorithm, called
     // periodically (opts.heartbeatTime) while a leader.
     function leader_heartbeat() {
@@ -362,6 +382,11 @@ function RaftServerBase(id, opts) {
         // queue us up to be called again
         heartbeat_timer = opts.schedule(leader_heartbeat,
                                         opts.heartbeatTime);
+
+        // If we are the only member of the cluster then we need to
+        // periodically check if entries are committed and whether
+        // they need to be applied
+        checkCommits();
     }
 
 
@@ -466,16 +491,10 @@ function RaftServerBase(id, opts) {
         clear_election_timer();
         // Ignore or reject RPC/API calls
         api.requestVote = function(args) {
-            dbg("Ignoring clientRequest(", args, ")");
+            dbg("Ignoring requestVote(", args, ")");
         };
         api.appendEntries = function(args) {
             dbg("Ignoring appenEntries(", args, ")");
-        };
-        api.clientRequest = function(cmd, callback) {
-            dbg("Rejecting clientRequest(", cmd, ")");
-            if (callback) {
-                callback({'status': 'error', 'msg': 'terminated'});
-            }
         };
     }
 
@@ -674,23 +693,7 @@ function RaftServerBase(id, opts) {
             // of the servers.
             matchIndex[sid] = args.curAgreeIndex;
             nextIndex[sid] = args.curAgreeIndex+1;
-            var sids = servers(),
-                majorityIndex = getMajorityIndex(sids);
-            // Is our term stored on a majority of the servers
-            if (majorityIndex > self.commitIndex) {
-                var termStored = false;
-                for (var idx=majorityIndex; idx < self.log.length; idx++) {
-                    if (self.log[idx].term === self.currentTerm) {
-                        termStored = true;
-                        break;
-                    }
-                }
-                if (termStored) {
-                    self.commitIndex = Math.min(majorityIndex,
-                                                self.log.length-1);
-                    applyEntries(majorityIndex);
-                }
-            }
+            checkCommits();
         } else {
             nextIndex[sid] -= 1;
             // TODO: resend immediately
