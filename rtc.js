@@ -79,7 +79,10 @@ function rtcSend(targetId, rpcName, args, callback) {
         json = JSON.stringify([rpcName, nodeId, args]);
     //log("rtcSend:", targetId, json);
     rpcCounts[rpcName]++;
-    if (conn) {
+    if (targetId === nodeId) {
+        // Local send
+        rtcReceive(json);
+    } else if (conn) {
         conn.send(json);
     } else {
         // TODO: server went away
@@ -94,6 +97,41 @@ function rtcReceive(json) {
     
     // Call the rpc indicated
     node[rpcName](args);
+}
+
+// Wrap async clientRequest/clientRequestResponse messages into
+// a callback based clientRequest call
+var curLeaderId = null;
+var pendingClientRequest = null;
+function clientRequest(args, callback) {
+    //log("clientRequest:", args);
+    if (pendingClientRequest) {
+        // TODO: fix this
+        throw Error("outstanding clientRequest");
+    }
+    args['responseId'] = nodeId;
+    pendingClientRequest = {args: args, callback: callback};
+    if (curLeaderId === null || curLeaderId === nodeId) {
+        node.clientRequest(args);
+    } else {
+        rtcSend(curLeaderId, 'clientRequest', args);
+    }
+}
+function clientRequestResponse(result) {
+    //log("clientRequestResponse:", result);
+    if (result.status === 'NOT_LEADER') {
+        curLeaderId = result.leaderHint;
+        if (pendingClientRequest) {
+            var args = pendingClientRequest.args;
+            //log("curLeaderId:", curLeaderId, nodeMap[curLeaderId]);
+            rtcSend(curLeaderId, 'clientRequest', args);
+        }
+    } else {
+        var callback = pendingClientRequest.callback,
+            args = pendingClientRequest.args;
+        pendingClientRequest = null;
+        callback(result);
+    }
 }
 
 //
@@ -195,7 +233,8 @@ peer.on('open', function(id) {
                 serverData: nodeMap,
                 firstServer: firstServer,
                 sendRPC: rtcSend,
-                electionTimeout: electionTimeout};
+                electionTimeout: electionTimeout,
+                clientRequestResponse: clientRequestResponse};
 
     node = new local.RaftServerLocal(nodeId, opts);
 

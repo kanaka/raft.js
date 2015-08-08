@@ -71,6 +71,8 @@ function RaftServerBase(id, opts) {
         return setTimeout(fn, ms); });
     setDefault(opts, 'unschedule',        function(id) {
         return clearTimeout(id); });
+    setDefault(opts, 'clientRequestResponse', function(args) {
+        console.warn("ignoring clientRequestResponse"); });
     if (typeof opts.saveFn === 'undefined') {
         console.warn("no saveFn, server recovery will not work");
         opts.saveFn = function(data, callback) {
@@ -762,6 +764,10 @@ function RaftServerBase(id, opts) {
         setTimeout(leader_heartbeat,1);
     }
 
+    function addServerResponse(args) {
+        console.log("addServerResponse:", args);
+    }
+
     // removeServer (Figure 4.1)
     //   args keys: oldServer (id)
     //   response: status, leaderHint
@@ -814,6 +820,10 @@ function RaftServerBase(id, opts) {
         setTimeout(leader_heartbeat,1);
     }
 
+    function removeServerResponse(args) {
+        console.log("removeServerResponse:", args);
+    }
+
     // clientRequest
     //   - cmd is map that is opaque for the most part but may contain
     //     a "ro" key (read-only) that when truthy implies the cmd is
@@ -822,8 +832,12 @@ function RaftServerBase(id, opts) {
     //   - callback is called after the cmd is committed (or
     //     immediately for a read-only cmd) and applied to the
     //     stateMachine
-    function clientRequest(cmd, callback) {
-        callback = callback || function() {};
+    function clientRequest(cmd) {
+        var callback = function(args) {
+            if (cmd.responseId) {
+                opts.sendRPC(cmd.responseId, "clientRequestResponse", args);
+            }
+        };
         if (self.state !== 'leader') {
             // tell the client to use a different server
             callback({'status': 'NOT_LEADER',
@@ -836,18 +850,24 @@ function RaftServerBase(id, opts) {
         // and are not added to the log. Otherwise, the cmd is added
         // to the log and the client callback will be called when the
         // cmd is is committed. See 8
-        cmd = copyMap(cmd);
-        if (cmd.ro) {
-            var result = opts.applyCmd(self.stateMachine, cmd);
+        var tcmd = copyMap(cmd);
+        delete tcmd.responseId;
+        if (tcmd.ro) {
+            var result = opts.applyCmd(self.stateMachine, tcmd);
             callback({status: 'success',
                       result: result});
         } else {
             clientCallbacks[self.log.length] = callback;
-            addEntries([{command: cmd}]);
+            addEntries([{command: tcmd}]);
             pendingPersist = true;
             // trigger leader heartbeat
             setTimeout(leader_heartbeat,1);
         }
+    }
+
+    function clientRequestResponse(args) {
+        dbg("clientRequestResponse:", args);
+        opts.clientRequestResponse(args);
     }
 
 
@@ -869,7 +889,8 @@ function RaftServerBase(id, opts) {
            appendEntriesResponse: appendEntriesResponse,
            addServer:             addServer,
            removeServer:          removeServer,
-           clientRequest:         clientRequest};
+           clientRequest:         clientRequest,
+           clientRequestResponse: clientRequestResponse};
     if (opts.debug) {
         api._self = self;
         api._step_down = step_down;
