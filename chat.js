@@ -1,6 +1,17 @@
 "use strict";
+var talk = document.getElementById('talk'),
+    send = document.getElementById('send'),
+    chat_history = document.getElementById('chat_history');
+
+function updateHistory() {
+    var lines = node._self.stateMachine['history'];
+    if (lines) {
+        chat_history.innerHTML = lines.value.join("\n");
+    }
+}
 
 function applyCmd(stateMachine, cmd) {
+    log("cmd:", JSON.stringify(cmd));
     switch (cmd.op) {
         case 'get':
             stateMachine[cmd.key];
@@ -8,7 +19,7 @@ function applyCmd(stateMachine, cmd) {
         case 'set':
             stateMachine[cmd.key] = cmd.value;
             return stateMachine[cmd.key];
-        case 'seqAppend': 
+        case 'seqAppend':
             // Returns a tuple of [success, curCnt, msg] or an
             // exception if the command is not a valid appendSeq or
             // the target key is not a sequence.
@@ -25,10 +36,12 @@ function applyCmd(stateMachine, cmd) {
                 } else {
                     seq.value.push(cmd.value);
                     seq.cnt += 1;
+                    setTimeout(updateHistory, 1);
                     return [true, seq.cnt];
                 }
             } else {
                 stateMachine[cmd.key] = {cnt: 0, value: [cmd.value]};
+                setTimeout(updateHistory, 1);
                 return [true, 0];
             }
     }
@@ -42,14 +55,13 @@ var sendTimeout = 100,
 function flushSends() {
     setTimeout(flushSends, sendTimeout);
     if (curSend || pendingSends.length === 0) { return; }
-    console.log("here1:", pendingSends);
     var curSend = pendingSends.shift(),
         req = {op: 'seqAppend',
                key: 'history',
                cnt: curSeqCnt,
                value: curSend};
     clientRequest(req, function(result) {
-        console.log("result:", JSON.stringify(result));
+        //console.log("result:", JSON.stringify(result));
         if (result.status !== 'success' || result.result[0] === false) {
             pendingSends.unshift(curSend);
         }
@@ -58,13 +70,19 @@ function flushSends() {
     });
 }
 
+function sendLine() {
+    var line = nodeId + ": " + talk.value;
+    talk.value = "";
+    pendingSends.push(line);
+}
+
 function startChat() {
-    var talk = document.getElementById('talk'),
-        send = document.getElementById('send');
-    send.onclick = function() {
-        console.log("talk.value:", talk.value);
-        pendingSends.push(talk.value); 
-        talk.value = "";
+    send.onclick = sendLine;
+    // Also send on enter
+    talk.onkeyup = function(e) {
+        if (e.keyCode === 13) {
+            sendLine();
+        }
     };
     start({applyCmd: applyCmd});
     flushSends();
