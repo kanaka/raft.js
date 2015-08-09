@@ -93,6 +93,7 @@ function RaftServerLocal(id, opts) {
         switch (cmd.op) {
             case 'get': stateMachine[cmd.key]; break;
             case 'set': stateMachine[cmd.key] = cmd.value; break;
+            default: throw new Error("invalid command: '" + cmd.op + "'");
         }
         return stateMachine[cmd.key];
     };

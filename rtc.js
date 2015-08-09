@@ -77,7 +77,6 @@ function rtcSend(targetId, rpcName, args, callback) {
     // Callback is ignored (no session tracked request/response with RTC)
     var conn = nodeMap[targetId],
         json = JSON.stringify([rpcName, nodeId, args]);
-    //log("rtcSend:", targetId, json);
     rpcCounts[rpcName]++;
     if (targetId === nodeId) {
         // Local send
@@ -107,7 +106,7 @@ function clientRequest(args, callback) {
     //log("clientRequest:", args);
     if (pendingClientRequest) {
         // TODO: fix this
-        throw Error("outstanding clientRequest");
+        throw new Error("outstanding clientRequest");
     }
     args['responseId'] = nodeId;
     pendingClientRequest = {args: args, callback: callback};
@@ -189,7 +188,8 @@ function addRemoveServersAsync() {
     }
 }
 
-window.onload = function() {
+function start(opts) {
+    opts = opts || {};
 
 var peer = new Peer({host: location.hostname,
                      port: location.port,
@@ -227,16 +227,17 @@ peer.on('open', function(id) {
 
     // Create the local raft.js node
     log("Starting Raft node");
-    var opts = {verbose: verbose,
-                debug: debug,
-                log: log,
-                serverData: nodeMap,
-                firstServer: firstServer,
-                sendRPC: rtcSend,
-                electionTimeout: electionTimeout,
-                clientRequestResponse: clientRequestResponse};
+    var node_opts = {verbose: verbose,
+                     debug: debug,
+                     log: log,
+                     serverData: nodeMap,
+                     firstServer: firstServer,
+                     sendRPC: rtcSend,
+                     electionTimeout: electionTimeout,
+                     clientRequestResponse: clientRequestResponse};
+    for (var k in opts) { node_opts[k] = opts[k] };
 
-    node = new local.RaftServerLocal(nodeId, opts);
+    node = new local.RaftServerLocal(nodeId, node_opts);
 
     // Start scanning for new servers
     addRemoveServersAsync();

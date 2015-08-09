@@ -289,23 +289,30 @@ function RaftServerBase(id, opts) {
             var entry = self.log[self.lastApplied],
                 cmd = entry.command,
                 callbacks = {},
+                status = null,
                 result = null;
             if (cmd) {
                 dbg("applying:", cmd);
-                // TODO: handle exceptions
-                result = opts.applyCmd(self.stateMachine, cmd);
+                try {
+                    result = opts.applyCmd(self.stateMachine, cmd);
+                    status = 'success';
+                } catch (exc) {
+                    result = exc.message;
+                    status = 'error';
+                }
             }
             // call client callback for the committed cmds
             var clientCallback = clientCallbacks[self.lastApplied];
             if (clientCallback) {
-                callbacks[self.lastApplied] = [clientCallback, result];
+                callbacks[self.lastApplied] = [clientCallback, status, result];
                 delete clientCallbacks[self.lastApplied];
             }
             saveBefore(function() {
                 for (var idx in callbacks) {
                     var callback = callbacks[idx][0],
-                        result =   callbacks[idx][1];
-                    callback({'status': 'success',
+                        status =   callbacks[idx][1];
+                        result =   callbacks[idx][2];
+                    callback({'status': status,
                               'result': result});
                 }
             });
@@ -853,8 +860,15 @@ function RaftServerBase(id, opts) {
         var tcmd = copyMap(cmd);
         delete tcmd.responseId;
         if (tcmd.ro) {
-            var result = opts.applyCmd(self.stateMachine, tcmd);
-            callback({status: 'success',
+            var status = null;
+            try {
+                result = opts.applyCmd(self.stateMachine, cmd);
+                status = 'success';
+            } catch (exc) {
+                result = exc;
+                status = 'error';
+            }
+            callback({status: status,
                       result: result});
         } else {
             clientCallbacks[self.log.length] = callback;
