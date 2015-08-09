@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 var opts = require('minimist')(process.argv.slice(2),
-                               {default: {port: 8001}});
+                               {default: {port: 8001,
+                                          home: 'rtc.html'}});
 var express = require('express');
 var app = express();
 var ExpressPeerServer = require('peer').ExpressPeerServer;
@@ -45,7 +46,7 @@ app.get('/', function(req, res, next) {
         query += '&'+k+'='+req.query[k];
     }
     // Full redirect URL
-    var url = 'rtc.html?channel=' + channel + query + '#firstServer';
+    var url = opts.home + '?channel=' + channel + query + '#firstServer';
     res.send('<html><head><meta http-equiv="refresh" content="0; url=' + url + '"/></head></html>');
 });
 

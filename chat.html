@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-type" content="text/html; charset=utf-8">
+    <title>Raft over webRTC</title>
+    <link rel="stylesheet" type="text/css" href="web/demo.css"/>
+    <link rel="stylesheet" type="text/css" href="web/chat.css"/>
+</head>
+<body>
+    <header><h1>Raft Distributed Consensus Algorithm over webRTC</h1></header>
+    <br>
+    Create more clients using this link: <a id="node_link" href="" target="_blank">Loading</a>
+    <br><br>
+    <div>
+        <textarea id='history' rows=20></textarea>
+    </div>
+    <div id=talk-div>
+        <table id=talk-table border=0>
+            <tr><td style="width:100%"><input id='talk' type=text rows=1></input></td>
+                <td><button id='send'>Send</button></td>
+        </table>
+    </div>
+    <br><br>
+    <table border=1 style="width: 100%">
+        <tr>
+            <td>
+                Term
+            </td>
+            <td>
+                State
+            </td>
+            <td>
+                Cluster Size
+            </td>
+            <td>
+                Log Length
+            </td>
+            <td>
+                Request Votes Sent/Received
+            </td>
+            <td>
+                Append Entries Sent/Received
+            </td>
+        </tr>
+        <tr>
+            <td id=term>
+                &nbsp;
+            </td>
+            <td id=state>
+                &nbsp;
+            </td>
+            <td id=cluster_size>
+                &nbsp;
+            </td>
+            <td id=log_length>
+                &nbsp;
+            </td>
+            <td id=rv_count>
+                &nbsp;
+            </td>
+            <td id=ae_count>
+                &nbsp;
+            </td>
+        </tr>
+    </table>
+    <div>
+        <textarea id='messages' rows=10></textarea>
+    </div>
+    <!--<script src="http://cdn.peerjs.com/0.3/peer.js"></script>-->
+    <!--<script src="https://skyway.io/dist/0.3/peer.js"></script>-->
+    <script type="text/javascript" src="peer.js"></script>
+    <script type="text/javascript" src="jquery-2.1.3.min.js"></script>
+    <script type="text/javascript" src="base.js"></script>
+    <script type="text/javascript" src="local.js"></script>
+    <script type="text/javascript" src="rtc.js"></script>
+    <script type="text/javascript" src="chat.js"></script>
+    <script type="text/javascript">
+        window.onload = startChat;
+    </script>
+</body>
+</html>
