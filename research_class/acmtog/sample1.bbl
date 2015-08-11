@@ -1,0 +1,451 @@
+%%% -*-BibTeX-*-
+%%% Do NOT edit. File created by BibTeX with style
+%%% ACM-Reference-Format-Journals [18-Jan-2012].
+
+\begin{thebibliography}{00}
+
+%%% ====================================================================
+%%% NOTE TO THE USER: you can override these defaults by providing
+%%% customized versions of any of these macros before the \bibliography
+%%% command.  Each of them MUST provide its own final punctuation,
+%%% except for \shownote{}, \showDOI{}, and \showURL{}.  The latter two
+%%% do not use final punctuation, in order to avoid confusing it with
+%%% the Web address.
+%%%
+%%% To suppress output of a particular field, define its macro to expand
+%%% to an empty string, or better, \unskip, like this:
+%%%
+%%% \newcommand{\showDOI}[1]{\unskip}   % LaTeX syntax
+%%%
+%%% \def \showDOI #1{\unskip}           % plain TeX syntax
+%%%
+%%% ====================================================================
+
+\ifx \showCODEN    \undefined \def \showCODEN     #1{\unskip}     \fi
+\ifx \showDOI      \undefined \def \showDOI       #1{{\tt DOI:}\penalty0{#1}\ }
+  \fi
+\ifx \showISBNx    \undefined \def \showISBNx     #1{\unskip}     \fi
+\ifx \showISBNxiii \undefined \def \showISBNxiii  #1{\unskip}     \fi
+\ifx \showISSN     \undefined \def \showISSN      #1{\unskip}     \fi
+\ifx \showLCCN     \undefined \def \showLCCN      #1{\unskip}     \fi
+\ifx \shownote     \undefined \def \shownote      #1{#1}          \fi
+\ifx \showarticletitle \undefined \def \showarticletitle #1{#1}   \fi
+\ifx \showURL      \undefined \def \showURL       #1{#1}          \fi
+
+\bibitem[\protect\citeauthoryear{Ablamowicz and Fauser}{Ablamowicz and
+  Fauser}{2007}]%
+        {Ablamowicz07}
+{Rafal Ablamowicz} {and} {Bertfried Fauser}. 2007.
+\newblock CLIFFORD: a Maple 11 Package for Clifford Algebra Computations,
+  version 11.
+\newblock   (2007).
+\newblock
+\showURL{%
+Retrieved February 28, 2008 from
+  \url{http://math.tntech.edu/rafal/cliff11/index.html}}
+
+
+\bibitem[\protect\citeauthoryear{Abril and Plant}{Abril and Plant}{2007}]%
+        {Abril07}
+{Patricia~S. Abril} {and} {Robert Plant}. 2007.
+\newblock \showarticletitle{The patent holder's dilemma: Buy, sell, or troll?}
+\newblock {\it Commun. ACM} {50}, 1 (Jan. 2007), 36--44.
+\newblock
+\showDOI{%
+\url{http://dx.doi.org/10.1145/1188913.1188915}}
+
+
+\bibitem[\protect\citeauthoryear{Andler}{Andler}{1979}]%
+        {Andler79}
+{Sten Andler}. 1979.
+\newblock \showarticletitle{Predicate Path expressions}. In {\em Proceedings of
+  the 6th. ACM SIGACT-SIGPLAN symposium on Principles of Programming Languages}
+  {\em (POPL '79)}. ACM Press, New York, NY, 226--236.
+\newblock
+\showDOI{%
+\url{http://dx.doi.org/10.1145/567752.567774}}
+
+
+\bibitem[\protect\citeauthoryear{Anisi}{Anisi}{2003}]%
+        {anisi03}
+{David~A. Anisi}. 2003.
+\newblock {\em Optimal Motion Control of a Ground Vehicle}.
+\newblock Master's\ thesis. Royal Institute of Technology (KTH), Stockholm,
+  Sweden.
+\newblock
+
+
+\bibitem[\protect\citeauthoryear{Bahrami, Lavie, and Rees}{Bahrami
+  et~al\mbox{.}}{2007}]%
+        {BLR-2007}
+{Bahador Bahrami}, {Nilli Lavie}, {and} {Geraint Rees}. 2007.
+\newblock \showarticletitle{Attentional Load Modulates Responses of Human
+  Primary Visual Cortex to Invisible Stimuli}.
+\newblock {\em Current Biology\/} {17}, 6 (March 2007), 509--513.
+\newblock
+
+
+\bibitem[\protect\citeauthoryear{Baudisch, DeCarlo, Duchowski, and
+  Geisler}{Baudisch et~al\mbox{.}}{2003}]%
+        {BDDG-03}
+{P. Baudisch}, {D. DeCarlo}, {A. Duchowski}, {and} {W. Geisler}. 2003.
+\newblock \showarticletitle{Focusing on the essential: considering attention in
+  display design}.
+\newblock {\em Commun. ACM\/} {46}, 3 (2003), 60--66.
+\newblock
+\showISSN{0001-0782}
+\showDOI{%
+\url{http://dx.doi.org/10.1145/636772.636799}}
+
+
+\bibitem[\protect\citeauthoryear{Clarkson}{Clarkson}{1985}]%
+        {Clarkson85}
+{Kenneth~L. Clarkson}. 1985.
+\newblock {\em Algorithms for Closest-Point Problems (Computational Geometry)}.
+\newblock Ph.D. Dissertation. Stanford University, Palo Alto, CA.
+\newblock
+\newblock
+\shownote{UMI Order Number: AAT 8506171.}
+
+
+\bibitem[\protect\citeauthoryear{Cohen}{Cohen}{1996}]%
+        {JCohen96}
+{Jacques Cohen} (Ed.). 1996.
+\newblock \showarticletitle{Special Issue: Digital Libraries}.
+\newblock {\em Commun. {ACM}\/} {39}, 11 (Nov. 1996).
+\newblock
+
+
+\bibitem[\protect\citeauthoryear{Cohen, Nutt, and Sagic}{Cohen
+  et~al\mbox{.}}{2007}]%
+        {Cohen07}
+{Sarah Cohen}, {Werner Nutt}, {and} {Yehoshua Sagic}. 2007.
+\newblock \showarticletitle{Deciding equivalances among conjunctive aggregate
+  queries}.
+\newblock {\em J. ACM\/} {54}, 2, Article 5 (April 2007), 50 pages.
+\newblock
+\showDOI{%
+\url{http://dx.doi.org/10.1145/1219092.1219093}}
+
+
+\bibitem[\protect\citeauthoryear{Cole, DeCarlo, Finkelstein, Kin, Morley, and
+  Santella}{Cole et~al\mbox{.}}{2006}]%
+        {CDFKMS-06}
+{Forrester Cole}, {Doug DeCarlo}, {Adam Finkelstein}, {Kenrick Kin}, {Keith
+  Morley}, {and} {Anthony Santella}. 2006.
+\newblock \showarticletitle{Directing Gaze in {3D} Models with Stylized Focus}.
+\newblock {\em Eurographics Symposium on Rendering\/} (June 2006), 377--387.
+\newblock
+
+
+\bibitem[\protect\citeauthoryear{Collewign, Erkelens, and Steinman}{Collewign
+  et~al\mbox{.}}{1988}]%
+        {BCHH:Collewijn:1988}
+{H. Collewign}, {C.~J. Erkelens}, {and} {R.~M. Steinman}. 1988.
+\newblock \showarticletitle{Binocular co-ordination of human horizontal
+  saccadic eye movements}.
+\newblock {\em Journal of Physiology\/}  {404} (Oct. 1988), 157--182.
+\newblock
+
+
+\bibitem[\protect\citeauthoryear{DeCarlo and Santella}{DeCarlo and
+  Santella}{2002}]%
+        {DS-02}
+{D. DeCarlo} {and} {A. Santella}. 2002.
+\newblock \showarticletitle{Stylization and abstraction of photographs}. In
+  {\em SIGGRAPH '02: Proceedings of the 29th annual conference on Computer
+  graphics and interactive techniques}. ACM Press, New York, NY, USA, 769--776.
+\newblock
+\showISBNx{1-58113-521-1}
+\showDOI{%
+\url{http://dx.doi.org/10.1145/566570.566650}}
+
+
+\bibitem[\protect\citeauthoryear{Dodge}{Dodge}{1900}]%
+        {Dod-1900}
+{R. Dodge}. 1900.
+\newblock \showarticletitle{Visual perception during eye movement}.
+\newblock {\em Psychological Review\/}  {7} (1900), 454--465.
+\newblock
+
+
+\bibitem[\protect\citeauthoryear{Dodge and Cline}{Dodge and Cline}{1901}]%
+        {DC-1901}
+{R. Dodge} {and} {T.~S. Cline}. 1901.
+\newblock \showarticletitle{The angle velocity of eye movements}.
+\newblock {\em Psychological Review\/}  {8} (1901), 145--157.
+\newblock
+
+
+\bibitem[\protect\citeauthoryear{Douglass, Harel, and Trakhtenbrot}{Douglass
+  et~al\mbox{.}}{1998}]%
+        {Douglass98}
+{Bruce~P. Douglass}, {David Harel}, {and} {Mark~B. Trakhtenbrot}. 1998.
+\newblock \showarticletitle{Statecarts in use: structured analysis and
+  object-orientation}.
+\newblock In {\em Lectures on Embedded Systems}, {Grzegorz Rozenberg} {and}
+  {Frits~W. Vaandrager} (Eds.). Lecture Notes in Computer Science, Vol. 1494.
+  Springer-Verlag, London, 368--394.
+\newblock
+\showDOI{%
+\url{http://dx.doi.org/10.1007/3-540-65193-4_29}}
+
+
+\bibitem[\protect\citeauthoryear{Duchowski}{Duchowski}{2002}]%
+        {Duc-2002}
+{A.~T. Duchowski}. 2002.
+\newblock \showarticletitle{A breadth-first survey of eye-tracking
+  applications.}
+\newblock {\em Behav Res Methods Instrum Comput\/} {34}, 4 (Nov. 2002),
+  455--470.
+\newblock
+
+
+\bibitem[\protect\citeauthoryear{Editor}{Editor}{2007}]%
+        {Editor00}
+{Ian Editor} (Ed.). 2007.
+\newblock {\em The title of book one\/} (1st. ed.). The name of the series one,
+  Vol.~9.
+\newblock University of Chicago Press, Chicago.
+\newblock
+\showDOI{%
+\url{http://dx.doi.org/10.1007/3-540-09237-4}}
+
+
+\bibitem[\protect\citeauthoryear{Editor}{Editor}{2008}]%
+        {Editor00a}
+{Ian Editor} (Ed.). 2008.
+\newblock {\em The title of book two\/} (2nd. ed.).
+\newblock University of Chicago Press, Chicago, Chapter 100.
+\newblock
+\showDOI{%
+\url{http://dx.doi.org/10.1007/3-540-09237-4}}
+
+
+\bibitem[\protect\citeauthoryear{Gajewski, Pearson, Mack, Bartlett~III, and
+  Henderson}{Gajewski et~al\mbox{.}}{2005}]%
+        {GPMBH-2005}
+{D.~A. Gajewski}, {A. Pearson}, {M.~L. Mack}, {F.~N. Bartlett~III}, {and}
+  {J.~M. Henderson}. 2005.
+\newblock {\em Lecture Notes in Computer Science}. Vol. 3368/2005.
+\newblock Springer Berlin - Heidelberg, Chapter Human Gaze Control in Real
+  World Search, 83--99.
+\newblock
+
+
+\bibitem[\protect\citeauthoryear{{Google Inc.}}{{Google Inc.}}{year}]%
+        {google}
+{{Google Inc.}} current-year.
+\newblock Google\textsuperscript{\texttrademark} {I}mage {S}earch.
+\newblock   (current-year).
+\newblock
+\newblock
+\shownote{http://images.google.com/.}
+
+
+\bibitem[\protect\citeauthoryear{Gundy, Balzarotti, and Vigna}{Gundy
+  et~al\mbox{.}}{2007}]%
+        {VanGundy07}
+{Matthew~Van Gundy}, {Davide Balzarotti}, {and} {Giovanni Vigna}. 2007.
+\newblock \showarticletitle{Catch me, if you can: Evading network signatures
+  with web-based polymorphic worms}. In {\em Proceedings of the first USENIX
+  workshop on Offensive Technologies} {\em (WOOT '07)}. USENIX Association,
+  Berkley, CA, Article 7, 9 pages.
+\newblock
+
+
+\bibitem[\protect\citeauthoryear{Harel}{Harel}{1978}]%
+        {Harel78}
+{David Harel}. 1978.
+\newblock {\em LOGICS of Programs: AXIOMATICS and DESCRIPTIVE POWER}.
+\newblock MIT Research Lab Technical Report TR-200. Massachusetts Institute of
+  Technology, Cambridge, MA.
+\newblock
+
+
+\bibitem[\protect\citeauthoryear{Harel}{Harel}{1979}]%
+        {Harel79}
+{David Harel}. 1979.
+\newblock {\em First-Order Dynamic Logic}. Lecture Notes in Computer Science,
+  Vol.~68.
+\newblock Springer-Verlag, New York, NY.
+\newblock
+\showDOI{%
+\url{http://dx.doi.org/10.1007/3-540-09237-4}}
+
+
+\bibitem[\protect\citeauthoryear{H{\"o}rmander}{H{\"o}rmander}{1985a}]%
+        {MR781537}
+{Lars H{\"o}rmander}. 1985a.
+\newblock {\em The analysis of linear partial differential operators. {III}}.
+  Grundlehren der Mathematischen Wissenschaften [Fundamental Principles of
+  Mathematical Sciences], Vol. 275.
+\newblock Springer-Verlag, Berlin, Germany. viii+525 pages.
+\newblock
+\showISBNx{3-540-13828-5}
+\newblock
+\shownote{Pseudodifferential operators.}
+
+
+\bibitem[\protect\citeauthoryear{H{\"o}rmander}{H{\"o}rmander}{1985b}]%
+        {MR781536}
+{Lars H{\"o}rmander}. 1985b.
+\newblock {\em The analysis of linear partial differential operators. {IV}}.
+  Grundlehren der Mathematischen Wissenschaften [Fundamental Principles of
+  Mathematical Sciences], Vol. 275.
+\newblock Springer-Verlag, Berlin, Germany. vii+352 pages.
+\newblock
+\showISBNx{3-540-13829-3}
+\newblock
+\shownote{Fourier integral operators.}
+
+
+\bibitem[\protect\citeauthoryear{Kirschmer and Voight}{Kirschmer and
+  Voight}{2010}]%
+        {Kirschmer:2010:AEI:1958016.1958018}
+{Markus Kirschmer} {and} {John Voight}. 2010.
+\newblock \showarticletitle{Algorithmic Enumeration of Ideal Classes for
+  Quaternion Orders}.
+\newblock {\em SIAM J. Comput.\/} {39}, 5 (Jan. 2010), 1714--1747.
+\newblock
+\showISSN{0097-5397}
+\showDOI{%
+\url{http://dx.doi.org/10.1137/080734467}}
+
+
+\bibitem[\protect\citeauthoryear{Knuth}{Knuth}{1997}]%
+        {Knuth97}
+{Donald~E. Knuth}. 1997.
+\newblock {\em The Art of Computer Programming, Vol. 1: Fundamental Algorithms
+  (3rd. ed.)}.
+\newblock Addison Wesley Longman Publishing Co., Inc.
+\newblock
+
+
+\bibitem[\protect\citeauthoryear{Kosiur}{Kosiur}{2001}]%
+        {Kosiur01}
+{David Kosiur}. 2001.
+\newblock {\em Understanding Policy-Based Networking\/} (2nd. ed.).
+\newblock Wiley, New York, NY.
+\newblock
+
+
+\bibitem[\protect\citeauthoryear{Lee}{Lee}{2005}]%
+        {Lee05}
+{Newton Lee}. 2005.
+\newblock \showarticletitle{Interview with Bill Kinder: January 13, 2005}.
+\newblock Video, {\em Comput. Entertain.\/} {3}, 1, Article 4 (Jan.-March
+  2005).
+\newblock
+\showDOI{%
+\url{http://dx.doi.org/10.1145/1057270.1057278}}
+
+
+\bibitem[\protect\citeauthoryear{Novak}{Novak}{2003}]%
+        {Novak03}
+{Dave Novak}. 2003.
+\newblock \showarticletitle{Solder man}. Video. In {\em ACM SIGGRAPH 2003 Video
+  Review on Animation theater Program: Part I - Vol. 145 (July 27--27, 2003)}.
+  ACM Press, New York, NY, 4.
+\newblock
+\showDOI{%
+\url{http://dx.doi.org/99.9999/woot07-S422}}
+
+
+\bibitem[\protect\citeauthoryear{Obama}{Obama}{2008}]%
+        {Obama08}
+{Barack Obama}. 2008.
+\newblock A more perfect union.
+\newblock Video.   (5 March 2008).
+\newblock
+\showURL{%
+Retrieved March 21, 2008 from
+  \url{http://video.google.com/videoplay?docid=6528042696351994555}}
+
+
+\bibitem[\protect\citeauthoryear{Poker-Edge.Com}{Poker-Edge.Com}{2006}]%
+        {Poker06}
+{Poker-Edge.Com}. 2006.
+\newblock Stats and Analysis.
+\newblock   (March 2006).
+\newblock
+\showURL{%
+Retrieved June 7, 2006 from \url{http://www.poker-edge.com/stats.php}}
+
+
+\bibitem[\protect\citeauthoryear{Rous}{Rous}{2008}]%
+        {rous08}
+{Bernard Rous}. 2008.
+\newblock \showarticletitle{The Enabling of Digital Libraries}.
+\newblock {\em Digital Libraries\/} {12}, 3, Article 5 (July 2008).
+\newblock
+\newblock
+\shownote{To appear.}
+
+
+\bibitem[\protect\citeauthoryear{Saeedi, Zamani, and Sedighi}{Saeedi
+  et~al\mbox{.}}{2010a}]%
+        {SaeediMEJ10}
+{Mehdi Saeedi}, {Morteza~Saheb Zamani}, {and} {Mehdi Sedighi}. 2010a.
+\newblock \showarticletitle{A library-based synthesis methodology for
+  reversible logic}.
+\newblock {\em Microelectron. J.\/} {41}, 4 (April 2010), 185--194.
+\newblock
+
+
+\bibitem[\protect\citeauthoryear{Saeedi, Zamani, Sedighi, and Sasanian}{Saeedi
+  et~al\mbox{.}}{2010b}]%
+        {SaeediJETC10}
+{Mehdi Saeedi}, {Morteza~Saheb Zamani}, {Mehdi Sedighi}, {and} {Zahra
+  Sasanian}. 2010b.
+\newblock \showarticletitle{Synthesis of Reversible Circuit Using Cycle-Based
+  Approach}.
+\newblock {\em J. Emerg. Technol. Comput. Syst.\/} {6}, 4 (Dec. 2010).
+\newblock
+
+
+\bibitem[\protect\citeauthoryear{Scientist}{Scientist}{2009}]%
+        {JoeScientist001}
+{Joseph Scientist}. 2009.
+\newblock The fountain of youth.
+\newblock   (Aug. 2009).
+\newblock
+\newblock
+\shownote{Patent No. 12345, Filed July 1st., 2008, Issued Aug. 9th., 2009.}
+
+
+\bibitem[\protect\citeauthoryear{Smith}{Smith}{2010}]%
+        {Smith10}
+{Stan~W. Smith}. 2010.
+\newblock \showarticletitle{An experiment in bibliographic mark-up: Parsing
+  metadata for XML export}. In {\em Proceedings of the 3rd. annual workshop on
+  Librarians and Computers} {\em (LAC '10)}, {Reginald~N. Smythe} {and}
+  {Alexander Noble} (Eds.), Vol.~3. Paparazzi Press, Milan Italy, 422--431.
+\newblock
+\showDOI{%
+\url{http://dx.doi.org/99.9999/woot07-S422}}
+
+
+\bibitem[\protect\citeauthoryear{Spector}{Spector}{1990}]%
+        {Spector90}
+{Asad~Z. Spector}. 1990.
+\newblock \showarticletitle{Achieving application requirements}.
+\newblock In {\em Distributed Systems} (2nd. ed.), {Sape Mullender} (Ed.). ACM
+  Press, New York, NY, 19--33.
+\newblock
+\showDOI{%
+\url{http://dx.doi.org/10.1145/90417.90738}}
+
+
+\bibitem[\protect\citeauthoryear{Thornburg}{Thornburg}{2001}]%
+        {Thornburg01}
+{Harry Thornburg}. 2001.
+\newblock Introduction to Bayesian Statistics.
+\newblock   (March 2001).
+\newblock
+\showURL{%
+Retrieved March 2, 2005 from
+  \url{http://ccrma.stanford.edu/~jos/bayes/bayes.html}}
+
+
+\end{thebibliography}
