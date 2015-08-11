@@ -8,10 +8,11 @@
 
 var system = require('system'),
     webpage = require('webpage'),
+    channel = Math.round(Math.random()*1000000),
     base_address = system.args[1],
     server_count = (system.args.length >= 3) ? parseInt(system.args[2]) : 3;
 
-var query = "?channel=0&console_logging=true";
+var query = '?channel='+ channel + '&console_logging=true';
 
 function new_instance(page_id, firstServer) {
     var page = webpage.create();
@@ -33,7 +34,7 @@ function new_instance(page_id, firstServer) {
     if (!firstServer) {
         full_address += "/rtc.html";
     }
-    full_address += query; //+ (firstServer ? "#firstServer" : "");
+    full_address += query + (firstServer ? "#firstServer" : "");
 
     console.log("Opening " + full_address);
 

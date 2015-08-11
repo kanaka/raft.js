@@ -150,7 +150,18 @@ function addRemoveServersAsync() {
         var diffNodes = function(map1, map2, rpc, argKey) {
             var peerIds = Object.keys(map1);
             for (var i=0; i<peerIds.length; i++) {
-                var peerId = peerIds[i];
+                var peerId = peerIds[i],
+                    cb = (function() {
+                        var id=peerId; // capture current val
+                        return function(res) {
+                            if (res.status === 'OK') {
+                                log("finished " + rpc + " of " + id);
+                            } else {
+                                log("could not " + rpc + " of " +
+                                    id + ": " + res.status);
+                            }
+                        };
+                    })();
                 if (!(peerId in map2)) {
                     changes += 1;
                     // Only make one modification each round
@@ -159,14 +170,7 @@ function addRemoveServersAsync() {
                     log(rpc + " of " + peerId);
                     var args = {};
                     args[argKey] = peerId;
-                    node[rpc](args, function(res) {
-                        if (res.status === 'OK') {
-                            log("finished " + rpc + " of " + peerId);
-                        } else {
-                            log("could not " + rpc + " of " +
-                                peerId + ": " + res.status);
-                        }
-                    });
+                    node[rpc](args, cb);
                 }
             }
         }

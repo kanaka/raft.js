@@ -38,13 +38,20 @@ function newPeerServerChannel(channel) {
 var channelCnt = 0;
 
 app.get('/', function(req, res, next) {
-    var channel = channelCnt++;
-    newPeerServerChannel(channel);
+    var channel = null;
     // Pass along query parameters
     var query = "";
     for (var k in req.query) {
         query += '&'+k+'='+req.query[k];
+        if (k === 'channel') {
+            channel = req.query[k];
+        }
     }
+    if (channel === null) {
+        channel = channelCnt++;
+    }
+    newPeerServerChannel(channel);
+
     // Full redirect URL
     var url = opts.home + '?channel=' + channel + query + '#firstServer';
     res.send('<html><head><meta http-equiv="refresh" content="0; url=' + url + '"/></head></html>');
