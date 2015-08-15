@@ -6,16 +6,21 @@
 //   IP_ADDR=$(hostname -I | awk '{print $1}')
 //   docker run -it -v `pwd`/test/chat.js:/chat.js fentas/slimerjs slimerjs /chat.js http://${IP_ADDR}:8000/
 
-var system = require('system'),
+var home = '/chat.html',
+    system = require('system'),
     webpage = require('webpage'),
     channel = Math.round(Math.random()*1000000),
     base_address = system.args[1],
     server_count = (system.args.length >= 3) ? parseInt(system.args[2]) : 3,
-    timeout = 10*1000;
+    page_create_delay = 1,
+    timeout = (10 + server_count)*1000;
 
 var query = '?channel='+ channel + '&console_logging=true';
 
-function new_page(page_id, firstServer) {
+var pages = [];
+
+function new_page(page_id, home, firstServer, callback) {
+    console.log("new_page: " + Date.now());
     var page = webpage.create();
 
     // Register external handlers
@@ -33,7 +38,7 @@ function new_page(page_id, firstServer) {
     var full_address = base_address;
 
     if (!firstServer) {
-        full_address += '/chat.html';
+        full_address += home;
     }
     full_address += query + (firstServer ? '#firstServer' : '');
 
@@ -44,9 +49,10 @@ function new_page(page_id, firstServer) {
             console.log('Unable to load the address!');
             phantom.exit(1);
         }
-        var mainTitle = page.evaluate(function () {
-            return document.title;
-        });
+        //var mainTitle = page.evaluate(function () {
+        //    return document.title;
+        //});
+        callback(page);
     });
 
     return page;
@@ -71,16 +77,23 @@ function get_node_info(full) {
 function wait_cluster_up(timeout, callback) {
     var start_time = Date.now();
     var checkfn = function () {
+        /*
+        // Wait until all pages/nodes created
+        if (pages.length < server_count) {
+            setTimeout(checkfn, 100);
+            return;
+        }
+        */
         // Gather data from the nodes
         var nodes = [];
-        for (var i=0; i < server_count; i++) {
+        for (var i=0; i < pages.length; i++) {
             nodes.push(pages[i].evaluate(get_node_info));
         }
 
         // Pull out some stats
         var states = {leader:[], candidate:[], follower:[]},
             nodeCnts = [];
-        for (var i=0; i < server_count; i++) {
+        for (var i=0; i < pages.length; i++) {
             var node = nodes[i];
             if (node) {
                 states[node.state].push(i);
@@ -103,7 +116,7 @@ function wait_cluster_up(timeout, callback) {
         } else if (Date.now() - start_time > timeout) {
             callback(false, nodes);
         } else {
-            setTimeout(checkfn, 200);
+            setTimeout(checkfn, 500);
         }
     }
     checkfn();
@@ -117,10 +130,15 @@ function show_nodes(nodes) {
 }
 
 // Start each page/cluster node
-var pages = [];
-for (var i=0; i < server_count; i++) {
-    pages.push(new_page(i, i === 0));
+var pcnt = 0;
+function add_page() {
+    var idx = pcnt;
+    pcnt += 1;
+    if (idx < server_count) {
+        pages.push(new_page(idx, home, idx === 0, add_page));
+    }
 }
+add_page();
 
 // Start checking the states
 wait_cluster_up(timeout, function(status, nodes) {
