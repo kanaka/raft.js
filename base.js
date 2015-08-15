@@ -383,7 +383,7 @@ function RaftServerBase(id, opts) {
                      prevLogTerm: nterm,
                      entries: nentries,
                      leaderCommit: self.commitIndex,
-                    
+                     // NOTE: These are additions to the basic Raft algorithm
                      curAgreeIndex: self.log.length-1});
         }
         // we may be called directly so cancel any outstanding timer
@@ -675,8 +675,7 @@ function RaftServerBase(id, opts) {
             opts.sendRPC(args.leaderId, "appendEntriesResponse",
                 {term: self.currentTerm,
                  success: true,
-                 // NOTE: These are additions to the basic Raft
-                 // algorithm
+                 // NOTE: These are additions to the basic Raft algorithm
                  sourceId: id,
                  curAgreeIndex: args.curAgreeIndex});
         });
@@ -705,6 +704,13 @@ function RaftServerBase(id, opts) {
             checkCommits();
         } else {
             nextIndex[sid] -= 1;
+            if (nextIndex[sid] === 0) {
+                // First log entry is always the same, so start with
+                // the second (setting nextIndex[sid] to 0 results in
+                // occasional errors from -1 indexing into the log)
+                self.dbg("Forcing nextIndex[" + sid + "] to 1");
+                nextIndex[sid] = 1;
+            }
             // TODO: resend immediately
         }
     }
