@@ -223,7 +223,7 @@ peer.on('open', function(id) {
                 rtcReceive(data);
             });
             conn.on('close', function(data) {
-                log("RTC connection closed:" + conn.peer);
+                //log("RTC connection closed:" + conn.peer);
                 delete nodeMap[peer_id];
             });
         });
@@ -259,7 +259,7 @@ peer.on('connection', function(conn) {
         rtcReceive(data);
     });
     conn.on('close', function(data) {
-        log("RTC connection closed:" + conn.peer);
+        //log("RTC connection closed:" + conn.peer);
         delete nodeMap[conn.peer];
     });
 });

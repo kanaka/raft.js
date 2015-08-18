@@ -13,7 +13,8 @@ var home = '/rtc.html',
     base_address = system.args[1],
     server_count = (system.args.length >= 3) ? parseInt(system.args[2]) : 3,
     page_create_delay = 1,
-    timeout = (10 + server_count)*1000;
+    up_timeout = (10 + (server_count*server_count)/4)*1000;
+    pred_timeout = (1 + (server_count*server_count)/6)*1000;
 
 var query = '?channel='+ channel + '&console_logging=true';
 
@@ -42,7 +43,7 @@ function new_page(page_id, home, firstServer, callback) {
     }
     full_address += query + (firstServer ? '#firstServer' : '');
 
-    console.log('Opening ' + full_address);
+    console.log('Opening ' + page_id + ': ' + full_address);
 
     page.open(full_address, function(status) {
         if (status !== 'success') {
@@ -52,7 +53,7 @@ function new_page(page_id, home, firstServer, callback) {
         //var mainTitle = page.evaluate(function () {
         //    return document.title;
         //});
-        callback(page);
+        if (callback) { callback(page); }
     });
 
     return page;
@@ -77,13 +78,6 @@ function get_node_info(full) {
 function wait_cluster_up(timeout, callback) {
     var start_time = Date.now();
     var checkfn = function () {
-        /*
-        // Wait until all pages/nodes created
-        if (pages.length < server_count) {
-            setTimeout(checkfn, 100);
-            return;
-        }
-        */
         // Gather data from the nodes
         var nodes = [];
         for (var i=0; i < pages.length; i++) {
@@ -112,11 +106,35 @@ function wait_cluster_up(timeout, callback) {
             states.candidate.length === 0 && 
             states.follower.length === server_count-1 &&
             totalNodeCnt === server_count*server_count) {
-            callback(true, nodes);
+            callback(true, nodes, Date.now() - start_time);
         } else if (Date.now() - start_time > timeout) {
-            callback(false, nodes);
+            callback(false, nodes, Date.now() - start_time);
         } else {
             setTimeout(checkfn, 500);
+        }
+    }
+    checkfn();
+}
+
+function wait_cluster_predicate(predicate, timeout, callback) {
+    var start_time = Date.now();
+    var checkfn = function () {
+        // Gather data from the nodes
+        var results = [];
+        for (var i=0; i < pages.length; i++) {
+            results.push(pages[i].evaluate(predicate));
+        }
+
+        var trueCnt = results.reduce(function(a,b) {return a+(b?1:0)}, 0);
+        console.log('Predicate results: ' + JSON.stringify(results) +
+                    ', true count: ' + trueCnt);
+        // Exit if cluster is up or we timeout
+        if (trueCnt >= server_count) {
+            callback(true, results, Date.now() - start_time);
+        } else if (Date.now() - start_time > timeout) {
+            callback(false, results, Date.now() - start_time);
+        } else {
+            setTimeout(checkfn, 25);
         }
     }
     checkfn();
@@ -129,26 +147,23 @@ function show_nodes(nodes) {
     }
 }
 
-// Start each page/cluster node
-var pcnt = 0;
-function add_page() {
-    var idx = pcnt;
-    pcnt += 1;
-    if (idx < server_count) {
-        pages.push(new_page(idx, home, idx === 0, add_page));
-    }
-}
-add_page();
-
 // Start checking the states
 wait_cluster_up(timeout, function(status, nodes) {
     if (status) {
-        console.log('Cluster is up');
-        show_nodes(nodes);
+        console.log('Cluster is up after ' + elapsed + 'ms');
+        //show_nodes(nodes);
+
         phantom.exit(0);
     } else {
-        console.log('Cluster failed to come up');
-        show_nodes(nodes);
+        console.log('Cluster failed to come up after ' + elapsed + 'ms');
+        //show_nodes(nodes);
         phantom.exit(1);
     }
 });
+
+// Start each page/cluster node
+pages.push(new_page(0, home, true, function() {
+    for (var idx = 1; idx < server_count; idx++) {
+        pages.push(new_page(idx, home, false));
+    }
+}));
