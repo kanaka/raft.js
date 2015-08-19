@@ -1,49 +1,31 @@
-// Usage:
-// - Start rtc_server.js first:
-//   ./rtc_server --port 8000
-//
-// - Then use a docker build of slimerjs to run the test:
-//   IP_ADDR=$(hostname -I | awk '{print $1}')
-//   docker run -it -v `pwd`/test/rtc.js:/rtc.js fentas/slimerjs slimerjs /rtc.js http://${IP_ADDR}:8000/
+var webpage = require('webpage');
 
-var home = '/rtc.html',
-    system = require('system'),
-    webpage = require('webpage'),
-    channel = Math.round(Math.random()*1000000),
-    base_address = system.args[1],
-    server_count = (system.args.length >= 3) ? parseInt(system.args[2]) : 3,
-    page_create_delay = 1,
-    up_timeout = (10 + (server_count*server_count)/4)*1000;
-    pred_timeout = (1 + (server_count*server_count)/6)*1000;
+exports.new_page = function (page_idx, firstServer, opts, callback) {
+    var query = '?channel='+ opts.channel + '&console_logging=true';
 
-var query = '?channel='+ channel + '&console_logging=true';
-
-var pages = [];
-
-function new_page(page_id, home, firstServer, callback) {
     console.log("new_page: " + Date.now());
     var page = webpage.create();
 
     // Register external handlers
     page.onConsoleMessage = function (msg, line, origin) {
-        console.log('CONSOLE ' + page_id + ': ' + msg);
+        console.log('CONSOLE ' + page_idx + ': ' + msg);
     };
     page.onCallback = function(msg) {
-        console.log('CALLBACK ' + page_id + ': ' + msg);
+        console.log('CALLBACK ' + page_idx + ': ' + msg);
         if (msg === 'QUIT') {
             console.log('Normal exit');
             slimer.exit(0);
         }
     };
 
-    var full_address = base_address;
+    var full_address = opts.base_address;
 
     if (!firstServer) {
-        full_address += home;
+        full_address += opts.home;
     }
     full_address += query + (firstServer ? '#firstServer' : '');
 
-    console.log('Opening ' + page_id + ': ' + full_address);
+    console.log('Opening ' + page_idx + ': ' + full_address);
 
     page.open(full_address, function(status) {
         if (status !== 'success') {
@@ -59,30 +41,46 @@ function new_page(page_id, home, firstServer, callback) {
     return page;
 }
 
-// Evaluates in page context so 'node' variable is implicit
-function get_node_info(full) {
-    if (typeof node !== 'undefined' && node) {
-        var data = {id: node._self.id,
-                    state: node._self.state,
-                    serverMapKeys: Object.keys(node._self.serverMap)};
-        if (full) {
-            data.stateMachine = node._self.stateMachine;
-            data.log = node._self.log;
-        }
-        return data;
-    } else {
-        return null;
+exports.get_node_info = function (pages, full) {
+    var nodes = [];
+    for (var i=0; i < pages.length; i++) {
+        nodes.push(pages[i].evaluate(function(full) {
+            // Evaluates in page context so 'node' variable is implicit
+            if (typeof node !== 'undefined' && node) {
+                var data = {id: node._self.id,
+                            state: node._self.state,
+                            serverMapKeys: Object.keys(node._self.serverMap)};
+                if (full) {
+                    data.stateMachine = node._self.stateMachine;
+                    data.log = node._self.log;
+                }
+                return data;
+            } else {
+                return null;
+            }
+        }, full));
+    }
+    return nodes;
+}
+
+exports.get_leader_idx = function(nodes) {
+    for (var i=0; i < nodes.length; i++) {
+        if (nodes[i].state === 'leader') { return i; }
     }
 }
 
-function wait_cluster_up(timeout, callback) {
+exports.show_nodes = function (nodes) {
+    for (var i=0; i < nodes.length; i++) {
+        console.log('Node ' + i + ': ');
+        console.log(JSON.stringify(nodes[i], null, 2));
+    }
+}
+
+exports.wait_cluster_up = function (pages, server_count, timeout, callback) {
     var start_time = Date.now();
     var checkfn = function () {
         // Gather data from the nodes
-        var nodes = [];
-        for (var i=0; i < pages.length; i++) {
-            nodes.push(pages[i].evaluate(get_node_info));
-        }
+        var nodes = exports.get_node_info(pages, false);
 
         // Pull out some stats
         var states = {leader:[], candidate:[], follower:[]},
@@ -95,8 +93,6 @@ function wait_cluster_up(timeout, callback) {
             } else {
                 nodeCnts.push(0);
             }
-            //console.log('Saving image /tmp/chat' + i + '.png');
-            //page.render('/tmp/chat' + i + '.png');
         }
         var totalNodeCnt = nodeCnts.reduce(function(a,b) {return a+b}, 0);
         console.log('Cluster states: ' + JSON.stringify(states) +
@@ -116,7 +112,7 @@ function wait_cluster_up(timeout, callback) {
     checkfn();
 }
 
-function wait_cluster_predicate(predicate, timeout, callback) {
+exports.wait_cluster_predicate = function(pages, server_count, timeout, predicate, callback) {
     var start_time = Date.now();
     var checkfn = function () {
         // Gather data from the nodes
@@ -140,30 +136,3 @@ function wait_cluster_predicate(predicate, timeout, callback) {
     checkfn();
 }
 
-function show_nodes(nodes) {
-    for (var i=0; i < server_count; i++) {
-        console.log('Node ' + i + ': ');
-        console.log(JSON.stringify(nodes[i], null, 2));
-    }
-}
-
-// Start checking the states
-wait_cluster_up(timeout, function(status, nodes) {
-    if (status) {
-        console.log('Cluster is up after ' + elapsed + 'ms');
-        //show_nodes(nodes);
-
-        phantom.exit(0);
-    } else {
-        console.log('Cluster failed to come up after ' + elapsed + 'ms');
-        //show_nodes(nodes);
-        phantom.exit(1);
-    }
-});
-
-// Start each page/cluster node
-pages.push(new_page(0, home, true, function() {
-    for (var idx = 1; idx < server_count; idx++) {
-        pages.push(new_page(idx, home, false));
-    }
-}));

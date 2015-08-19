@@ -10,6 +10,9 @@
 \usepackage{graphicx}
 \DeclareGraphicsExtensions{.png,.jpg,.pdf,.eps}
 
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.5}
+
 %\acmVolume{VV}
 %\acmNumber{N}
 %\acmYear{YYYY}
@@ -46,7 +49,6 @@
 \author{Joel D. Martin {\upshape and} David Levine
 \affil{University of Texas at Arglington}
 }
-
 
 
 
@@ -121,7 +123,7 @@ will describe the results of the implementation and look at some of
 unique challenges (and opportunities) we encountered with the
 implementation. We will also explore some ideas for further study.
 
-\section{Use Cases}
+\section{Motivation/Use Cases}
 The traditional use of distributed consensus is in the data-center
 (private or cloud based) especially as the core coordination component
 of a replicated data-storage system. In these examples, the set of
@@ -668,9 +670,11 @@ statistics are shown in the application:
 \item \emph{Append Entries Sent/Received}: the number of `appendEntries` RPCs that have been sent from and received by this node.
 \end{enumerate}
 
-\section{Outcome}
+\section{Results}
 
-\subsection{Testing}
+\subsection{Manual Testing}
+
+\subsubsection{Setup}
 
 The initial way that the application was tested was by loading the
 initial landing page to create a Raft over WebRTC cluster with
@@ -726,7 +730,8 @@ separate computers. In addition, cross-browser functionality was
 verified by running nodes from the same cluster running simultaneously
 in Chrome 42 and Firefox 37.
 
-\subsection{Results}
+
+\subsubsection{Outcome}
 
 The results of the manual testing above showed that Raft over WebRTC
 was able to perform leader elections correctly, the log and state
@@ -802,6 +807,57 @@ over the long term because higher performing nodes more are likely to
 start and win elections. This also indicates dynamic adjustment of
 timeout values may be a fruitful area of further study.
 
+\subsection{Automated Testing}
+
+\subsubsection{Setup}
+
+TBD: Setup for the automated tests.
+
+Description of SlimerJS
+
+Creation of SlimerJS test scripts using JavaScript.
+
+\subsubsection{Outcome}
+
+TBD: Outcome of the automated tests.
+
+\begin{tikzpicture}
+    \begin{axis}[
+            title=Initial Cluster Activation,
+            xlabel={Nodes},
+            ylabel={Time (ms)},
+            grid=major,
+        ]
+        \addplot table {data/data_cluster_up.dat};
+    \end{axis}
+\end{tikzpicture}
+
+\begin{tikzpicture}
+    \begin{axis}[
+            title=Message Propagation,
+            xlabel={Nodes},
+            ylabel={Time (ms)},
+            grid=major,
+        ]
+        \addplot table {data/data_cluster_up.dat};
+    \end{axis}
+\end{tikzpicture}
+
+\begin{tikzpicture}
+    \begin{axis}[
+            title=Node Failure Recovery,
+            xlabel={Nodes},
+            ylabel={Time (ms)},
+            grid=major,
+            legend entries={$Leader Down$,$Half Cluster Down$},
+        ]
+        \addplot table {data/data_kill_leader.dat};
+        \addplot table {data/data_kill_half.dat};
+    \end{axis}
+\end{tikzpicture}
+
+
+
 \section{Next Steps}
 
 One of the useful outcomes of this project was that it brought to
@@ -818,22 +874,12 @@ Here are some interesting areas for further exploration:
   one or both of these constraints relaxed.
 \item Test the survivability of the cluster when the signaling server is
   becomes completely unresponsive or just very slow.
-\item Implement a full online chat system with linearizable guarantees for
-  the chat message ordering.
 \item Explore models for dynamically adjusting Raft timeout values to
   account for changing network and browser conditions.
 \item Test the ability of the system to catch up stale nodes by
   disconnecting one or more nodes, run the cluster for some period
   time with transactions created periodically, and then reconnect the stale
   clients.
-\item Implement and test forwarding client requests rather than default
-  redirecting the client to the leader. In other words, allow client
-  requests to originate from any node of the cluster and be redirected
-  automatically to the leader (rather than the current manual
-  process).
-\item Perform quantitative and real-world testing to better characterize
-  the performance, availability and scalability characteristics of the
-  system.
 \item Implement a user interface for sending commands to the transaction
   log and for viewing the current state of the Raft state machine.
 \item Explore models for dealing with the case where the cluster goes from
@@ -851,56 +897,6 @@ Here are some interesting areas for further exploration:
 \item Perform quantitative and real-world testing to better characterize
   the performance, availability and scalability characteristics of the
   system.
-\item Implement a user interface for sending commands to the transaction
-  log and for viewing the current state of the Raft state machine.
-\item Explore models for dealing with the case where the cluster goes from
-  two nodes down to one node. Can usefulness and availability be
-  improved without sacrificing Raft safety constraints.
-\item Test the system in more various network environments. Determine the
-  reliability of establishing direct browser-to-browser communication.
-  Determine if corporate firewalls make this as difficult as is
-  implied in some of the documentation and standards texts.
-\item Explore models for timing out and automatically removing nodes
-  when they become unresponsive without needing to be notified by the
-  signaling server that the nodes have disconnected.
-\item Test larger scale deployments across multiple systems. Determine the
-  factors that affect scalability and characterize scaling limits.
-\item Perform wider cross-browser testing including Internet Explorer and
-  Opera.
-\item Implement Raft log compaction.
-\item Explore models that allow for a combination of strict shared state
-  and high performance bulk data such as media or object blobs. For
-  example, the data with full consensus might contain hashes that to
-  the refer to bulk data.
-\item Implement a Node.js based Raft over WebRTC application. This would
-  allow non-browser contexts to participate in the Raft cluster
-  together with the browser clients. PeerJS issue
-  [103](https://github.com/peers/peerjs/issues/103) must be resolved
-  for this to be feasible.
-\item Explore a design where some nodes of the cluster are non-voting and
-  are not counted as part of transaction commit quorum. However, these
-  nodes would still be included in the log replication algorithm. One
-  model this would enable would be a configuration where a small group
-  of voting nodes serve as the hub for a larger group of non-voting
-  nodes. This may enable higher scaling of the system. It also enables
-  interesting applications such as a logging or backup nodes.
-\item Implement and test forwarding client requests rather than default
-  redirecting the client to the leader. In other words, allow client
-  requests to originate from any node of the cluster and be redirected
-  automatically to the leader (rather than the current manual
-  process).
-\item Perform quantitative and real-world testing to better characterize
-  the performance, availability and scalability characteristics of the
-  system.
-\item Implement a user interface for sending commands to the transaction
-  log and for viewing the current state of the Raft state machine.
-\item Explore models for dealing with the case where the cluster goes from
-  two nodes down to one node. Can usefulness and availability be
-  improved without sacrificing Raft safety constraints.
-\item Test the system in more various network environments. Determine the
-  reliability of establishing direct browser-to-browser communication.
-  Determine if corporate firewalls make this as difficult as is
-  implied in some of the documentation and standards texts.
 \item Explore models for timing out and automatically removing nodes
   when they become unresponsive without needing to be notified by the
   signaling server that the nodes have disconnected.
