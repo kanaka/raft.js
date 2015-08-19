@@ -1,0 +1,599 @@
+%--------------------------------------------
+%
+% Package pgfplots
+%
+% Provides a user-friendly interface to create function plots (normal
+% plots, semi-logplots and double-logplots).
+% 
+% It is based on Till Tantau's PGF package.
+%
+% Copyright 2007-2013 by Christian Feuersänger.
+%
+% This program is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, either version 3 of the License, or
+% (at your option) any later version.
+% 
+% This program is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public License
+% along with this program.  If not, see <http://www.gnu.org/licenses/>.
+%
+%--------------------------------------------
+
+
+% the \addplot commands assign
+%   \pgfplots@current@point@error@x@plus
+%   \pgfplots@current@point@error@x@minus
+%   \pgfplots@current@point@error@y@plus
+%   \pgfplots@current@point@error@y@minus
+%   \pgfplots@current@point@error@z@plus
+%   \pgfplots@current@point@error@z@minus
+%
+% the error bar processing takes these values as input, adds them to
+% the current coordinates where applicable and according the the error
+% bar configuration and overwrites these macros.
+%   
+% Then, these values are registered as "visualization depends on",
+% i.e. they will be available for every visualization phase.
+%
+% The visualization phase, in turn, expects these values. More
+% precisely, a separate visualization phase called
+% \pgfplotsaxis@visphase@name@errorbars is started. This installs the
+% plot handler \pgfplots@errorbars@plot@handler and does the same job
+% as it would for normal plot handlers.
+%
+\def\pgfplots@errorbars@survey@begin{%
+	%
+	\pgfplots@errorbars@prepare@value@serialization
+	%
+	% Now, prepare the coordinate processing for errorbars:
+	\pgfplots@PREPARE@errorbar@processing@in@dir x%
+	\pgfplots@PREPARE@errorbar@processing@in@dir y%
+	\ifpgfplots@curplot@threedim
+		\pgfplots@PREPARE@errorbar@processing@in@dir z%
+	\else
+		\let\pgfplots@PREPARE@errorbar@process@z=\relax
+	\fi
+}
+
+\def\pgfplots@errorbars@survey@end{%
+	\pgfplots@streamerrorbarend
+}%
+
+\def\pgfplots@errorbars@survey@point{%
+	% This thing gets the 'current@point@...' context,
+	% that means 
+	% \pgfplots@current@point@[xy]
+	% \pgfplots@current@point@[xy]@error
+	% \pgfplots@current@point@[xy]@unfiltered
+	\pgfplots@PREPARE@errorbar@process@x%
+	\pgfplots@PREPARE@errorbar@process@y%
+	\pgfplots@PREPARE@errorbar@process@z%
+}
+
+\def\pgfplots@errorbars@visphase@begin{%
+	\pgfplots@errorbars@prepare@value@serialization
+}
+
+\def\pgfplots@errorbars@visphase@end{%
+}%
+
+\def\pgfplots@errorbars@visphase@point{%
+}%
+
+\def\pgfplots@errorbars@prepare@value@serialization{%
+	\if0\pgfplots@errorbars@xdirection
+	\else
+		\pgfplotsset{%
+			visualization depends on=value \pgfplots@current@point@error@x@plus\as\pgfplots@current@point@error@x@plus,
+			visualization depends on=value \pgfplots@current@point@error@x@minus\as\pgfplots@current@point@error@x@minus,
+		}%
+	\fi
+	\if0\pgfplots@errorbars@ydirection
+	\else
+		\pgfplotsset{%
+			visualization depends on=value \pgfplots@current@point@error@y@plus\as\pgfplots@current@point@error@y@plus,
+			visualization depends on=value \pgfplots@current@point@error@y@minus\as\pgfplots@current@point@error@y@minus,
+		}%
+	\fi
+	\ifpgfplots@curplot@threedim
+		\if0\pgfplots@errorbars@zdirection
+		\else
+			\pgfplotsset{%
+				visualization depends on=value \pgfplots@current@point@error@z@plus\as\pgfplots@current@point@error@z@plus,
+				visualization depends on=value \pgfplots@current@point@error@z@minus\as\pgfplots@current@point@error@z@minus,
+			}%
+		\fi
+	\fi
+}%
+
+% Prepares a macro \pgfplots@PREPARE@process@errorbar@for@dir##1
+% which can then be used to process error bars. The macro will be
+% \relax if error bars are disabled for #1.
+%
+% #1: either x, y or z.
+%
+% POSTCONDITION:
+%   the macro \pgfplots@PREPARE@errorbar@process@#1 will be defined.
+%   It is supposed to be used inside of the pgfplots streaming methods
+%   and depends on the arguments
+% 		\pgfplots@current@point@[xyz]
+%		\pgfplots@current@point@[xyz]@unfiltered
+%		\pgfplots@current@point@[xyz]@error
+%	The '@unfilterered' arguments are needed for log plots. I do not
+%	want to compute exp(current@point@[xyz]) again.
+\def\pgfplots@PREPARE@errorbar@processing@in@dir#1{%
+	\pgfplots@PREPARE@errorbar@processing@in@dir@reset#1%
+	%
+	\if0\csname pgfplots@errorbars@#1direction\endcsname
+		% no error bars. Ok. Do nothing here.
+		\expandafter\let\csname pgfplots@PREPARE@errorbar@process@#1\endcsname=\relax
+	\else
+		%
+		% The routine which is invoked for every reported input
+		% coordinate is \pgfplots@process@errorbar@for.
+		%
+		% This here prepares its helper macros for direction '#1':
+		%
+		% More precisely, it prepared 
+		%
+		% ##1 is either '+' or '-':
+		% \pgfplots@PREPARE@errorbar@process@x@##1
+		% \pgfplots@PREPARE@errorbar@process@y@##1
+		% \pgfplots@PREPARE@errorbar@process@z@##1
+		%
+		\pgfplots@if{pgfplots@#1islinear}{%
+			\ifcase\csname pgfplots@errorbars@#1mode\endcsname\relax
+				% fixed absolute error.
+				\pgfplotscoordmath{#1}{parsenumber}{\csname pgfplots@errorbars@#1fixed\endcsname}%
+				\expandafter\let\csname pgfplots@error@coord@#1\endcsname=\pgfmathresult
+				\expandafter\def\csname pgfplots@PREPARE@errorbar@process@#1@\endcsname##1{%
+					\if +##1%
+						\def\pgfplots@loc@TMPb{add}%
+					\else
+						\def\pgfplots@loc@TMPb{subtract}%
+					\fi
+					\pgfplotscoordmath{#1}{op}{\pgfplots@loc@TMPb}{%
+						{\csname pgfplots@current@point@#1\endcsname}%
+						{\csname pgfplots@error@coord@#1\endcsname}%
+					}%
+					\let\pgfplots@error@coord=\pgfmathresult
+					\pgfplots@PREPARE@errorbar@stream@it@#1##1%
+				}%
+			\or% fixed relative error:
+				\pgfplotscoordmath{#1}{parsenumber}{\csname pgfplots@errorbars@#1rel\endcsname}%
+				\let\pgfplots@loc@TMPb=\pgfmathresult
+				%
+				% +1:
+				\pgfplotscoordmath{#1}{parsenumber}{1}%
+				\let\pgfplots@loc@TMPa=\pgfmathresult
+				%
+				% Prepare '1 + err':
+				\pgfplotscoordmath{#1}{op}{add}{%
+					{\pgfplots@loc@TMPa}%
+					{\pgfplots@loc@TMPb}%
+				}%
+				\expandafter\let\csname pgfplots@error@coord@#1@+\endcsname=\pgfmathresult
+				%
+				% Prepare '1 - err':
+				\pgfplotscoordmath{#1}{op}{subtract}{%
+					{\pgfplots@loc@TMPa}%
+					{\pgfplots@loc@TMPb}%
+				}%
+				\expandafter\let\csname pgfplots@error@coord@#1@-\endcsname=\pgfmathresult
+				%
+				\expandafter\def\csname pgfplots@PREPARE@errorbar@process@#1@\endcsname##1{%
+					\pgfplotscoordmath{#1}{op}{multiply}{%
+						{\csname pgfplots@current@point@#1\endcsname}
+						{\csname pgfplots@error@coord@#1@##1\endcsname}%
+					}%
+					\let\pgfplots@error@coord=\pgfmathresult
+					\pgfplots@PREPARE@errorbar@stream@it@#1##1%
+				}%
+			\or% explicit absolute:
+				\expandafter\def\csname pgfplots@PREPARE@errorbar@process@#1@\endcsname##1{%
+					\edef\pgfplots@error@coord{\csname pgfplots@current@point@error@#1@\pgfplots@errorbars@plusminus##1\endcsname}%
+					\ifx\pgfplots@error@coord\pgfutil@empty
+						\pgfplots@PREPARE@errorbar@stream@it@empty#1##1%
+					\else
+						\pgfplotscoordmath{#1}{parsenumber}{\pgfplots@error@coord}%
+						\pgfplotscoordmath{#1}{if is bounded}{\pgfmathresult}{%
+							\let\pgfplots@error@coord=\pgfmathresult
+							% remember result here - will be used in case
+							% of '+' AND '-' error bars:
+							%\expandafter\let\csname pgfplots@current@point@error@#1@\pgfplots@errorbars@plusminus##1\endcsname=\pgfmathresult
+							\if +##1%
+								\def\pgfplots@loc@TMPb{add}%
+							\else
+								\def\pgfplots@loc@TMPb{subtract}%
+							\fi
+							\pgfplotscoordmath{#1}{op}{\pgfplots@loc@TMPb}{%
+								{\csname pgfplots@current@point@#1\endcsname}%
+								{\pgfplots@error@coord}%
+							}%
+							\let\pgfplots@error@coord=\pgfmathresult
+							\pgfplots@PREPARE@errorbar@stream@it@#1##1%
+						}{%
+							% input is unbounded. Skip it.
+							\pgfplots@PREPARE@errorbar@stream@it@empty#1##1%
+						}%
+					\fi
+				}%
+			\or% explicit relative:
+				\expandafter\def\csname pgfplots@PREPARE@errorbar@process@#1@\endcsname##1{%
+					\edef\pgfplots@error@coord{\csname pgfplots@current@point@error@#1@\pgfplots@errorbars@plusminus##1\endcsname}%
+					\ifx\pgfplots@error@coord\pgfutil@empty
+						\pgfplots@PREPARE@errorbar@stream@it@empty#1##1%
+					\else
+						\pgfplotscoordmath{#1}{parsenumber}{\pgfplots@error@coord}%
+						\pgfplotscoordmath{#1}{if is bounded}{\pgfmathresult}{%
+							\let\pgfplots@error@coord=\pgfmathresult
+							% compute ' 1 + value' or '1-value':
+							\pgfplotscoordmath{#1}{one}%
+							\if +##1%
+								\def\pgfplots@loc@TMPb{add}%
+							\else
+								\def\pgfplots@loc@TMPb{subtract}%
+							\fi
+							\pgfplotscoordmath{#1}{op}{\pgfplots@loc@TMPb}{%
+								{\pgfmathresult}%
+								{\pgfplots@error@coord}%
+							}%
+							\let\pgfplots@error@coord=\pgfmathresult
+							\pgfplotscoordmath{#1}{op}{multiply}{%
+								{\csname pgfplots@current@point@#1\endcsname}
+								{\pgfplots@error@coord}%
+							}%
+							\let\pgfplots@error@coord=\pgfmathresult
+							\pgfplots@PREPARE@errorbar@stream@it@#1##1%
+						}{%
+							% input is unbounded. Skip it.
+							\pgfplots@PREPARE@errorbar@stream@it@empty#1##1%
+						}%
+					\fi
+				}%
+			\fi
+		}{%
+			% LOGARITHMIC scaling. All errors are interpreted as 
+			%   log(x +- e_x)
+			% or
+			%   log( x*(1+-e_x) )
+			%
+			% That means any input argument is
+			% given in log base e and in fixed point.
+			% Furthermore, we expect the '@unfiltered' keys to be
+			% present (I don't want to apply 'exp' again!).
+			%
+			\ifcase\csname pgfplots@errorbars@#1mode\endcsname
+				% fixed absolute, log( x +- e_x )
+				%
+				\pgfplotscoordmath{default}{parsenumber}{\csname pgfplots@errorbars@#1fixed\endcsname}%
+				\expandafter\let\csname pgfplots@error@coord@#1\endcsname=\pgfmathresult
+				\expandafter\def\csname pgfplots@PREPARE@errorbar@process@#1@\endcsname##1{%
+					\pgfplotscoordmath{default}{parsenumber}{\csname pgfplots@current@point@#1@unfiltered\endcsname}%
+					\let\pgfplots@loc@TMPa=\pgfmathresult
+					\if +##1%
+						\def\pgfplots@loc@op{add}%
+					\else
+						\def\pgfplots@loc@op{subtract}%
+					\fi
+					\pgfplotscoordmath{default}{op}{\pgfplots@loc@op}{%
+						{\pgfplots@loc@TMPa}%
+						{\csname pgfplots@error@coord@#1\endcsname}%
+					}%
+					\pgfplotscoordmath{default}{tostring}{\pgfmathresult}%
+					\pgfplotscoordmath{#1}{log}{\pgfmathresult}%
+					\let\pgfplots@error@coord=\pgfmathresult
+					\pgfplots@PREPARE@errorbar@stream@it@#1##1%
+				}%
+			\or% fixed relative, log( x ( 1+-e_x ) ) = log(x) + log(1+-e_x)
+				\pgfplotscoordmath{default}{parsenumber}{\csname pgfplots@errorbars@#1rel\endcsname}%
+				\let\pgfplots@loc@TMPb=\pgfmathresult
+				%
+				% +1:
+				\pgfplotscoordmath{default}{one}%
+				\let\pgfplots@loc@TMPa=\pgfmathresult
+				%
+				% Prepare '1 + err':
+				\pgfplotscoordmath{default}{op}{add}{{\pgfplots@loc@TMPa}{\pgfplots@loc@TMPb}}%
+				\pgfplotscoordmath{default}{tostring}{\pgfmathresult}%
+				\pgfplotscoordmath{#1}{log}{\pgfmathresult}%
+				\pgfplotscoordmath{#1}{if is bounded}{\pgfmathresult}{%
+				}{%
+					% 1 + err <= 0  and log(1+err) is undefined:
+					\pgfplotscoordmath{default}{tostring}{\pgfplots@loc@TMPb}%
+					\pgfplots@error{Sorry, log(1 + \pgfmathresult) is undefined. Please provide a different argument for '/pgfplots/error bar/#1 fixed relative'.}%
+					\let\pgfmathresult=\pgfutil@empty
+				}%
+				\expandafter\let\csname pgfplots@error@coord@#1@+\endcsname=\pgfmathresult
+				%
+				% Prepare '1 - err':
+				\pgfplotscoordmath{default}{op}{subtract}{{\pgfplots@loc@TMPa}{\pgfplots@loc@TMPb}}%
+				\pgfplotscoordmath{default}{tostring}{\pgfmathresult}%
+				\pgfplotscoordmath{#1}{log}{\pgfmathresult}%
+				\pgfplotscoordmath{#1}{if is bounded}{\pgfmathresult}{%
+				}{%
+					% 1 - err <= 0  and log(1+err) is undefined:
+					\pgfplotscoordmath{default}{tostring}{\pgfplots@loc@TMPb}%
+					\pgfplots@error{Sorry, log(1 - \pgfmathresult) (\pgfplots@loc@TMPa - \pgfplots@loc@TMPb) is undefined. Please provide a different argument for '/pgfplots/error bar/#1 fixed relative'.}%
+					\let\pgfmathresult=\pgfutil@empty
+				}%
+				\expandafter\let\csname pgfplots@error@coord@#1@-\endcsname=\pgfmathresult
+				%
+				\expandafter\def\csname pgfplots@PREPARE@errorbar@process@#1@\endcsname##1{%
+					\expandafter\ifx\csname pgfplots@current@point@#1@##1\endcsname\pgfutil@empty
+						\pgfplots@PREPARE@errorbar@stream@it@empty#1##1%
+					\else
+						\pgfmath@basic@add@
+							{\csname pgfplots@current@point@#1\endcsname}
+							{\csname pgfplots@error@coord@#1@##1\endcsname}%
+						\let\pgfplots@error@coord=\pgfmathresult
+						\pgfplots@PREPARE@errorbar@stream@it@#1##1%
+					\fi
+				}%
+			\or% explicit absolute
+				% log( x +- e_x )
+				\expandafter\def\csname pgfplots@PREPARE@errorbar@process@#1@\endcsname##1{%
+					\edef\pgfplots@error@coord{\csname pgfplots@current@point@error@#1@\pgfplots@errorbars@plusminus##1\endcsname}%
+					\ifx\pgfplots@error@coord\pgfutil@empty
+						\pgfplots@PREPARE@errorbar@stream@it@empty#1##1%
+					\else
+						\pgfplotscoordmath{default}{parsenumber}{\pgfplots@error@coord}%
+						\pgfplotscoordmath{default}{if is bounded}{\pgfmathresult}{%
+							\let\pgfplots@error@coord=\pgfmathresult
+							% remember result here - will be used in case
+							% of '+' AND '-' error bars:
+							%\expandafter\let\csname pgfplots@current@point@error@#1@\pgfplots@errorbars@plusminus##1\endcsname=\pgfmathresult
+							\pgfplotscoordmath{default}{parsenumber}{\csname pgfplots@current@point@#1@unfiltered\endcsname}%
+							\let\pgfplots@loc@TMPa=\pgfmathresult
+							\if +##1%
+								\def\pgfplots@loc@op{add}%
+							\else
+								\def\pgfplots@loc@op{subtract}%
+							\fi
+							\pgfplotscoordmath{default}{op}{\pgfplots@loc@op}{%
+								{\pgfplots@loc@TMPa}%
+								{\pgfplots@error@coord}%
+							}%
+							\pgfplotscoordmath{default}{tostring}{\pgfmathresult}%
+							\pgfplotscoordmath{#1}{log}{\pgfmathresult}%
+							\let\pgfplots@error@coord=\pgfmathresult
+							\pgfplots@PREPARE@errorbar@stream@it@#1##1%
+						}{%
+							% input is unbounded. Skip it.
+							\pgfplots@PREPARE@errorbar@stream@it@empty#1##1%
+						}%
+					\fi
+				}%
+				%
+			\or% explicit relative:
+				% log( x ( 1+-e_x ) ) = log(x) + log(1+-e_x)
+				\expandafter\def\csname pgfplots@PREPARE@errorbar@process@#1@\endcsname##1{%
+					\edef\pgfplots@error@coord{\csname pgfplots@current@point@error@#1@\pgfplots@errorbars@plusminus##1\endcsname}%
+					\ifx\pgfplots@error@coord\pgfutil@empty
+						\pgfplots@PREPARE@errorbar@stream@it@empty#1##1%
+					\else
+						\pgfplotscoordmath{default}{parsenumber}{\pgfplots@error@coord}%
+						\pgfplotscoordmath{default}{if is bounded}{\pgfmathresult}{%
+							\let\pgfplots@error@coord=\pgfmathresult
+							% remember result here - will be used in case
+							% of '+' AND '-' error bars:
+							%\expandafter\let\csname pgfplots@current@point@error@#1@\pgfplots@errorbars@plusminus##1\endcsname=\pgfmathresult
+							%
+							\pgfplotscoordmath{default}{one}%
+							\let\pgfplots@loc@TMPa=\pgfmathresult
+							\if +##1%
+								\def\pgfplots@loc@op{add}%
+							\else
+								\def\pgfplots@loc@op{subtract}%
+							\fi
+							\pgfplotscoordmath{default}{op}{\pgfplots@loc@op}{%
+								{\pgfplots@loc@TMPa}%
+								{\pgfplots@error@coord}%
+							}%
+							\pgfplotscoordmath{default}{tostring}{\pgfmathresult}%
+							\pgfplotscoordmath{#1}{log}{\pgfmathresult}%
+							\let\pgfplots@error@coord=\pgfmathresult
+							\pgfplotscoordmath{#1}{if is bounded}{\pgfmathresult}{%
+								\pgfplotscoordmath{#1}{op}{add}{%
+									{\csname pgfplots@current@point@#1\endcsname}
+									{\pgfplots@error@coord}%
+								}%
+								\let\pgfplots@error@coord=\pgfmathresult
+								\pgfplots@PREPARE@errorbar@stream@it@#1##1%
+							}{%
+								% -> log( <= 0 ) -> do nothing.
+								\pgfplots@PREPARE@errorbar@stream@it@empty#1##1%
+							}%
+						}{%
+							% input is unbounded - do nothing.
+							\pgfplots@PREPARE@errorbar@stream@it@empty#1##1%
+						}%
+					\fi
+				}%
+				%
+			\fi
+		}%
+		\ifcase\csname pgfplots@errorbars@#1direction\endcsname
+			% none
+		\or
+			% plus
+			\expandafter\edef\csname pgfplots@PREPARE@errorbar@process@#1\endcsname{%
+				\expandafter\noexpand\csname pgfplots@PREPARE@errorbar@process@#1@\endcsname+%
+			}%
+		\or
+			% minus
+			\expandafter\edef\csname pgfplots@PREPARE@errorbar@process@#1\endcsname{%
+				\expandafter\noexpand\csname pgfplots@PREPARE@errorbar@process@#1@\endcsname-%
+			}%
+		\or
+			% both
+			\expandafter\edef\csname pgfplots@PREPARE@errorbar@process@#1\endcsname{%
+				\expandafter\noexpand\csname pgfplots@PREPARE@errorbar@process@#1@\endcsname+%
+				\expandafter\noexpand\csname pgfplots@PREPARE@errorbar@process@#1@\endcsname-%
+			}%
+		\fi
+	\fi
+}
+
+\def\pgfplots@PREPARE@errorbar@processing@in@dir@reset#1{%
+	\expandafter\let\csname pgfplots@current@point@error@#1@plus\endcsname=\pgfutil@empty
+	\expandafter\let\csname pgfplots@current@point@error@#1@minus\endcsname=\pgfutil@empty
+}%
+
+% #1: one of x,y, or z
+% #2: either '+' or '-', denotes the direction of the error
+% bar
+%
+% PRECONDITION: \pgfplots@error@coord contains the value which is to
+% be stored as \pgfplots@current@point@error@#1@plus or
+% \pgfplots@current@point@error@#1@minus
+%
+% POSTCONDITION: limits updated and
+% \pgfplots@current@point@error@#1@plus or
+% \pgfplots@current@point@error@#1@minus
+% is defined.
+\def\pgfplots@PREPARE@errorbar@stream@it@#1#2{%
+	\ifx\pgfplots@error@coord\pgfutil@empty
+	\else
+		\expandafter\let\expandafter\pgfplots@current@point@@old\csname pgfplots@current@point@#1\endcsname
+		\expandafter\let\csname pgfplots@current@point@#1\endcsname=\pgfplots@error@coord
+		\pgfplotsaxisupdatelimitsforcoordinate\pgfplots@current@point@x\pgfplots@current@point@y\pgfplots@current@point@z
+		\expandafter\let\csname pgfplots@current@point@#1\endcsname=\pgfplots@current@point@@old
+	\fi
+	%
+	% ... and remember what we need! This value will be stored as
+	% "visualization depends on"
+	\expandafter\let\csname pgfplots@current@point@error@#1@\pgfplots@errorbars@plusminus#2\endcsname=\pgfplots@error@coord
+}%
+
+\def\pgfplots@PREPARE@errorbar@stream@it@empty#1#2{%
+	% ... and remember what we need! This value will be stored as
+	% "visualization depends on"
+	\expandafter\let\csname pgfplots@current@point@error@#1@\pgfplots@errorbars@plusminus#2\endcsname=\pgfutil@empty
+}
+
+\def\pgfplots@errorbars@plusminus#1{%
+	\if#1+%
+		plus%
+	\else
+		minus%
+	\fi
+}%
+
+% A dummy plot handler which is used in a special visualization phase
+% for error bars.
+\def\pgfplots@errorbars@plot@handler{%
+	\gdef\pgf@plotstreamstart{%
+		\pgfplots@streamerrorbar@directdraw
+		\global\let\pgf@plotstreampoint=\pgfplots@errorbars@plot@handler@point
+		\global\let\pgf@plotstreamspecial=\relax
+		\global\let\pgf@plotstreamend=\pgfplots@streamerrorbarend
+		\pgfplots@streamerrorbarstart
+	}%
+}%
+
+\def\pgfplots@errorbars@plot@handler@point#1{%
+	\pgf@process{#1}%
+	\edef\pgfplots@errorbars@src{(\the\pgf@x,\the\pgf@y)}%
+	%
+	% we want to allow scatter plots to vary depending on 'point
+	% meta'. This here does not hurt:
+	\pgfplotsaxisvisphasetransformpointmetaifany
+	%
+	\pgfplots@errorbars@plot@handler@point@dir x%
+	\pgfplots@errorbars@plot@handler@point@dir y%
+	\ifpgfplots@curplot@threedim
+		\pgfplots@errorbars@plot@handler@point@dir z%
+	\fi
+}
+
+% #1: one of x,y, or z
+% #2: the error bar value in dir #1
+% output: \pgfplots@errorbars@trg in the form (<x>,<y>,<z>)
+\def\pgfplots@errorbars@to@pt#1#2{%
+	\begingroup
+	\expandafter\let\csname pgfplots@current@point@#1\endcsname=#2%
+	\ifpgfplots@curplot@threedim
+		\edef\pgfplotsretval{(\pgfplots@current@point@x,\pgfplots@current@point@y,\pgfplots@current@point@z)}%
+	\else
+		\edef\pgfplotsretval{(\pgfplots@current@point@x,\pgfplots@current@point@y)}%
+	\fi
+	\global\let\pgfplots@errorbars@trg=\pgfplotsretval
+	\endgroup
+}%
+
+% #1: a <\macro> containing the value 
+% #2: either x,y, or z
+\def\pgfplots@errorbars@plot@handler@point@dir@@#1#2{%
+	\ifx#1\pgfutil@empty
+	\else
+		\pgfplotsaxisvisphasetransformcoordinateentry{#2}{#1}%
+		\pgfplots@errorbars@to@pt{#2}{\pgfmathresult}%
+		\pgfplots@streamerrorbarcoords{\pgfplots@errorbars@src}{\pgfplots@errorbars@trg}%
+	\fi
+}%
+
+\def\pgfplots@errorbars@plot@handler@point@dir#1{%
+	\ifcase\csname pgfplots@errorbars@#1direction\endcsname
+		% none
+	\or
+		% plus
+		\expandafter\pgfplots@errorbars@plot@handler@point@dir@@\csname pgfplots@current@point@error@#1@plus\endcsname#1%
+	\or
+		% minus
+		\expandafter\pgfplots@errorbars@plot@handler@point@dir@@\csname pgfplots@current@point@error@#1@minus\endcsname#1%
+	\or
+		% both
+		\expandafter\pgfplots@errorbars@plot@handler@point@dir@@\csname pgfplots@current@point@error@#1@plus\endcsname#1%
+		\expandafter\pgfplots@errorbars@plot@handler@point@dir@@\csname pgfplots@current@point@error@#1@minus\endcsname#1%
+	\fi
+}%
+
+\def\pgfplots@streamerrorbarstart{%
+}%
+\def\pgfplots@streamerrorbarend{%
+}%
+\def\pgfplots@streamerrorbarcoords#1#2{%
+}%
+
+\def\pgfplots@streamerrorbar@directdraw{%
+	\def\pgfplots@streamerrorbarstart{}%
+	\def\pgfplots@streamerrorbarend{}%
+	\def\pgfplots@streamerrorbarcoords##1##2{%
+		\pgfplots@errorbar@draw{##1}{##2}%
+	}%
+}
+	
+% This thing here shall draw all error bar commands listed in '#2'.
+%
+% It will be invoked when any plotting commands take effect (that
+% means all limits are computed; the axis has been drawn,
+% transformations are set up...)
+\def\pgfplots@errorbars@finishwithstyleoptions[#1]#2{%
+	\scope[/pgfplots/.cd,#1,/pgfplots/every error bar]% it uses the /pgfplots/.unknown handler
+	#2%
+	\endscope
+}
+
+\def\pgfplots@errorbar@draw#1#2{%
+	\begingroup
+	\pgfplots@restorepgfpoint
+	\pgfkeysvalueof{/pgfplots/error bars/draw error bar/.@cmd}{#1}{#2}\pgfeov%
+	\endgroup
+}%
+
+\def\pgfplotsaxis@visphase@name@errorbars{errorbars}
+
+\expandafter\def\csname pgfplots@visphase@\pgfplotsaxis@visphase@name@errorbars\endcsname{%
+	\pgfplots@errorbars@finishwithstyleoptions[]{%
+		\let\tikz@plot@handler=\pgfplots@errorbars@plot@handler
+		\pgfplots@coord@stream@finalize@storedcoords@START
+	}%
+}%
+
+\endinput

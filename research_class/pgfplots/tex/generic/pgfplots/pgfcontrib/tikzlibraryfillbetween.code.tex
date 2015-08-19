@@ -1,0 +1,577 @@
+%--------------------------------------------
+%
+% Package pgfplots
+%
+% Provides a user-friendly interface to create function plots (normal
+% plots, semi-logplots and double-logplots).
+% 
+% It is based on Till Tantau's PGF package.
+%
+% Copyright 2013 by Christian Feuersaenger
+%
+% This program is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, either version 3 of the License, or
+% (at your option) any later version.
+% 
+% This program is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public License
+% along with this program.  If not, see <http://www.gnu.org/licenses/>.
+%
+%--------------------------------------------
+
+
+% This library adds support for high-level instructions for "fill area
+% between two arbitrary plots of functions".
+%
+% It activates the syntax \pgfpathfillbetween
+% where A and B are two plots named by 'name path='.
+%
+% In fact, this here is not much more than a low-level invocation of
+% \pgfpathfillbetween
+% and a couple of styles. It could become a TikZ library because it
+% actually works on any two named paths, but it has its restrictions
+% regarding the supported input paths: both need to be plots of
+% functions (non-intersecting, should have at most one function value
+% for each canvas X coord)
+
+\pgfutil@IfUndefined{pgfplotsset}{%
+	\pgferror{Please load pgfplots before pgfplots.fillbetween.}%
+	\endinput
+}{}%
+
+\usetikzlibrary{intersections}
+\usetikzlibrary{decorations.softclip}
+
+% COMPATIBILITY WITH PGF RELEASE:
+\pgfutil@IfUndefined{pgfintersectiongetsolutiontimes}{%
+	\pgfplotsusecompatibilityfile{pgflibraryintersections.code.tex}%
+}{}%
+\def\tikz@key@name@path@wrong#1#2{%
+    \tikz@addmode{%
+      \pgfsyssoftpath@getcurrentpath\tikz@intersect@temppath@round%
+      \pgfprocessround\tikz@intersect@temppath@round\tikz@intersect@temppath%
+      \ifx\tikz@intersect@namedpaths\pgfutil@empty%
+      \else%
+        \tikz@intersect@namedpaths%
+        \pgfutil@ifundefined{tikz@intersect@path@name@#1}{}%
+        {%
+          \expandafter\expandafter\expandafter\def\expandafter\expandafter\expandafter\tikz@intersect@@temppath%
+          \expandafter\expandafter\expandafter{\csname tikz@intersect@path@name@#1\endcsname}%
+          \expandafter\expandafter\expandafter\def\expandafter\expandafter\expandafter\tikz@intersect@temppath%
+          \expandafter\expandafter\expandafter{\expandafter\tikz@intersect@temppath\tikz@intersect@temppath}%
+        }%
+      \fi%
+      \tikz@intersect@addto@path@names{#1}{#2}%
+    }%
+}%
+
+\def\tikz@key@name@path@new#1#2{%
+    \tikz@addmode{%
+      \pgfsyssoftpath@getcurrentpath\tikz@intersect@temppath@round%
+      \pgfprocessround\tikz@intersect@temppath@round\tikz@intersect@temppath%
+      \ifx\tikz@intersect@namedpaths\pgfutil@empty%
+      \else%
+        \tikz@intersect@namedpaths%
+      \fi%
+      \tikz@intersect@addto@path@names{#1}{#2}%
+    }%
+}%
+
+\ifx\tikz@key@name@path@wrong\tikz@key@name@path
+	\immediate\write16{Package pgfplots: loading complementary 'name path' implementation for your pgf version...}
+	\let\tikz@key@name@path=\tikz@key@name@path@new
+\fi
+
+% ------------------------------------------------------------
+
+\newif\iftikzfillbetween@optimize@name@intersections
+
+\pgfkeys{%
+	/tikz/fill between/of/.code=\tikzlibraryfillbetween@parse#1\pgf@stop,
+	%
+	/tikz/fill between/on layer/.initial=pre main,
+	/tikz/fill between/every segment/.style={},
+	/tikz/fill between/every odd segment/.style={},
+	/tikz/fill between/every even segment/.style={},
+	/tikz/fill between/every last segment/.style={},
+	%
+	% Allows to add path instructions *after* the segment.
+	% If you want to add some *before* the segment, you can rely on
+	% 'every segment no 0/.style={ ... suitable tikz options ... }'
+	/tikz/fill between/path after segment/.initial={},
+	%
+	% soft clip={(axis cs:0,0) rectangle (axis cs:1,1)}
+	/tikz/fill between/soft clip/.style={
+		/tikz/fill between/soft clip first={#1},%
+		/tikz/fill between/soft clip second={#1},%
+	},%
+	/tikz/fill between/soft clip first/.initial=,%
+	/tikz/fill between/soft clip second/.initial=,
+	%
+	% #1: drawing options.
+	/tikz/fill between/@draw style/.style={
+		/pgf/fill between/result stream/begin/.code={%
+			\gdef\tikzsegmentindex{0}%
+			\xdef\tikzsegmentindices{##1}%
+			\c@pgf@countc=##1 %
+			\advance\c@pgf@countc by-1 %
+			\xdef\tikzsegmentlastindex{\the\c@pgf@countc}%
+		},%
+		/pgf/fill between/result stream/next ready/.code={%
+			\let\pgflibraryfill@path=\pgfretval
+			\def\pgfplots@loc@TMPa{%
+				/tikz/fill between/every segment,
+				#1,%
+				/tikz/fill between/every segment no \tikzsegmentindex/.try,
+			}%
+			\ifodd\tikzsegmentindex\relax
+				\expandafter\def\expandafter\pgfplots@loc@TMPa\expandafter{\pgfplots@loc@TMPa
+					/tikz/fill between/every odd segment,
+				}%
+			\else
+				\expandafter\def\expandafter\pgfplots@loc@TMPa\expandafter{\pgfplots@loc@TMPa
+					/tikz/fill between/every even segment,
+				}%
+			\fi
+			%
+			\ifnum\tikzsegmentindex=\tikzsegmentlastindex\relax
+				\expandafter\def\expandafter\pgfplots@loc@TMPa\expandafter{\pgfplots@loc@TMPa
+					/tikz/fill between/every last segment,
+				}%
+			\fi
+			%
+			\expandafter\fill\expandafter[\pgfplots@loc@TMPa]
+				\pgfextra 
+				\pgfsetpathandBB{\pgflibraryfill@path}%
+				\pgfkeysgetvalue{/tikz/fill between/path after segment}\tikz@fillbetween@post@segment
+				\expandafter
+				\endpgfextra
+				\tikz@fillbetween@post@segment
+			;%
+			\pgfplotsutil@advancestringcounter@global\tikzsegmentindex
+		},%
+		/pgf/fill between/result stream/end/.code=,%
+	},
+	/tikz/fill between/.search also={/pgf/fill between,/pgfplots},
+	/tikz/fill between/optimize name intersections/.is if=tikzfillbetween@optimize@name@intersections,
+	% 
+	% FIXME : this optimization needs much more work... I believe it
+	% would be stable enough, but it covers too few cases.
+	%/tikz/fill between/optimize name intersections=true,
+	%
+	%
+	%
+	%--------------------------------------------------
+	% /pgfplots/execute at begin axis@@/.add={%
+	% 	\def\b@pgfplotslibraryfill@added
+	% }{%
+	% 	
+	% },%
+	%-------------------------------------------------- 
+}
+
+\def\tikzlibraryfillbetween@parse#1 and #2\pgf@stop{%
+	\def\tikz@fillbetween@a{#1}%
+	\def\tikz@fillbetween@b{#2}%
+}%
+
+% \tikzfillbetween[<options>]{<draw style>}
+%
+% <options> must contain 'of=<A> and <B>' and may configure how the
+% area is computed.
+%
+% <draw style> affects every drawn region.
+%
+\def\tikzfillbetween{\pgfutil@ifnextchar[{\tikzfillbetween@opt}{\tikzfillbetween@opt[]}}
+\def\tikzfillbetween@opt[#1]#2{%
+	\begingroup
+	\pgfqkeys{/tikz/fill between}{% 
+		% prepare the low-level path generation instruction(s):
+		/tikz/fill between/@draw style={#2},%
+		%
+		% set up input options:
+		#1,%
+	}%
+	% automagically try to use the correct layer:
+	\pgfkeysgetvalue{/tikz/fill between/on layer}\tikzlibraryfillbetween@path@layer@name
+	\tikzlibraryfillbetween@determine@layer
+	%
+	\ifx\tikzlibraryfillbetween@path@layer@name\pgfutil@empty \else
+		\pgfonlayer{\tikzlibraryfillbetween@path@layer@name}%
+	\fi
+	%
+		\tikzlibraryfillbetween@path@generatepath
+	%
+	\ifx\tikzlibraryfillbetween@path@layer@name\pgfutil@empty \else
+		\endpgfonlayer%
+	\fi
+	%
+	\endgroup
+}%
+
+% Defines \tikzlibraryfillbetween@path@layer@name
+\def\tikzlibraryfillbetween@determine@layer{%
+	\ifx\tikzlibraryfillbetween@path@layer@name\pgfutil@empty
+	\else
+		\pgfutil@IfUndefined{pgf@layerlist}{%
+			% hm. No layers active!? A pity...
+			\tikzlibraryfillbetween@path@warn@layer
+			\let\tikzlibraryfillbetween@path@layer@name\pgfutil@empty%
+		}{%
+			\edef\pgfplots@loc@TMPa{\noexpand\pgfutil@in@{\tikzlibraryfillbetween@path@layer@name}}%
+			\expandafter\pgfplots@loc@TMPa\expandafter{\pgf@layerlist}%
+			\ifpgfutil@in@
+			\else
+				\tikzlibraryfillbetween@path@warn@layer
+				\let\tikzlibraryfillbetween@path@layer@name\pgfutil@empty%
+			\fi
+		}%
+	\fi
+}%
+
+\def\tikzlibraryfillbetween@path@warn@layer{%
+	\pgfplots@warning{'fill between': Could not activate graphics layer '\tikzlibraryfillbetween@path@layer@name'. Filled path will be on top of the other ones. Please ensure that '\tikzlibraryfillbetween@path@layer@name' is somewhere in the layer list (or set '/tikz/fill between/on layer=').}%
+}%
+
+\def\tikzlibraryfillbetween@parse@softclip{%
+	\pgfkeysgetvalue{/tikz/fill between/soft clip first}\pgf@temp
+	\pgfkeysgetvalue{/tikz/fill between/soft clip second}\pgf@tempb
+	\ifx\pgf@temp\pgf@tempb
+		% Ah - both have the same value!
+		\ifx\pgf@temp\pgfutil@empty
+			% ... and both are empty.
+			\pgffillbetweensetsoftclippath{\pgfutil@empty}%
+		\else
+			% ... and both contain some path! Process it (once):
+			\def\tikz@marshal{\tikzlibsoftclip@setkey{\pgffillbetweensetsoftclippath}}%
+			\expandafter\tikz@marshal\pgf@temp\pgf@stop
+		\fi
+	\else
+		% handle 'soft clip first':
+		\ifx\pgf@temp\pgfutil@empty
+			\pgffillbetweensetsoftclippathfirst{\pgfutil@empty}%
+		\else
+			\def\tikz@marshal{\tikzlibsoftclip@setkey{\pgffillbetweensetsoftclippathfirst}}%
+			\expandafter\tikz@marshal\pgf@temp\pgf@stop
+		\fi
+		%
+		% handle 'soft clip second':
+		\pgfkeysgetvalue{/tikz/fill between/soft clip second}\pgf@tempb
+		\ifx\pgf@tempb\pgfutil@empty
+			\pgffillbetweensetsoftclippathsecond{\pgfutil@empty}%
+		\else
+			\def\tikz@marshal{\tikzlibsoftclip@setkey{\pgffillbetweensetsoftclippathsecond}}%
+			\expandafter\tikz@marshal\pgf@tempb\pgf@stop
+		\fi
+	\fi
+}%
+
+\def\tikzlibraryfillbetween@path@generatepath{%
+	%
+	\tikzlibraryfillbetween@parse@softclip
+	%
+	\tikzlibraryfillbetween@path@check
+	\expandafter\let\expandafter\tikz@fillbetween@a@path
+		\csname tikz@intersect@path@name@\tikz@fillbetween@a\endcsname
+	\expandafter\let\expandafter\tikz@fillbetween@b@path
+		\csname tikz@intersect@path@name@\tikz@fillbetween@b\endcsname
+	%
+	\iftikzfillbetween@optimize@name@intersections
+		\ifpgfpathfillbetween@split
+			\tikzfillbetween@optimize@name@intersections\tikz@fillbetween@a\tikz@fillbetween@b
+		\fi
+	\fi
+	%
+	\pgfpathfillbetween{\tikz@fillbetween@a@path}{\tikz@fillbetween@b@path}%
+}%
+
+\def\tikzlibraryfillbetween@path@check{%
+	\pgfutil@IfUndefined{tikz@intersect@path@name@\tikz@fillbetween@a}{%
+		\pgferror
+		{fill between: the mandatory argument 'of=<name path A> and <name path B> is missing or has empty arguments. Please ensure that the option has been set and that both path names have been assigned (perhaps you need 'name path global=\tikz@fillbetween@a' somewhere?)}%
+	}{}%
+	\pgfutil@IfUndefined{tikz@intersect@path@name@\tikz@fillbetween@b}{%
+		\pgferror
+		{fill between: the mandatory argument 'of=<name path A> and <name path B> is missing or has empty arguments. Please ensure that the option has been set and that both path names have been assigned (perhaps you need 'name path global=\tikz@fillbetween@b' somewhere?)}%
+	}{}%
+}
+
+
+%-----------------------------------------
+%
+% Utilities to work with path segments
+%
+%-----------------------------------------
+
+% Defines \pgfretval such that it contains the named path '#1'
+\def\tikzgetnamedpath#1{%
+	\pgfutil@IfUndefined{tikz@intersect@path@name@#1}{%
+		\pgferror{There is no named path called '#1'. Perhaps you misspelled it?}%
+	}{%
+		\expandafter\let\expandafter\pgfretval
+			\csname tikz@intersect@path@name@#1\endcsname
+	}%
+}%
+
+\def\tikznamecurrentpath#1{%
+	\pgfgetpath\pgf@temp
+	\pgfprocessround\pgf@temp\pgf@tempb%
+	\expandafter\global\expandafter\let\csname tikz@intersect@path@name@#1\endcsname=\pgf@tempb
+}%
+
+% ---------------------------------------------------------------------------------------
+
+\newif\iftikzpathsegments@reverse
+\def\tikzlibrarysegments@parse#1 and #2\pgf@stop{%
+	\def\tikz@path@segments@a{#1}%
+	\def\tikz@path@segments@b{#2}%
+}%
+
+
+\pgfkeys{
+	% allows to append intersection segments to the current path by
+	% writing
+	% \path[intersection segments={of=first and second, sequence=A0 -- B1 -- B3 A3[reverse] -- A1}];
+	/tikz/intersection segments/.code={%
+		\tikzpathintersectionsegments[#1]%
+	},
+	/tikz/segments/of/.code=\tikzlibrarysegments@parse#1\pgf@stop,
+	/tikz/segments/of={} and {},
+	/tikz/segments/sequence/.initial=A0 -- B1,
+	/tikz/segments/reverse/.is if=tikzpathsegments@reverse,
+	/tikz/segments/reverse/.default=true,
+}
+
+% Programmatic method to do the same as 'intersection
+% segments={<options>}
+%
+% #1: <options>
+\def\tikzpathintersectionsegments[#1]{%
+	\begingroup
+	\pgfqkeys{/tikz/segments}{#1}%
+	\tikzgetnamedpath{\tikz@path@segments@a}%
+	\let\tikz@path@segments@A=\pgfretval
+	\tikzgetnamedpath{\tikz@path@segments@b}%
+	\let\tikz@path@segments@B=\pgfretval
+	%
+	% this macro will be called whenever we need an intersection
+	% segment. Perhaps we do not need it at all
+	\def\tikz@ensurehascomputedintersection{%
+		% compute intersections using the PGF intersection lib...
+		\pgfintersectionofpaths{\pgfsetpath\tikz@path@segments@A}{\pgfsetpath\tikz@path@segments@B}%
+		%
+		\ifnum\pgfintersectionsolutions=0 %
+			\pgferror{The argument of 'sequence' requests an intersection segment -- but the two input paths do not intersect. Please use A* or B* to select the whole path}%
+			\def\b@tikz@select@all{1}%
+		\else
+			%
+			% ... and compute the intersection *segments* for both input
+			% paths...
+			\pgfcomputeintersectionsegments1%
+			\pgfcomputeintersectionsegments2%
+		\fi
+		\let\tikz@ensurehascomputedintersection=\relax
+	}%
+	%
+	\pgfkeysgetvalue{/tikz/segments/sequence}\tikz@sequence
+	%
+	\def\b@tikz@isect@nextismoveto{1}%
+	\let\pgfpointlastofsetpath=\pgfutil@empty
+	\expandafter\tikzpathintersectionsegments@parse@loop\tikz@sequence\pgf@stop
+	\pgfmath@smuggleone\pgfpointlastofsetpath
+	\endgroup
+	\tikz@make@last@position{\pgfpointlastofsetpath}%
+}%
+
+\def\tikzpathintersectionsegments@parse@loop{%
+	\pgfutil@ifnextchar-{%
+		\tikz@isect@p@lineto
+	}{%
+		\pgfutil@ifnextchar A{%
+			\tikz@isect@p@next
+		}{%
+			\pgfutil@ifnextchar B{%
+				\tikz@isect@p@next
+			}{%
+				\pgfutil@ifnextchar L{%
+					\tikz@isect@p@next
+				}{%
+					\pgfutil@ifnextchar R{%
+						\tikz@isect@p@next
+					}{%
+						\pgfutil@ifnextchar\pgf@stop{%
+							\tikz@isect@finish
+						}{%
+							\tikz@isect@p@error
+						}%
+					}%
+				}%
+			}%
+		}%
+	}%
+}%
+
+\def\tikz@isect@finish\pgf@stop{}%
+
+\def\tikz@isect@p@lineto--{%
+	\def\b@tikz@isect@nextismoveto{0}%
+	\tikzpathintersectionsegments@parse@loop
+}%
+
+\def\tikz@isect@p@error#1\pgf@stop{%
+	\pgferror{The argument of 'sequence' has an unexpected format near '#1'. Please write something like A0 -- B1 -- A1}%
+}
+
+\def\tikz@isect@p@next#1#2{%
+	\def\tikz@temp{#2}%
+	\def\tikz@@temp{-}%
+	\ifx\tikz@@temp\tikz@temp
+		% also accept minus signs without curly braces, i.e. 
+		% L-2 instead of L{-2}
+		\def\tikz@next{\tikz@isect@p@next@{#1}{#2}}%
+	\else
+		\def\tikz@next{\tikz@isect@p@next@{#1}{#2}{}}%
+	\fi
+	\tikz@next
+}%
+\def\tikz@isect@p@next@#1#2#3{%
+	\pgfutil@ifnextchar[{%
+		\tikz@isect@p@next@opt{#1}{#2#3}%
+	}{%
+		\tikz@isect@p@next@opt{#1}{#2#3}[]%
+	}%
+}%
+
+\def\tikz@isect@p@next@opt#1#2[#3]{%
+	\begingroup
+	%
+	% set keys (if any):
+	\def\tikz@temp{#3}%
+	\ifx\tikz@temp\pgfutil@empty
+	\else
+		\pgfqkeys{/tikz/segments}{#3}%
+	\fi
+	%
+	\def\tikz@indexshift{}%
+	\if A#1%
+		% FIRST function (0-based index)
+		\def\tikz@path{1}%
+		\def\tikz@path@ab{A}%
+	\else
+		\if B#1%
+			% SECOND function (0-based index)
+			\def\tikz@path{2}%
+			\def\tikz@path@ab{B}%
+		\else
+			\if L#1%
+				% FIRST function (1-based index)
+				\def\tikz@path{1}%
+				\def\tikz@indexshift{-1}%
+				\def\tikz@path@ab{A}%
+			\else
+				\if R#1%
+					% SECOND function (1-based index)
+					\def\tikz@path{2}%
+					\def\tikz@indexshift{-1}%
+					\def\tikz@path@ab{B}%
+				\else
+					\def\tikz@path{}%
+					\pgferror{The argument of 'sequence' has an unexpected format near '#1#2': expected L#2 or R#2}%
+				\fi
+			\fi
+		\fi
+	\fi
+	%
+	% parse arguments:
+	\def\pgfmathresult{#2}%
+	\def\tikz@temp{*}%
+	\ifx\pgfmathresult\tikz@temp
+		\def\b@tikz@select@all{1}%
+	\else
+		\def\b@tikz@select@all{0}%
+		\tikz@ensurehascomputedintersection
+		\pgfmathparse{round(#2)}%
+		\let\tikz@index=\pgfmathresult
+		\ifx\tikz@indexshift\pgfutil@empty
+		\else
+			\afterassignment\pgfutil@gobble@until@relax
+			\c@pgf@countc=\tikz@index\relax
+			\ifnum\c@pgf@countc<0 \else
+				% the index shift is ONLY for positive numbers: we
+				% want to start indexing at 1, not at 0 -- and the
+				% negative ones start at -1 anyway.
+				\advance\c@pgf@countc by\tikz@indexshift\relax
+				\edef\tikz@index{\the\c@pgf@countc}%
+			\fi
+		\fi
+	\fi
+	%
+	%
+	% PROCESS IT:
+	\ifx\tikz@path\pgfutil@empty
+		\let\pgfpointlastofsetpath=\pgfutil@empty
+	\else
+		\if1\b@tikz@select@all%
+			% ok... select the *entire* path. 
+			% #1 = A|B :
+			\expandafter\let\expandafter\pgfretval\csname tikz@path@segments@\tikz@path@ab\endcsname
+		\else
+			\pgfgetintersectionsegmentpath{\tikz@path}{\tikz@index}%
+		\fi
+		\iftikzpathsegments@reverse
+			\pgf@reverse@path\pgfretval
+		\fi
+		\if0\b@tikz@isect@nextismoveto
+			\pgfpathreplacefirstmoveto\pgfretval
+		\fi
+		\pgfaddpathandBB\pgfretval
+	\fi
+	\pgfmath@smuggleone\pgfpointlastofsetpath
+	\endgroup
+	\def\b@tikz@isect@nextismoveto{1}%
+	\tikzpathintersectionsegments@parse@loop
+}%
+
+\def\tikzfillbetween@optimize@name@intersections#1#2{%
+	\edef\tikzfillbetween@precached@intersectionofpaths@A{#1}%
+	\edef\tikzfillbetween@precached@intersectionofpaths@B{#2}%
+	\pgfkeys{%
+		/tikz/name intersections/.add code={%
+			\let\pgfintersectionofpaths=\tikzfillbetween@precached@intersectionofpaths
+		}{%
+			\let\pgfintersectionofpaths=\pgfintersectionofpaths@orig
+		}
+	}%
+}%
+
+\let\pgfintersectionofpaths@orig=\pgfintersectionofpaths
+
+\def\tikzfillbetween@precached@intersectionofpaths@log{%
+	\immediate\write-1{fill between: outcome of 'name intersections={of=\tikz@intersect@path@a\space and \tikz@intersect@path@b}' has been computed from available information of fill between}%
+}
+\def\tikzfillbetween@precached@intersectionofpaths#1#2{%
+	\def\pgf@loc@TMPa{0}%
+	\ifx\tikz@intersect@path@a\tikzfillbetween@precached@intersectionofpaths@A
+		\ifx\tikz@intersect@path@b\tikzfillbetween@precached@intersectionofpaths@B
+			\def\pgf@loc@TMPa{1}%
+		\fi
+	\fi
+	\ifx\tikz@intersect@path@b\tikzfillbetween@precached@intersectionofpaths@A
+		\ifx\tikz@intersect@path@a\tikzfillbetween@precached@intersectionofpaths@B
+			\def\pgf@loc@TMPa{1}%
+		\fi
+	\fi
+	%
+	\if1\pgf@loc@TMPa
+		\tikzfillbetween@precached@intersectionofpaths@log
+		\relax
+	\else
+		\pgfintersectionofpaths@orig{#1}{#2}%
+	\fi
+}%
+\endinput

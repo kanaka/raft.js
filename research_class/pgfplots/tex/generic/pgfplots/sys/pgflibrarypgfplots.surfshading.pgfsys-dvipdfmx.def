@@ -1,0 +1,179 @@
+%--------------------------------------------
+%
+% Package pgfplots
+%
+% Provides a user-friendly interface to create function plots (normal
+% plots, semi-logplots and double-logplots).
+% 
+% It is based on Till Tantau's PGF package.
+%
+% Copyright 2007-2012 by Christian Feuersänger.
+%
+% This program is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, either version 3 of the License, or
+% (at your option) any later version.
+% 
+% This program is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public License
+% along with this program.  If not, see <http://www.gnu.org/licenses/>.
+%
+%--------------------------------------------
+
+\newcount\c@pgfplotslibrarysurf@streamlen
+
+\def\pgfplotslibrarysurf@initstream{%
+	% binary doesn't work due to limitations of DVI.
+	% We NEED an ASCII encoding.
+	%
+	\def\pgfplotslibrarysurf@filter@encode{ASCIIHexEncode}%
+	\def\pgfplotslibrarysurf@filter@decode{ASCIIHexDecode}%
+	\global\c@pgfplotslibrarysurf@streamlen=0 %
+}%
+
+\def\pgfplotslibrarysurf@advancestreamlen#1{%
+	\global\advance\c@pgfplotslibrarysurf@streamlen by#1\relax
+}%
+
+% The lowlevel call for surface shadings. It uses a pattern type 2
+% dictionary as fill color and has thus several things to do. This is
+% a little bit more complicated than using the '/sh' operator (as
+% other pgf shadings do): the surface shading must be positioned
+% exactly at the requested coordinates, otherwise it is quite useless.
+%
+% Since shadings are *not* affected by changes in the canvas
+% transformation matrix (shifts, rotations etc), it is necessary to
+% pack the shading into a separate xform object which is then rotated
+% and translated correctly. 
+%
+% There is just one more transformation necessary: the shift inside of
+% the xform. This shift is done using changes in the canvas
+% transformation matrix and it is UNDONE in the /Matrix argument of
+% the pattern dictionary. This last step can't be done with the /sh
+% operator which is why I am using pattern dictionaries.
+\def\pgfplotslibrarysurfdraw{%
+	\begingroup
+	\setbox\pgfutil@tempboxa=\hbox
+	{%
+		\pgfpicture
+		\pgfplotssys@do@surfshading@fillpaths\pgfplots@loc@TMPa%
+		\global\let\pgfplots@glob@TMPa=\pgfplots@loc@TMPa
+		\pgfpathrectanglecorners
+			{\pgfplotslibrarysurf@corner@sw}
+			{\pgfplotslibrarysurf@corner@ne}%
+		\pgfplotslibrarysurfusepath
+		\endpgfpicture
+	}%
+	%
+	% NOTE : this code was broken due to some driver in pgf. I fixed
+	% that and brought the fix with pgfplots.
+	%
+	% for some reason, dvipdfmx requires to move the XObject
+	% declaration out of the current stream.
+	% Perhaps I should rephrase and say that for some reason, this appears to be
+	% unnecessary for pdftex. 
+	%
+	% FIXME : this might have N^2 time due to "box-append"!
+	\pgfutil@insertatbegincurrentpagefrombox
+	{%
+		\special{pdf: bxobj @pgfplotsX\pgfplotslibrarysurf@count\space 
+			width \the\wd\pgfutil@tempboxa\space height \the\ht\pgfutil@tempboxa}%
+		\special{pdf: put @resources 
+			% write the pattern resource dictionary of the XObject
+			% (only!):
+			<< /Pattern << \pgfplots@glob@TMPa >> >> 
+		}%
+		%
+		% no need to add the pattern to the page's resource list!
+		% we do not need this:
+		%\pgfutil@addpdfresource@patterns{\pgfplots@glob@TMPa}%
+		\leavevmode
+		\box\pgfutil@tempboxa
+		\special{pdf: exobj}%
+	}%
+	\endgroup
+	\special{pdf: uxobj @pgfplotsX\pgfplotslibrarysurf@count\space}%
+	\pgfplotsutil@advancestringcounter@global\pgfplotslibrarysurf@count
+}
+
+% To be used inside of a pgfpicture.
+%
+% #1: a macro name. The contents of this macro needs to be written
+% into the pdf pattern dictionary contained in the pdf resources of
+% the current context. The current context is either the current page
+% or an xform object.
+%
+%
+\def\pgfplotssys@do@surfshading@fillpaths#1{%
+	% it contain the BINARY bytes. But it is ASCII encoded, see docs of ASCIIHexEncode.
+	\global\multiply\c@pgfplotslibrarysurf@streamlen by2 % 
+	%
+	\def\pgfplots@loc@TMPa{%
+		% stream length will be computed automatically
+		/ShadingType \pgfplotslibrarysurf@type\space
+		/BitsPerCoordinate \pgfplotslibrarysurf@bitspercoordinate\space
+		/BitsPerComponent \pgfplotslibrarysurf@bitspercomponent\space
+		\if5\pgfplotslibrarysurf@type
+			/VerticesPerRow \pgfkeysvalueof{/pgfplots/surf shading/cols}
+		\else
+			/BitsPerFlag 8
+		\fi
+		/ColorSpace /Device\pgfplotslibrarysurf@colorspace
+		/Decode [\pgfplotslibrarysurf@decode]
+		\ifpgfplotslibrarysurf@usecolormap
+			/Function \pgfkeysvalueof{/pgfplots/surf shading/colormap}
+		\fi
+		\ifx\pgfplotslibrarysurf@filter@decode\pgfutil@empty
+		\else
+			/Filter /\pgfplotslibrarysurf@filter@decode\space
+		\fi
+		/Length \the\c@pgfplotslibrarysurf@streamlen
+	}%
+	%
+	\pgf@process{\pgfpointdiff{\pgfplotslibrarysurf@corner@sw}{\pgfkeysvalueof{/pgfplots/surf shading/anchor}}}%
+	\pgf@sys@bp@correct\pgf@x%
+	\pgf@sys@bp@correct\pgf@y%
+	%
+	%\noexpand\pgfutil@insertatbegincurrentpagefrombox
+	{%
+		\special{pdf: object @pgfplotsShading\pgfplotslibrarysurf@count\space << \pgfplots@loc@TMPa >> 
+			stream^^J%
+			\pgfplotslibrarysurf@binarystream
+			endstream
+		}%
+		\special{pdf: close @pgfplotsShading\pgfplotslibrarysurf@count\space }%
+		\special{pdf: object @pgfplotsPattern\pgfplotslibrarysurf@count\space <<
+			/Type /Pattern
+			/PatternType 2
+	%		/Matrix [\pgf@pt@aa\space\pgf@pt@ab\space\pgf@pt@ba\space\pgf@pt@bb\space\pgf@sys@tonumber\pgf@pt@x\space\pgf@sys@tonumber\pgf@pt@y]
+			% FIXME: INCORPORATE TIKZ CM
+			/Matrix [1 0 0 1 \pgf@sys@tonumber\pgf@x\space \pgf@sys@tonumber\pgf@y] %226.533 518.141] 
+			%--------------------------------------------------
+			% /ExtGState 
+			% 	<<
+			% 		/LW 2
+			% 		/OP true
+			% 		/OPM 1
+			% 	>>
+			%-------------------------------------------------- 
+			/Shading @pgfplotsShading\pgfplotslibrarysurf@count
+		>>
+		}%
+		\special{pdf: close @pgfplotsPattern\pgfplotslibrarysurf@count\space }%
+	}%
+	\edef#1{%
+		/pgfplotsSurface\pgfplotslibrarysurf@count\space @pgfplotsPattern\pgfplotslibrarysurf@count
+	}%
+	%
+	% I inlined \pgfsys@setpatterncolored here because it appears to be
+	% natural - and in order to bring this driver to PGF 2.00 (which
+	% would fail otherwise)
+	\pgfsysprotocol@literal{/Pattern cs /pgfplotsSurface\pgfplotslibrarysurf@count\space scn}%
+}
+
+\endinput
+% vi: ft=tex

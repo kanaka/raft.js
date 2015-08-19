@@ -1,0 +1,517 @@
+%--------------------------------------------
+%
+% Package pgfplots
+%
+% Provides a user-friendly interface to create function plots (normal
+% plots, semi-logplots and double-logplots).
+% 
+% It is based on Till Tantau's PGF package.
+%
+% Copyright 2013 by Christian Feuersaenger
+%
+% This program is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, either version 3 of the License, or
+% (at your option) any later version.
+% 
+% This program is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public License
+% along with this program.  If not, see <http://www.gnu.org/licenses/>.
+%
+%--------------------------------------------
+%
+% This library adds support for a "soft clip" decoration. It applies
+% clipping to an input path, but rather than simply instructing the
+% display driver to clip the path, it computes a new clip path from
+% the input.
+%
+% This library is (currently) on top of tikz.
+
+\pgfutil@IfUndefined{pgfplotsset}{%
+	\pgferror{Please load pgfplots before pgfplots.fillbetween.}%
+	\endinput
+}{}%
+
+\usetikzlibrary{intersections}
+
+\pgfplots@iffileexists{pgflibraryfillbetween.code.tex}{%
+	\usepgflibrary{fillbetween}
+}{%
+	\pgfplotsusecompatibilityfile{pgflibraryfillbetween.code.tex}%
+}%
+
+\pgfutil@IfUndefined{pgfintersectiongetsolutiontimes}{%
+	\pgfplotsusecompatibilityfile{pgflibraryintersections.code.tex}%
+}{}%
+
+
+\pgfkeys{
+	% soft clip={(axis cs:0,0) rectangle (axis cs:1,1)}
+	% or
+	% soft clip={A}
+	% where 'A' is defined using 'name path=A' somewhere
+	/pgf/decoration/soft clip path/.code={%
+		% FIXME : I would rather NOT evaluate path arguments in this
+		% context! Who knows how people set keys!? But alas, we cannot
+		% evaluate late because the CM is reset while working on
+		% decorations ... (see below)
+		\tikzlibsoftclip@setkey{\tikzlibsoftclip@setkey@assign}#1\pgf@stop
+	},
+	/pgf/decoration/every soft clipped path/.style={},%
+}
+
+% #1 a macro containing a soft path
+\def\tikzlibsoftclip@setkey@assign#1{%
+	\let\pgf@decoration@soft@clip=#1%
+}%
+
+\tikzlibsoftclip@setkey@assign{\pgfutil@empty}%
+
+\pgfdeclaredecoration{soft clip}{replace}{
+
+	\state{replace}[width=\pgfdecoratedpathlength,
+		persistent precomputation={%
+			% This here is an earlier draft... but alas, the
+			% transformation matrix has been reset in this context,
+			% and we cannot define the clip path dynamically here.
+			% I left it to document that.
+			%
+			%\pgfkeysgetvalue{/pgf/decoration/soft clip path}\pgf@temp
+			%\def\tikz@marshal{\tikzlibsoftclip@setkey{\tikzlibsoftclip@setkey@assign}}%
+			%\expandafter\tikz@marshal\pgf@temp\pgf@stop
+		}
+	]{%
+		\ifx\pgf@decoration@soft@clip\pgfutil@empty
+			\pgfplotsthrow{invalid argument}
+				{\pgf@decoration@soft@clip}%
+				{The mandatory argument 'soft clip path=(A) rectangle (B)' has not been set}%
+				\pgfeov
+		\else
+			\tikzset{/pgf/decoration/every soft clipped path}%
+			\pgfpathcomputesoftclippath{\pgfdecoratedpath}{\pgf@decoration@soft@clip}%
+			\pgfsetpathandBB{\pgfretval}%
+		\fi
+	}
+}
+
+% ---------------------------------------------------------------------------------
+%
+%  SOFT-CLIPPING.
+%
+%  "softclip" means to get rid of those parts of a path which are
+%  outside of a clip path. 
+%
+%  An example is to trim at the beginning and/or end of a
+%  path as part of fill-between ("poor-mans-clipping").
+%
+%  The difference to "real" clipping is that it is applied to the
+%  path, not to the viewer -- the path can still be drawn with any
+%  decorations, line widths, etc.
+%
+%  Another difference is that this feature is (considerably) less sophisticated.
+%
+%  #1: the input path
+%  #2: the clip path (if it is empty, no clipping will be applied)
+% OUTPUT:
+%  \pgfretval is #1 with modifications
+\def\pgfpathcomputesoftclippath#1#2{%
+	\ifx#2\pgfutil@empty
+		\let\pgfretval=#1%
+	\else
+		\ifx#1\pgfutil@empty
+			\let\pgfretval=#1%
+		\else
+			\pgfpathcomputesoftclippath@{#1}{#2}%
+		\fi
+	\fi
+}
+
+\def\pgfpathcomputesoftclippath@#1#2{%
+	\begingroup
+		\pgfprocessround{#1}{#1}%
+		\pgfprocessround{#2}{#2}%
+		%
+		%
+		\pgfpathcomputesoftclippath@is@first@outside@of@path{#1}{#2}%
+		\let\b@pgffill@is@outside@clip=\pgfretval
+		%
+%\message{computing soft clip path for ^^J\meaning#1 and ^^J\meaning#2^^J  first point of input is outside of clip path=\b@pgffill@is@outside@clip^^J}%
+		%
+		% FIXME : it might be that I need to sort them ... !? but
+		% other tests indicate that I should not!?
+		%\pgfintersectionsortbyfirstpath
+		\pgf@intersect@sortfalse
+		\pgfintersectionofpaths%
+			{%
+				\pgfsetpath#1%
+			}%
+			{%
+				\pgfsetpath#2%
+			}%
+		%
+%\message{... num intersections = \pgfintersectionsolutions^^J}%
+		%
+		\ifnum\pgfintersectionsolutions=0 %
+			\if1\b@pgffill@is@outside@clip
+				% entire path is outside of the clipped area.
+				\let\pgfretval=\pgfutil@empty
+			\else
+				\let\pgfretval=#1%
+			\fi
+		\else
+			% split the first involved path into the
+			% segments induced by the intersection points:
+			\pgfcomputeintersectionsegments{1}%
+			\let\pgfpathfilled@a@segments=\pgfretval
+			%
+			% Now, create a new path which contains only those
+			% segments which are INSIDE of the clip path.
+			%
+			% I assume that I can rely on "even/odd" matching: if the
+			% first is inside, the second is outside, the third
+			% inside, etc.
+			\pgfapplistnewempty{pgfretval@tmp}%
+			\def\c@pgfpathfilled@counter{0}%
+			\pgfmathloop
+			\ifnum\c@pgfpathfilled@counter<\pgfpathfilled@a@segments\relax
+				\if0\b@pgffill@is@outside@clip
+					\expandafter\let\expandafter\pgf@loc@path@a\csname pgf@intersect@path@split@a@\c@pgfpathfilled@counter\endcsname
+					\expandafter\pgfapplistpushback\pgf@loc@path@a\to{pgfretval@tmp}%
+				\fi
+				\pgfpathfillbetween@negate\b@pgffill@is@outside@clip
+				%
+				\pgfutil@advancestringcounter\c@pgfpathfilled@counter
+			\repeatpgfmathloop
+			\pgfapplistlet\pgfretval={pgfretval@tmp}%
+		\fi
+		%
+		\global\let\pgf@glob@TMPa=\pgfretval%
+	\endgroup
+	\let\pgfretval=\pgf@glob@TMPa
+}
+
+% #1: input path (non-empty)
+% #2: soft clip path
+% Defines "\def\pgfretval{1}" if (the first point of #1 is outside or on the path #2)
+% Defines "\def\pgfretval{0}" if (the first point of #1 is inside of the path #2)
+\def\pgfpathcomputesoftclippath@is@first@outside@of@path#1#2{%
+	% APPROACH: shoot a line starting at the first coordinate of the
+	% first path through "the middle of #2". Then make an even/odd
+	% check on the number of intersections.
+	%
+	% FIXME : for now, I only support (x,y) rectangle (X,Y) anyway --
+	% optimize for that case!? This here might be too complex...
+	\begingroup
+	\expandafter\pgfpathfillbetween@get@first@coord#1\pgf@stop
+	\let\pgfpathfilled@a@firstcoord=\pgfretval%
+	%
+	% Get some point "in the middle of #2":
+	\pgfpathcomputesoftclippath@accum@pseudo@mean#2%
+	\edef\pgfpathfilled@b@center{\noexpand\pgfqpoint\pgfretval}%
+	%
+	% We have to shoot *through* #2, not just into the middle of #2.
+	% Consequently, we need to know how big #2 is:
+	\pgfpathcomputesoftclippath@is@first@outside@of@path@getBB#2%
+	\let\pgf@size@hint=\pgfretval
+	%
+	% Now, compute a target point such that our shot goes through it:
+	\pgfqpointscale{%
+		\pgf@size@hint
+	}{%
+		\pgfpointnormalised{%
+			\pgfpointdiff%
+				{\expandafter\pgfqpoint\pgfpathfilled@a@firstcoord}%
+				{\pgfpathfilled@b@center}%
+		}%
+	}%
+	% collect intermediate results as \pgf@xa/\pgf@ya are overwritten:
+	\edef\pgf@direction@vector{\noexpand\pgfqpoint{\the\pgf@x}{\the\pgf@y}}%
+	\pgfpointadd{\pgfpathfilled@b@center}{\pgf@direction@vector}%
+	\edef\pgfpathfilled@shoot@line@trg{{\the\pgf@x}{\the\pgf@y}}%
+	%
+	% this here is our path!
+	\edef\pgf@direction@path{%
+		\noexpand\pgfsyssoftpath@movetotoken\pgfpathfilled@a@firstcoord
+		\noexpand\pgfsyssoftpath@linetotoken\pgfpathfilled@shoot@line@trg
+	}%
+	%
+	% ... ok, compute intersections. This should be fairly fast as
+	% our second path has just 1 segment, i.e. it will be O(N) where N
+	% is the number of segments in #2.
+	\pgf@intersect@sortfalse
+	\pgfintersectionofpaths%
+		{%
+			\pgfsetpath#2%
+		}%
+		{%
+			\pgfsetpath\pgf@direction@path%
+		}%
+	%
+	\ifnum\pgfintersectionsolutions=0 %
+		% this must not happen! We have taken great care such that we
+		% *have* at least 1 intersection points!
+		\pgferror{Illegal state encountered: the computation of a softpath failed. The failure occurred while computing whether the first input coordinate is inside of the clip path (found no intersections)}%
+	\fi
+	%
+	\pgfpathcomputesoftclippath@if@is@first@on@boundary{%
+		% AH! The first point is ON the boundary of the clip path.
+		% This is equivalent to the condition that the first
+		% intersection point equals the first point.
+		%
+		% In this case, we say that it is OUTSIDE of the clip path!
+		%
+		% This is actually related to 
+		%   1. the fact that the input path is splitted into segments
+		%   induced by the intersection points in order to apply
+		%   soft-clipping.
+		%   2. the fact that the clipping is based on an even/odd
+		%   matching (in/out). 
+		%
+		% In that setup, we want to skip the segment until the first
+		% intersection point - after all, it is "empty" anyway.
+		%
+		% To this end, we have to say that this first (empty) segment
+		% is OUTSIDE:
+		\def\pgfretval{1}%
+	}{%
+		\ifodd\pgfintersectionsolutions\relax%
+			\def\pgfretval{0}%
+		\else
+			\def\pgfretval{1}%
+		\fi
+	}%
+	\pgfmath@smuggleone\pgfretval
+	\endgroup
+}
+
+\def\pgfpathcomputesoftclippath@if@is@first@on@boundary#1#2{%
+	\pgfpathcomputesoftclippath@compute@infty@norm{%
+		\pgfpointdiff%
+			{\expandafter\pgfqpoint\pgfpathfilled@a@firstcoord}%
+			{\pgfpointintersectionsolution{1}}%
+	}%
+	\ifdim\pgf@x<\pgfintersectiontolerance\relax
+		% YES: the first point IS on the boundary: the first
+		% intersection solution == first point.
+		#1%
+	\else
+		% No, it is NOT equal to the first intersection solution - and
+		% thus NOT on the boundary.
+		#2%
+	\fi
+}%
+
+% Defines \pgf@x to be the infty norm of vector #1
+\def\pgfpathcomputesoftclippath@compute@infty@norm#1{%
+	\pgf@process{#1}%
+	\ifdim\pgf@x<0sp \global\pgf@x=-\pgf@x\fi
+	\ifdim\pgf@y<0sp \global\pgf@y=-\pgf@y\fi
+	\ifdim\pgf@x<\pgf@y 
+		\global\pgf@x=\pgf@y
+	\fi
+}
+
+% Defines \pgfretval to be a *scalar* "size indicator" (1-norm) of the bounding
+% box of #1.
+%
+% #1: a macro containing a softpath.
+\def\pgfpathcomputesoftclippath@is@first@outside@of@path@getBB#1{%
+	\begingroup
+	\pgf@getpathsizes\pgf@interrupt@pathsizes
+	% we only need the path size here:
+	\pgf@relevantforpicturesizefalse
+	%
+	% FIXME : CODE CLEANUP NEEDED
+	\def\pgfsetpathBB@protocol@lastmoveto##1##2{}%
+	\expandafter\pgfsetpath@loop#1\pgf@stop
+	\pgfpointdiff
+		{\pgfqpoint\pgf@pathminx\pgf@pathminy}%
+		{\pgfqpoint\pgf@pathmaxx\pgf@pathmaxy}%
+	% compute |v|_1 = x + y (both components are non-negative anyway):
+	\pgf@xa=\pgf@x
+	\advance\pgf@xa by\pgf@y
+	\xdef\pgf@glob@TMPa{\pgf@sys@tonumber\pgf@xa}%
+	\pgf@setpathsizes\pgf@interrupt@pathsizes
+	\endgroup
+	\let\pgfretval=\pgf@glob@TMPa
+}%
+
+% Defines \pgfretval to be of a "pseudo" mean of path #1.
+%
+% Here, "pseudo" refers to the fact that the mean will only be
+% accumulated over the "first couple of coordinates" to avoid numeric
+% overflows in TeX's math engine.
+\def\pgfpathcomputesoftclippath@accum@pseudo@mean#1{%
+	\begingroup
+	\let\pgfsyssoftpath@movetotoken\pgfpathcomputesoftclippath@accum@pseudo@mean@
+	\let\pgfsyssoftpath@linetotoken\pgfpathcomputesoftclippath@accum@pseudo@mean@
+	\let\pgfsyssoftpath@closepathtoken\pgfpathcomputesoftclippath@accum@pseudo@mean@
+	\let\pgfsyssoftpath@curvetotoken\pgfpathcomputesoftclippath@accum@pseudo@mean@
+	\let\pgfsyssoftpath@curvetosupportatoken\pgfpathcomputesoftclippath@accum@pseudo@mean@relax
+	\let\pgfsyssoftpath@curvetosupportbtoken\pgfpathcomputesoftclippath@accum@pseudo@mean@relax
+	\c@pgf@countc=0 %
+	\pgf@xa=0pt %
+	\pgf@ya=0pt %
+	#1%
+	\divide\pgf@xa by\c@pgf@countc
+	\divide\pgf@ya by\c@pgf@countc
+	\edef\pgfretval{{\the\pgf@xa}{\the\pgf@ya}}%
+	\pgfmath@smuggleone\pgfretval
+	\endgroup
+}%
+\def\pgfpathcomputesoftclippath@accum@pseudo@mean@relax#1#2{}
+\def\pgfpathcomputesoftclippath@accum@pseudo@mean@#1#2{%
+	\ifnum\c@pgf@countc<4
+		% avoid overflows. 4 must be sufficient for now.
+		\advance\pgf@xa by#1\relax
+		\advance\pgf@ya by#2\relax
+		\advance\c@pgf@countc by1 %
+	\fi
+}
+
+
+% #1: of the form '{<x>}{<y>}'
+% #2: of the form '{<x>}{<y>}'
+\def\pgfpathfillbetween@check@x@less@than#1#2{%
+	\edef\pgf@temp{#1#2}%
+	\expandafter\pgfpathfillbetween@check@x@less@than@\pgf@temp
+}%
+
+% #1: x1
+% #2: y1
+% #3: x2
+% #4: y2
+\def\pgfpathfillbetween@check@x@less@than@#1#2#3#4{%
+	\ifdim#1>#3\relax
+		% <=
+		\def\pgfretval{0}%
+	\else
+		\def\pgfretval{1}%
+	\fi
+}%
+
+\def\pgfpathfillbetween@negate#1{%
+	\if0#1%
+		\def#1{1}%
+	\else
+		\def#1{0}%
+	\fi
+}
+
+\pgfkeys{
+	/tikz/soft clip assign/name/.code={\tikzgetnamedpath{#1}},
+	/tikz/soft clip assign/path/.code={\tikzlibsoftclip@setkey@@#1\pgf@stop},
+}
+
+% 
+% \tikzlibsoftclip@setkey{<\macro>} <path name>\pgf@stop
+%
+% OR
+%
+% \tikzlibsoftclip@setkey{<\macro>} (<A>) rectangle (<B>)\pgf@stop
+%
+% #1: a macro which is called with the resulting clip path as argument #1.
+\def\tikzlibsoftclip@setkey#1#2\pgf@stop{%
+	\pgfutil@in@{=}{#2}%
+	\ifpgfutil@in@
+		\pgfqkeys{/tikz/soft clip assign}{#2}%
+	\else
+		\def\pgf@temp{#2}%
+		\pgfplots@command@to@string\pgf@temp\pgf@temp
+		%
+		\tikzifisnamedpath{\pgf@temp}{%
+			\pgfkeysalso{/tikz/soft clip assign/name={#2}}%
+		}{%
+			\pgfkeysalso{/tikz/soft clip assign/path={#2}}%
+		}%
+	\fi
+	#1{\pgfretval}%
+}
+
+\def\tikzlibsoftclip@setkey@@{%
+	%
+	\tikz@scan@one@point\tikzlibsoftclip@setkey@bb@scan@a
+}%
+
+\def\tikzlibsoftclip@setkey@bb@scan@a#1{%
+	\def\tikzlibsoftclip@setkey@bb@a{#1}%
+	\pgfutil@ifnextchar r{%
+		\tikzlibsoftclip@setkey@bb@scan@rectangle
+	}{%
+		\tikzlibsoftclip@setkey@@error
+	}%
+}%
+
+\def\tikzlibsoftclip@setkey@bb@scan@rectangle rectangle{%
+	\tikz@scan@one@point\tikzlibsoftclip@setkey@bb@scan@b
+}%
+
+\def\tikz@gobble@until@stop#1\pgf@stop{}%
+
+\def\tikzlibsoftclip@setkey@bb@scan@b#1{%
+	\def\tikzlibsoftclip@setkey@bb@b{#1}%
+	\pgfutil@ifnextchar \pgf@stop{%
+		\tikzlibsoftclip@setkey@@activate
+		\tikz@gobble@until@stop
+	}{%
+		\tikzlibsoftclip@setkey@@error
+	}%
+}%
+
+\def\tikzlibsoftclip@setkey@@error#1\pgf@stop{%
+	\def\pgfplots@loc@TMPa{#1}%
+	\pgfplots@command@to@string\pgfplots@loc@TMPa\pgfplots@loc@TMPb
+	\pgfplotsthrow{invalid argument}
+		{\pgfplots@loc@TMPa}%
+		{fill between: the argument of 'soft clip' has an unexpected format near '\pgfplots@loc@TMPb'; expected '(<pt>) rectangle (<pt>)'}%
+		\pgfeov
+}%
+
+% INPUT:
+%  - two PGF points \tikzlibsoftclip@setkey@bb@a and \tikzlibsoftclip@setkey@bb@b.
+%
+% POSTCONDITION: \pgfretval contains the resulting path.
+\def\tikzlibsoftclip@setkey@@activate{%
+	% Expand points to {<x>}{<y>} ...
+	\pgf@process{\tikzlibsoftclip@setkey@bb@a}%
+	\edef\tikzlibsoftclip@setkey@bb@a{{\the\pgf@x}{\the\pgf@y}}%
+	\pgf@process{\tikzlibsoftclip@setkey@bb@b}%
+	\edef\tikzlibsoftclip@setkey@bb@b{{\the\pgf@x}{\the\pgf@y}}%
+	%
+	\pgfinterruptpath
+	\pgf@relevantforpicturesizefalse%
+	\expandafter\pgfqpoint\tikzlibsoftclip@setkey@bb@a
+	\pgf@xa=\pgf@x
+	\pgf@ya=\pgf@y
+	\expandafter\pgfqpoint\tikzlibsoftclip@setkey@bb@b
+	\pgf@xb=\pgf@x
+	\pgf@yb=\pgf@y
+	%
+	\pgfpathmoveto{\pgfqpoint{\pgf@xa}{\pgf@ya}}%
+	\pgfpathlineto{\pgfqpoint{\pgf@xa}{\pgf@yb}}%
+	\pgfpathlineto{\pgfqpoint{\pgf@xb}{\pgf@yb}}%
+	\pgfpathlineto{\pgfqpoint{\pgf@xb}{\pgf@ya}}%
+	\pgfpathclose
+	\pgfgetpath\pgfplots@loc@TMPa
+	\global\let\pgfplots@glob@TMPa=\pgfplots@loc@TMPa
+	\endpgfinterruptpath
+	%
+	\let\pgfretval=\pgfplots@glob@TMPa
+}%
+% ---------------------------------------------------------------------------------
+
+% Executes #2 if #1 is a named path and #3 otherwise.
+\def\tikzifisnamedpath#1#2#3{%
+	\pgfutil@IfUndefined{tikz@intersect@path@name@#1}{%
+		\def\tikz@next{#3}%
+	}{%
+		\def\tikz@next{#2}%
+	}%
+	\tikz@next
+}%
+
+

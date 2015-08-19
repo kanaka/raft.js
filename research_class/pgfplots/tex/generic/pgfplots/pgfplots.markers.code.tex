@@ -1,0 +1,368 @@
+%--------------------------------------------
+%
+% Package pgfplots
+%
+% Provides a user-friendly interface to create function plots (normal
+% plots, semi-logplots and double-logplots).
+% 
+% It is based on Till Tantau's PGF package.
+%
+% Copyright 2007-2013 by Christian Feuersänger.
+%
+% This program is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, either version 3 of the License, or
+% (at your option) any later version.
+% 
+% This program is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public License
+% along with this program.  If not, see <http://www.gnu.org/licenses/>.
+%
+%--------------------------------------------
+	
+\def\pgfplots@markers@visphase@name@none{none}%
+\def\pgfplots@markers@visphase@name@afterpath@clipped{afterpath@clipped}%
+\def\pgfplots@markers@visphase@name@afterpath@unclipped{afterpath@unclipped}%
+\def\pgfplots@markers@visphase@name@endaxis@unclipped{endaxis@unclipped}%
+
+% defines \pgfplotsretval to contain the visualization phase used by
+% the current plot.
+\def\pgfplots@markers@survey@set@visphasename{%
+	\begingroup
+	%
+	% this validates+normalizes \tikz@plot@mark:
+	\pgfplots@markers@check@for@default@plot@mark
+	\ifx\tikz@plot@mark\pgfutil@empty
+		\ifpgfplots@scatterplotenabled
+			\def\b@pgfplots@has@plot@mark{1}%
+		\else
+			\def\b@pgfplots@has@plot@mark{0}%
+		\fi
+	\else
+		\def\b@pgfplots@has@plot@mark{1}%
+	\fi
+	%
+	% this sets \ifpgfplots@clip@marker@paths:
+	\pgfplots@markers@prepare@layered@graphics@marks
+	%
+	\if0\b@pgfplots@has@plot@mark
+		% no markers. Ok, we do not need a visualization phase for
+		% markers.
+		\let\pgfplotsretval=\pgfplots@markers@visphase@name@none
+	\else
+		\ifpgfplots@clip@marker@paths
+			\let\pgfplotsretval=\pgfplots@markers@visphase@name@afterpath@clipped
+		\else
+			\if2\pgfplots@clipmode
+				% clip mode=individual:
+				\let\pgfplotsretval=\pgfplots@markers@visphase@name@afterpath@unclipped
+			\else
+				% clip mode=global
+				\let\pgfplotsretval=\pgfplots@markers@visphase@name@endaxis@unclipped
+			\fi
+		\fi
+	\fi
+	%
+	\pgfmath@smuggleone\pgfplotsretval
+	\endgroup
+}%
+
+\def\pgfplots@markers@visphase@after@axis@prepare{%
+	\global\pgfplotslistnewempty\pgfplots@stored@markerlist
+}
+
+% Draw any markers for which drawing has been postponed.
+%
+% The motivation here is that markers should be drawn on top of
+% their plots, and AFTER the clip path.
+%
+\def\pgfplots@markers@visphase@after@axis{%
+	\begingroup
+	\pgfplotslistforeach\pgfplots@stored@plotlist\as\pgfplots@loc@TMPa{%
+		\expandafter\pgfplots@stored@plotlist@EXTRACTENTRY\pgfplots@loc@TMPa
+%\message{^^JProcessing stored plot with precommand '\meaning\pgfplots@stored@current@precmd';^^J  pgfplots@plotcmd '\meaning\pgfplots@stored@current@cmd'^^J postcommand '\meaning\pgfplots@stored@current@postcmd'^^J}%
+%\message{DATA: '\meaning\pgfplots@stored@current@data';^^J}%
+		% The precmd sets all required variables needed to
+		% finalize a plot.
+		% @see the stream preparation routines.
+		\pgfplots@stored@current@precmd
+		\ifx\pgfplots@markers@visphase@name\pgfplots@markers@visphase@name@endaxis@unclipped
+			\ifx\pgfplots@stored@current@cmd\pgfutil@empty
+				% Ah: some \pgfplotsextra command like \draw,\path,
+				% \node or even \scope or \endscope.
+				% Has been done earlier.
+			\else
+				\begingroup
+				% reconfigure...
+				\pgfkeyssetvalue{/pgfplots/on layer}{\pgfkeysvalueof{/pgfplots/mark layer}}%
+				%
+				% choose the one that is necessary for us here:
+				\let\pgfplots@markers@visphase@name=\pgfplots@markers@visphase@name@afterpath@unclipped
+				%
+				% provide an empty list of phase names here in order
+				% to turn off standard visualization phases: they
+				% have been applied already.
+				\pgfplots@stored@plotlist@visualize@selected@phases{}%
+				\endgroup
+			\fi
+			\pgfplots@stored@current@postcmd
+		\fi
+	}%
+	\endgroup
+}
+
+\def\pgfplots@execute@at@begin@plot@visualization@internal{%
+	\global\let\pgfplots@stored@markerlist@last=\relax
+}%
+
+\def\pgfplots@markers@install@plotmark@handler{%
+	% note: I can't check on tikz@transform because it can be '\relax'.
+	\pgfplots@gettikzinternal@keyval{mark indices}{tikz@mark@list}{}%
+	\pgfplots@gettikzinternal@keyval{mark}{tikz@plot@mark}{}%
+	%
+	%
+	% do not reset \tikz@options: draw color may be acquired
+	% from 'current plot style'
+	%\let\tikz@options=\pgfutil@empty%
+	\let\tikz@transform=\pgfutil@empty%
+	\tikzset{every plot/.try,every mark}%
+	%
+	% This sets colors:
+	\tikz@options
+	%
+	% This sets the \iftikz@mode@draw etc:
+	%\tikz@mode
+	% FIXME: using 'color=blue' will NOT activate filltrue!
+	% So: if 'tikz@mode' *contains* 'fillfalse', I know what to do... 
+	% but all other cases are not clear
+	%--------------------------------------------------
+	% \iftikz@mode@draw
+	% \else
+	% 	% Override the marker codes: force 'draw=none'
+	% 	% even if the markers likes to be stroked:
+	% 	\let\pgfusepathqfillstroke=\pgfusepathqfill
+	% \fi
+	% \iftikz@mode@fill
+	% \else
+	% 	% Override the marker codes: force 'fill=none'
+	% 	% even if the markers likes to be filled:
+	% 	\let\pgfusepathqfillstroke=\pgfusepathqstroke
+	% \fi
+	%-------------------------------------------------- 
+	%
+	% this here is the MAIN marker code.
+	% It may be modified if scatter plot is enabled, see below.
+	\def\pgfplots@loc@TMPa{%
+		% the transformation has been reset before processing plot
+		% marks.
+		% Consequently, it applies only transformation options in "every mark".
+		\tikz@transform
+		\pgfuseplotmark{\tikz@plot@mark}%
+	}%
+	\ifpgfplots@scatterplotenabled
+		% Scatter plots work like this:
+		%
+		% <compute per-point meta info>
+		% /pgfplots/scatter/@pre marker code
+		% <marker code, lowlevel>
+		% /pgfplots/scatter/@post marker code
+		%
+		% -> that's all. The Rest is configurable with style which
+		%  (re)define '@pre marker code' and '@post marker code' (see
+		%  the docs for details).
+		%
+		% Prepare arguments for '@pre/@post' macros:
+		\t@pgfplots@toka={%
+			\begingroup
+			% prepare programmatic access to '/data point/x' etc:
+   			\pgfplotspointgetcoordinates
+			\pgfplotsaxisvisphasetransformpointmeta
+			\pgfkeysvalueof{/pgfplots/scatter/@pre marker code/.@cmd}\pgfeov
+		}%
+		\t@pgfplots@tokb=\expandafter{\pgfplots@loc@TMPa}%
+		\t@pgfplots@tokc={%
+			\pgfkeysvalueof{/pgfplots/scatter/@post marker code/.@cmd}\pgfeov
+			\endgroup
+		}%
+		\edef\pgfplots@loc@TMPa{%
+			\the\t@pgfplots@toka
+			\the\t@pgfplots@tokb
+			\the\t@pgfplots@tokc
+		}%
+		\if r\pgfplots@scatter@position
+			% scatter/position=relative
+			%
+			% tikz transforms the coordinate system such that "(0,0)"
+			% is the point where the mark should be placed.
+		\else
+			% scatter/position=absolute
+			%
+			% ah - we do not want tikz's transformation.
+			%
+			% Disable it by means of \aftergroup hackery:
+			\t@pgfplots@tokc=\expandafter{\pgfplots@loc@TMPa}%
+			\xdef\pgfplots@scatter@plot@mark{%
+				\noexpand\begingroup
+				\the\t@pgfplots@tokc
+				\noexpand\endgroup
+			}%
+			\def\pgfplots@loc@TMPa{\aftergroup\pgfplots@scatter@plot@mark}%
+		\fi
+	\fi
+	\def\pgfplots@loc@TMPb##1{%
+		\ifx\tikz@mark@list\pgfutil@empty%
+			\pgfplothandlermark{##1}%
+		\else
+			\pgfplothandlermarklisted{##1}{\tikz@mark@list}%
+		\fi
+	}%
+	\t@pgfplots@tokc=\expandafter\expandafter\expandafter{\expandafter\pgfplots@loc@TMPb\expandafter{\pgfplots@loc@TMPa}}%
+	\edef\pgfplots@basiclevel@plothandler{\the\t@pgfplots@tokc}%
+	\expandafter\def\expandafter\pgfplots@basiclevel@plothandler\expandafter{%
+		\pgfplots@basiclevel@plothandler
+		\global\let\pgfplots@markers@plotstreamstart=\pgf@plotstreamstart
+		\def\pgf@plotstreamstart{%
+			\pgfplots@markers@plotstreamstart
+			\global\let\pgfplots@markers@mark@handler@@=\pgf@plotstreampoint
+			\global\let\pgf@plotstreampoint=\pgfplots@markers@mark@handler
+		}%
+	}%
+	\let\tikz@plot@handler=\pgfplots@basiclevel@plothandler
+	%
+	\pgfplots@basiclevel@plothandler
+	%
+}%
+
+\def\pgfplots@markers@mark@handler#1{%
+	\ifpgfplots@clip
+		% check for clip marker paths:
+		\pgfplotsaxisifcontainspoint{\pgfplots@markers@mark@handler@@{#1}}{}%
+	\else
+		\pgfplots@markers@mark@handler@@{#1}
+	\fi
+}%
+
+\def\pgfplots@if@has@plot@marks#1#2{%
+	% make sure there is a mark set!
+	\pgfplots@gettikzinternal@keyval{mark}{tikz@plot@mark}{}%
+	\def\pgfplots@loc@TMPa{none}%
+	\ifx\tikz@plot@mark\pgfplots@loc@TMPa
+		% this here happens only in older versions of pgf.
+		\let\tikz@plot@mark\pgfutil@empty
+	\fi
+	\ifx\tikz@plot@mark\pgfutil@empty
+		#2\relax
+	\else
+		#1\relax
+	\fi
+}%
+
+\def\pgfplots@markers@check@for@default@plot@mark{%
+	\pgfplots@if@has@plot@marks{}{%
+		\pgfplots@getcurrent@plothandler\pgfplots@basiclevel@plothandler
+		\ifx\pgfplots@basiclevel@plothandler\pgfplothandlerdiscard
+			% oh, the "only marks" plot handler-- and no plot mark!?
+			% what's that!?
+			\ifpgfplots@scatterplotenabled
+				% scatter handles this in /pgfplots/scatter/true
+				% automatically.
+			\else
+				% that appears to be nonsense...
+				\def\tikz@plot@mark{*}%
+			\fi
+		\fi
+	}%
+}%
+
+
+% Used inside of /pgfplots/scatter/classes :
+\def\pgfplots@scatter@classes@pre@marker@code{%
+	\pgfutil@ifundefined{pgfp@scatter@class@\pgfplotspointmeta}{%
+		\let\pgfplots@loc@TMPa=\pgfplotspointmeta
+		%
+		% ups - no styles available? Maybe something went
+		% wrong with the 'scatter src' key. Check whether it
+		% was accidentally a numerical style:
+		\if1\csname pgfpmeta@\pgfplotspointmetainputhandler @issymbolic\endcsname
+		\else
+			% ok, be fault tolerant and round to an integer:
+			\pgfplotscoordmath{meta}{tofixed}{\pgfplotspointmeta}%
+			\begingroup
+			\pgfkeys{/pgf/number format/precision=0}%
+			\expandafter\pgfmathroundto\expandafter{\pgfmathresult}%
+			\pgfmath@smuggleone\pgfmathresult
+			\endgroup
+			\let\pgfplotspointmeta=\pgfmathresult
+		\fi
+		% now, check again:
+		\pgfutil@ifundefined{pgfp@scatter@class@\pgfplotspointmeta}{%
+			% still not possible? Then, try truncating the
+			% number to an integer.
+			\expandafter\pgfutil@in@\expandafter.\expandafter{\pgfplotspointmeta}%
+			\ifpgfutil@in@
+				\def\pgfplots@loc@TMPb##1.##2\relax{\def\pgfplotspointmeta{##1}}%
+				\expandafter\pgfplots@loc@TMPb\pgfplots@loc@TMPa\relax
+			\fi
+			% now, check again:
+			\pgfutil@ifundefined{pgfp@scatter@class@\pgfplotspointmeta}{%
+				\pgfutil@ifundefined{pgfp@scatter@WARNING@\pgfplotspointmeta}{%
+					\pgfplotswarning{scatter classes no such class}\pgfplotspointmeta\pgfeov%
+					\expandafter\gdef\csname pgfp@scatter@WARNING@\pgfplotspointmeta\endcsname{ALREADY CHECKED}%
+				}{}%
+				\def\pgfplots@loc@TMPa{}%
+			}{%
+				\expandafter\let\expandafter\pgfplots@loc@TMPa\csname pgfp@scatter@class@\pgfplotspointmeta\endcsname
+			}%
+		}{%
+			\expandafter\let\expandafter\pgfplots@loc@TMPa\csname pgfp@scatter@class@\pgfplotspointmeta\endcsname
+		}%
+	}{%
+		\expandafter\let\expandafter\pgfplots@loc@TMPa\csname pgfp@scatter@class@\pgfplotspointmeta\endcsname
+	}%
+	\expandafter\scope\expandafter[\pgfplots@loc@TMPa]%
+}%
+
+% validates 'mark layer' such that it can be queried afterwards.
+\def\pgfplots@markers@prepare@layered@graphics@marks{%
+	\ifpgfplots@layered@graphics
+		\pgfkeysgetvalue{/pgfplots/mark layer}\pgfplots@loc@TMPa
+		\edef\pgfplots@loc@TMPa{\pgfplots@loc@TMPa}%
+		\ifx\pgfplots@loc@TMPa\pgfutil@empty
+			\def\pgfplots@loc@TMPa{auto}%
+		\fi
+		\def\pgfplots@loc@TMPb{auto}%
+		\ifx\pgfplots@loc@TMPa\pgfplots@loc@TMPb
+			% COMBINATION: 'activate layers,mark layer=auto' --> keep
+			% backwards compatibility with 'clip marker paths'
+			% -> nothing to do.
+			\pgfkeyslet{/pgfplots/mark layer}\pgfutil@empty%
+		\else
+			% mark layer=like plot
+			\def\pgfplots@loc@TMPb{like plot}%
+			\ifx\pgfplots@loc@TMPa\pgfplots@loc@TMPb
+				% draw markers together with their plot (no matter
+				% on which layer):
+				\pgfplots@clip@marker@pathstrue
+				\pgfkeyslet{/pgfplots/mark layer}\pgfutil@empty%
+			\else
+				\edef\pgfplots@loc@TMPb{\pgfkeysvalueof{/pgfplots/on layer}}%
+				\ifx\pgfplots@loc@TMPa\pgfplots@loc@TMPb
+					% nothing to do; they are on the same layer
+					% anyway: (this is the same as 'like plot'
+					\pgfplots@clip@marker@pathstrue
+					\pgfkeyslet{/pgfplots/mark layer}\pgfutil@empty%
+				\else
+					% OK, marks will be plotted on their own layer.
+				\fi
+			\fi
+		\fi
+	\else
+		% reset its value:
+		\pgfkeyslet{/pgfplots/mark layer}\pgfutil@empty%
+	\fi
+}%
+

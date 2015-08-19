@@ -1,0 +1,50 @@
+
+% Token-wise equals; will expand arguments with \edef
+% #1: expected
+% #2: actual
+% #3: message
+\def\pgfplotsassertequalstok#1#2#3{%
+	\edef\pgfplots@assert@a{#1}%
+	\edef\pgfplots@assert@b{#2}%
+	\pgfplotscommandtostring\pgfplots@assert@a\pgfplots@assert@a
+	\pgfplotscommandtostring\pgfplots@assert@b\pgfplots@assert@b
+	\ifx\pgfplots@assert@a\pgfplots@assert@b
+	\else
+		\pgfplotsassertfail{#3 ^^Jexpected '#1'^^J but was '#2'}%
+	\fi
+}%
+
+% Token-wise equals of two MACROS; no expansion
+% #1: expected
+% #2: actual
+% #3: message
+\def\pgfplotsassertequalstoknoexpand#1#2#3{%
+	\ifx#1#2%
+	\else
+		\pgfplotsassertfail{#3 expected '\meaning#1' but was '\meaning#2'}%
+	\fi
+}%
+
+\def\pgfplotsassertfail#1{%
+	\pgfplots@error{Assertion failed: #1}%
+}%
+
+% Float-equals
+% #1: expected
+% #2: actual
+% #3: message
+\def\pgfplotsassertequalsfloat#1#2#3{%
+	\edef\pgfplots@assert@a{#1}%
+	\edef\pgfplots@assert@b{#2}%
+	%
+	\pgfmathfloatparsenumber{\pgfplots@assert@a}%
+	\let\pgfplots@assert@a\pgfmathresult
+	%
+	\pgfmathfloatparsenumber{\pgfplots@assert@b}%
+	\let\pgfplots@assert@b\pgfmathresult
+	%
+	\pgfmathfloatifapproxequalrel{\pgfplots@assert@a}{\pgfplots@assert@b}{%
+	}{%
+		\pgfplotsassertfail{#3 ^^Jexpected '#1'^^J but was '#2'}%
+	}%
+}%

@@ -1,0 +1,425 @@
+%--------------------------------------------
+%
+% Package pgfplots
+%
+% Provides a user-friendly interface to create function plots (normal
+% plots, semi-logplots and double-logplots).
+% 
+% It is based on Till Tantau's PGF package.
+%
+% Copyright 2007-2014 by Christian Feuersänger.
+%
+% This program is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, either version 3 of the License, or
+% (at your option) any later version.
+% 
+% This program is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public License
+% along with this program.  If not, see <http://www.gnu.org/licenses/>.
+%
+%--------------------------------------------
+
+\def\pgfplotsset#{\pgfqkeys{/pgfplots}}
+
+% This is *identical* to \pgfutil@IfUndefined . I copied it here
+% because pgf up to and including version 2.10 does not contain it.
+\def\pgfplotsutil@IfUndefined#1{%
+  \begingroup\expandafter\expandafter\expandafter\endgroup
+  \expandafter\ifx\csname#1\endcsname\relax
+    \expandafter\pgfutil@firstoftwo
+  \else
+    \expandafter\pgfutil@secondoftwo
+  \fi
+}
+\pgfplotsutil@IfUndefined{pgfutil@IfUndefined}{\let\pgfutil@IfUndefined=\pgfplotsutil@IfUndefined}{}
+
+\def\pgfplotsloglevel{4}%
+
+\def\pgfplots@log#1#2{%
+	\ifnum#1>\pgfplotsloglevel\relax
+	\else
+		\ifnum\inputlineno=1
+			\pgfutil@IfUndefined{@currenvline}{%
+				\def\pgfplots@log@tmp{}%
+			}{%
+				\let\pgfplots@log@tmp=\@currenvline
+			}%
+		\else
+			\def\pgfplots@log@tmp{ on input line \the\inputlineno}%
+		\fi
+		\immediate\write-1{Package pgfplots info\pgfplots@log@tmp: #2}%
+	\fi
+}%
+
+\newif\ifpgfplots@LUA@supported
+\pgfutil@IfUndefined{directlua}{%
+	\pgfplots@LUA@supportedfalse
+}{%
+	\pgfplots@LUA@supportedtrue
+}%
+
+% this is an emergency key which allows to switch off LUA support in
+% pgfplots early at boot time. 
+%
+% use \def\pgfplotsenablelua{0} to switch it off. '1' switches it on
+% (or uncommenting the line).
+\pgfutil@IfUndefined{pgfplotsenablelua}{}{%
+	\ifpgfplots@LUA@supported
+		\def\pgfplots@glob@TMPc{1}%
+		\ifx\pgfplots@glob@TMPc\pgfplotsenablelua
+			\message{Pgfplots: found emergency control flag \string\pgfplotsenablelua=1. Keeping LUA active.^^J}%
+		\else
+			\message{Pgfplots: found emergency control flag \string\pgfplotsenablelua!=1. Disabling LUA support.^^J}%
+			\pgfplots@LUA@supportedfalse
+		\fi
+	\fi
+}%
+
+\def\pgfplots@alloc@catcodetable{%
+	% it is task of the TeX format to load this.
+	% context comes with it out-of-the box, and pgfplots.sty loads luatexbase.sty
+	\pgfutil@IfUndefined{newcatcodetable}{%
+		% Oh. The TeX format does not have support for
+		% \newcatcodetable and the associated pgfplots module did not
+		% load an addon-package!?
+		%
+		% We _need_ the catcodes which are active when pgfplots starts.
+		% And there is no central mechanism to allocate catcodes. I will
+		% take one for me now and hope that it will not be used (soon).
+		\def\pgfplotsglobalretval{41}%
+	}{%
+		% the macro \pgfplots@luabackend@table is never used by TeX
+		% code.
+		% I only need the value inside of the .lua files: whenever
+		% they print something, they need to use it.
+		\newcatcodetable\pgfplots@luabackend@table
+		\let\pgfplotsglobalretval=\pgfplots@luabackend@table
+	}%
+}%
+\ifpgfplots@LUA@supported
+	\let\pgfplotsutil@directlua=\directlua
+	\let\pgfplotsutil@directlua@std=\pgfplotsutil@directlua
+	\pgfplotsutil@directlua{
+		tex.enableprimitives("pgfplotsutil@",{ "savecatcodetable", "luaescapestring"})}%
+	\def\pgfplotsutil@directlua@trace#1{%
+		\directlua{%
+			texio.write_nl("CALLING\string\n\pgfplotsutil@luaescapestring{#1}");
+			#1%
+		}%
+	}%
+	\pgfplots@log3{Initializing with LUA version \pgfplotsutil@directlua{tex.print(_VERSION)}}%
+	\pgfplotsutil@directlua{require("pgfplots"); pgfplots.pgfplotsversion = "\pgfplotsversion";}%
+	%
+	\pgfplots@alloc@catcodetable
+	\c@pgf@counta=\pgfplotsglobalretval
+	\pgfplotsutil@savecatcodetable\c@pgf@counta
+	\pgfplotsutil@directlua{pgfplots.LOAD_TIME_CATCODETABLE = \the\c@pgf@counta}%
+\fi
+
+\pgfkeys{
+	/pgfplots/lua support/.is choice,
+	/pgfplots/lua support/true/.code={\pgfplots@LUA@supportedtrue},%
+	/pgfplots/lua support/false/.code={\pgfplots@LUA@supportedfalse},%
+	/pgfplots/lua support/auto/.code={%
+		\pgfutil@IfUndefined{directlua}{%
+			\pgfplots@LUA@supportedfalse
+		}{%
+			\pgfplots@LUA@supportedtrue
+		}%
+	},%
+	%/pgfplots/lua support/auto,% this is the default anyway
+}
+
+\def\pgfplots@error#1{\PackageError{pgfplots}{#1}{}}%
+\def\pgfplotstable@error@pkg#1{\PackageError{pgfplotstable}{#1}{}}%
+% DO NOT USE THIS METHOD DIRECTLY: use \pgfplotswarning{<warning name>}<args>\pgfeov
+\pgfplotsutil@IfUndefined{PackageWarning}{%
+	\def\pgfplots@warning#1{\pgfplots@message{! Package pgfplots Warning:
+#1}}%
+}{%
+	\def\pgfplots@warning#1{\PackageWarning{pgfplots}{#1}{}}%
+}%
+
+\def\pgfplots@message#1{%
+	\immediate\write16{#1}%
+}%
+
+\pgfutil@IfUndefined{pgfkeys}{%
+	\pgfplots@error{It seems your version of PGF/Tikz is older than 2.00. Unfortunately, pgfplots requires at least version 2.00 ... you may need to update your TeX-Distribution or install PGF manually, sorry}%
+}{\relax}
+
+% Throws exception `#1' with arguments `#2'.
+%
+% #1 : the exception name
+% #2: all what comes after the exception name is considered to be argument
+%    (or arguments) for the exception '#1'.
+%    the \pgfeov is IMPORTANT as it delimits the argument.
+%
+% Note that all standard pgfplots exceptions provide a feature to
+% exchange the error message text: define \pgfplotsexceptionmsg
+% set a replacement.
+\def\pgfplotsthrow#1#2\pgfeov{%
+	\def\pgfkeyscurrentkey{/pgfplots/exception/#1}%
+	\pgfkeysvalueof{/pgfplots/exception/#1/.@cmd}#2\pgfeov
+}%
+\let\pgfplotsthrow@orig=\pgfplotsthrow
+
+% Generates warning `#1' with argument(s) `#2'.
+%
+% It works in exactly the same way as \pgfplotsthrow.
+\def\pgfplotswarning#1#2\pgfeov{%
+	\def\pgfkeyscurrentkey{/pgfplots/warning/#1}%
+	\pgfkeysvalueof{/pgfplots/warning/#1/.@cmd}#2\pgfeov
+}%
+
+\def\pgfplotsthrow@warning#1{%
+	\pgfplots@warning{#1}%
+	\immediate\write-1{ [warning \pgfkeyscurrentkey]}%
+}%
+
+\def\pgfplots@assert@not@zero#1#2{%
+	\ifdim#1=0sp %
+		\pgfplotsthrow{invalid argument}{\pgfplots@loc@TMPa}{#2}\pgfeov
+	\fi
+}%
+
+% A primitive try #1 catch #2 end  block.
+%
+% It tries code #1. If any exception occurs within, it suppresses the
+% exception and tries to continue. It then invokes #2 as soon as it
+% can.
+%
+% You can use \pgfplotsrethrow in #2.
+%
+% ATTENTION: this is a simple attempt to simulate error control. Don't
+% rely on it too heavily! In the moment, I am not even sure if it can
+% be nested (perhaps you need to introduce extra scopes since
+% \pgfplotstry doesn't).
+\long\def\pgfplotstry#1\catch#2\endpgfplotstry{%
+	\global\let\pgfplotstry@exception\pgfutil@empty
+	\def\pgfplotsthrow##1##2\pgfeov{\gdef\pgfplotstry@exception{{##1}{##2}}}%
+	#1\relax%
+	\let\pgfplotsthrow=\pgfplotsthrow@orig
+	\ifx\pgfplotstry@exception\pgfutil@empty
+	\else
+		#2%
+	\fi
+	\global\let\pgfplotstry@exception\pgfutil@empty
+}%
+\def\pgfplotsrethrow{\expandafter\pgfplotsthrow\pgfplotstry@exception\pgfeov}%
+
+\pgfkeys{
+	% #1: the argument which should have been assigned.
+	% #2: an error message. 
+	/pgfplots/exception/invalid argument/.code 2 args={%
+		\ifx\pgfplotsexceptionmsg\relax
+			\pgfplots@error{#2}%
+		\else
+			\pgfplots@error{\pgfplotsexceptionmsg}%
+		\fi
+		\let#1=\pgfutil@empty
+	},%
+	% #1 : the layer name
+	% #2 : additional context information (message)
+	/pgfplots/exception/inactive layer/.code 2 args={%
+		\ifx\pgfplotsexceptionmsg\relax
+			\pgfplots@error{Sorry, the layer '#1' has not been activated but it is referenced in #2. Perhaps you misspelled it? Each referenced layer must be activated (expect for layer 'discard').}%
+		\else
+			\pgfplots@error{\pgfplotsexceptionmsg}%
+		\fi
+	},%
+	% #1: the argument which should have been assigned.
+	% #2: an error message. 
+	/pgfplots/exception/no such element/.code 2 args={%
+		\ifx\pgfplotsexceptionmsg\relax
+			\pgfplots@error{#2}%
+		\else
+			\pgfplots@error{\pgfplotsexceptionmsg}%
+		\fi
+		\let#1=\pgfutil@empty
+	},%
+	/pgfplots/exception/invalid color component/.code 2 args={%
+		\ifx\pgfplotsexceptionmsg\relax
+			\pgfplots@error{#2}%
+		\else
+			\pgfplots@error{\pgfplotsexceptionmsg}%
+		\fi
+		\let#1=\pgfutil@empty
+	},%
+	% #1: an error message
+	/pgfplots/exception/unsupported operation/.code={%
+		\ifx\pgfplotsexceptionmsg\relax
+			\pgfplots@error{#1}%
+		\else
+			\pgfplots@error{\pgfplotsexceptionmsg}%
+		\fi
+	},%
+	% #1: the argument which should have been assigned.
+	% #2: the file name
+	% #3: the error message
+	/pgfplots/exception/no such table file/.code args={#1#2#3}{%
+		\ifx\pgfplotsexceptionmsg\relax
+			\pgfplots@error{#3}%
+		\else
+			\pgfplots@error{\pgfplotsexceptionmsg}%
+		\fi
+		\let#1=\relax
+	},
+	%
+	%
+	%
+	%
+	% Generated if you say 'ymin=0' in a log axis.
+	% #1: the user argument ('ymin')
+	% #2: the offending value.
+	/pgfplots/warning/illegal user argument in log axis/.code args={#1#2}{%
+		\pgfplotsthrow@warning{Ignoring illegal input argument #1=#2: cannot apply log.}%
+	},
+	/pgfplots/warning/plot without coordinates/.code={%
+		\pgfplotsthrow@warning{the current plot has no coordinates (or all have been filtered away)}%
+	},
+	/pgfplots/warning/log basis required/.code 2 args={%
+		\pgfplotsthrow@warning{Some input argument (#2) explicitly relies on the log basis of #1 (which is e). Please verify that this is intended and set 'log basis #1=10' otherwise. This warning will be shown only once per document.}%
+	},
+	/pgfplots/warning/no such legend to name/.code={%
+		\pgfplotsthrow@warning{There is no `legend to name=#1', sorry. I am skipping it}%
+	},
+	/pgfplots/warning/no such colorbar to name/.code={%
+		\pgfplotsthrow@warning{There is no `colorbar to name=#1', sorry. I am skipping it}%
+	},
+	/pgfplots/warning/no such addplot label/.code={%
+		\pgfplotsthrow@warning{There is no \string\addplot\space label `#1', sorry. I am skipping it}%
+	},
+	/pgfplots/warning/enlargelimits respects figure size failed/.code={%
+		\pgfplotsthrow@warning{enlargelimits respects figure size=true: could not respect the prescribed width/height (\pgfplotsretval). The size and/or aspect ratio of your image will be different than expected. You can try to modify BOTH width and height.}%
+	},
+	% #1: the axis
+	/pgfplots/warning/empty range cleared axis/.code={%
+		\pgfplotsthrow@warning{You have an axis with empty range (in direction #1). Replacing it with a default range and clearing all plots.}%
+	},
+	/pgfplots/warning/approx empty range enlarged/.code args={#1#2#3}{%
+		\pgfplotsthrow@warning{Axis range for axis #1 is approximately empty; enlarging it (it is [#2:#3])}%
+	},
+	/pgfplots/warning/lossy colormap rgb conversion/.code 2 args={%
+		\pgfplotsthrow@warning{I am about to convert colormap '#1' from #2\space to rgb (which might be lossy). Perhaps the choice 'colorbar sampled={surf,shader=interp}' yields better results since it supports #2.}%
+	},
+	/pgfplots/warning/colorbar uninitialised/.code={%
+		\pgfplotsthrow@warning{Sorry, the colorbar is uninitialised - your axis has no color data. Consider using 'point meta=f(x)' or something like that. I am using a color range of [0,1] for the colorbar.}%
+	},
+	/pgfplots/warning/colorbar CMYK unsupported/.code={%
+		\pgfplotsthrow@warning{colorbar remark: The colormap '#1' has a CMYK colorspace which is not (yet) supported by PGF. I switched colorbar styles automatically to the visually equivalent 'colorbar sampled={surf,shader=interp}' to generate a proper CMYK colorbar. This has less support in some previewers. Use \string\pgfplotscolorbarCMYKworkaroundfalse\space to disable this improvement. [This message won't be replicated for '#1']}%
+	},
+	/pgfplots/warning/ticklabel anchor undetermined/.code args={#1#2#3#4}{%
+		\pgfplotsthrow@warning{the ticklabel anchor cannot be determined, the normal vector -(#2) and the unit #1 vector (#3) are almost parallel (abs(cos(angle)) = #4)!}%
+	},
+	/pgfplots/warning/point meta unbounded/.code 2 args={%
+		\pgfplotsthrow@warning{The per point meta data `#1' (#2) (and probably others as well) is unbounded - using the minimum value instead.}%
+	},
+	/pgfplots/warning/gnuplot -V impossible/.code={%
+		\pgfplotsthrow@warning{Sorry, I could not determine 'gnuplot -V' to check whether gnuplot and logscale writes results in log() or not. Please set `/pgfplots/gnuplot writes logscale=true|false' manually.}%
+	},
+	/pgfplots/warning/gnuplot -V format unknown/.code={%
+		\pgfplotsthrow@warning{Sorry, I can't reliably check which version of gnuplot is available. I guess it is gnuplot < 4.4. Please set `/pgfplots/gnuplot writes logscale=true|false' manually if anything fails.}%
+	},
+	/pgfplots/warning/plot3 graphics compatibility mode/.code={%
+		\pgfplotsthrow@warning{plot3 graphics is running in backwards compatibility mode. %
+					Use \string\pgfplotsset{compat=1.6} or higher to benefit from upgraded scaling capabilites.}%
+	},
+	/pgfplots/warning/plot3 graphics too few inner anchors/.code={%
+		\pgfplotsthrow@warning{plot graphics in 3D axis has just two inner anchors (those with '(x,y,z)=>(imgx,imgy)'). You should provide a third one such that I can check for correct scaling.}%
+	},
+	/pgfplots/warning/scatter classes no such class/.code={%
+		\pgfplotsthrow@warning{scatter/classes: can't find class for '#1'!? Please make sure you have specified 'scatter src=explicit symbolic'. Ignoring class '#1' (this message will not come again).}%
+	},
+	/pgfplots/warning/lua colormap unavailable/.code={%
+		\pgfplotsthrow@warning{there is no LUA colormap representation for #1. Using TeX arithmetics.}%
+	},
+	/pgfplots/warning/interior colormap inefficient/.code={%
+		\pgfplotsthrow@warning{the combination 'shader=interp,interior colormap name' is inefficient (it uses 'shader=faceted interp,faceted color=none') and may slow down the *display* of your document}%
+	},
+	/pgfplots/warning/matrix delinearize uses sqrt/.code args={#1#2#3#4}{%
+		\pgfplotsthrow@warning{%
+									mesh processing did not find '[mesh/rows=<N>]' or '[mesh/cols=<N>]'. 
+									Assuming [mesh/rows=#1,mesh/cols=#2] 
+									as sqrt(num points) = sqrt(#3) [ = #4].}%
+	},
+	/pgfplots/warning/matrix check/.code args={#1#2#3#4#5}{%
+		#1{the arguments of [mesh/rows=#2,mesh/cols=#3] assume  #5\space points, but I got actually N = #4\space points! The data matrix appears to be incomplete or overcomplete!? [Use mesh/check=false to disable this message]}%
+	},
+	/pgfplots/warning/tick computation failed/.code 2 args={%
+		\pgfplotsthrow@warning{Tick computation for direction #1 failed; there are always too few tick labels (try min ticks has already been advanced to #2)}%
+	},
+	/pgfplots/warning/scale uniformly unsupported/.code={%
+		\pgfplotsthrow@warning{Sorry, 'scale uniformly' failed because its actual implementation works only if y_x = 0 and x_y = 0 (for 2d axes) or if z_x = 0 (for 3d axes). The result will not fill the prescribed dimensions. Falling back to 'scale uniformly strategy=units only. (use scale uniformly warning=false to disable this warning)}%
+	},
+	/pgfplots/warning/axis equal incompatible change/.code={%
+		\pgfplotsthrow@warning{the content of your 3d axis has changed compared to previous versions of pgfplots. please review it. ^^J   %
+		[continued]   explanation: you have a 3d axis with 'axis equal' and/or 'unit vector ratio' which has (probably) been optimized for an older version of pgfplots. any version older than 1.6 produced wrong output.^^J   %
+	[continued]	  to remove this warning, write \string\pgfplotsset{compat=1.6} (or newer) in your preamble (may change all figures in your document) or by adding that to the affected axis.}%
+	},
+	/pgfplots/warning/unit vector ratio axis undetermined/.code={%
+		\pgfplotsthrow@warning{The algorithm to implement 'unit vector ratio' failed! It could not determine the axis which shall be scaled and decided to use 'unit vector ratio axis=#1'.}%
+	},
+	/pgfplots/warning/linear system singular/.code={%
+		\pgfplotsthrow@warning{Linear system is singular up to machine precision! Continuing with small threshold.}%
+	},
+	/pgfplots/warning/center lines upgrade required/.code={%
+		\pgfplotsthrow@warning{Please use '\string\pgfplotsset{compat=1.8}' to enable correct label placement for 3d axes (at least compat/labels=1.8).}%
+	},
+	/pgfplots/warning/empty column name/.code 2 args={%
+		\pgfplotsthrow@warning{Table '#1' has an empty column name; replacing it by '#2'}%
+	},
+}
+\let\pgfplotsexceptionmsg=\relax
+
+\def\pgfplots@EOI{\pgfplots@EOI}%
+
+\newif\ifpgfplots@loc@tmp
+\newtoks\t@pgfplots@toka
+\newtoks\t@pgfplots@tokb
+\newtoks\t@pgfplots@tokc
+\newdimen\pgfplots@tmpa
+\newcount\c@pgfplots@coordindex
+\newcount\c@pgfplots@scanlineindex
+\pgfutil@IfUndefined{r@pgf@reada}{%
+	\csname newread\endcsname\r@pgfplots@reada
+}{%
+	\let\r@pgfplots@reada=\r@pgf@reada
+}
+
+% use these macros for GLOBAL temporary assignments.
+% you can NEVER rely on their values unless you know exactly what you are doing.
+\gdef\pgfplots@glob@TMPa{}%
+\gdef\pgfplots@glob@TMPb{}%
+\gdef\pgfplots@glob@TMPc{}%
+
+% use these macros for LOCAL temporary assigments.
+% you can NEVER rely on their values unless you know exactly what you are doing.
+\def\pgfplots@loc@TMPa{}%
+\def\pgfplots@loc@TMPb{}%
+\def\pgfplots@loc@TMPc{}%
+
+
+% Invokes code #2 if file '#1' exists and #3 if not.
+\long\def\pgfplots@iffileexists#1#2#3{%
+	\openin\r@pgfplots@reada=#1
+	\ifeof\r@pgfplots@reada
+		#3\relax
+	\else
+		\closein\r@pgfplots@reada
+		#2\relax
+	\fi
+}
+\let\pgfplotsiffileexists=\pgfplots@iffileexists
+
+\pgfutil@ifundefined{pgfplots@texdist@protect}{%
+	\def\pgfplots@texdist@protect{}%
+}{}
+
+\input pgfplotssysgeneric.code.tex
+\endinput

@@ -1,0 +1,1157 @@
+% Copyright 2013 by Christian Feuersaenger
+%
+% This file may be distributed and/or modified
+%
+% 1. under the LaTeX Project Public License and/or
+% 2. under the GNU Free Documentation License.
+%
+% See the file doc/generic/pgf/licenses/LICENSE for more details.
+
+
+\usepgflibrary{intersections}
+% FIXME : ARCHITECTURE VIOLATION:  REQUIRES
+% \usetikzlibrary{decorations.softclip} 
+%
+%\usepgfmodule{decorations}
+
+\newif\ifpgfpathfillbetween@split
+
+\pgfkeys{%
+	/pgf/fill between/reverse/.is choice,
+	/pgf/fill between/reverse/.default=true,
+	/pgf/fill between/reverse/false/.code=\def\pgfpathfillbetween@reverse@mode{0},%
+	/pgf/fill between/reverse/true/.code=\def\pgfpathfillbetween@reverse@mode{1},%
+	%
+	% checks the coordinates of the first two path instructions as heuristics:
+	/pgf/fill between/reverse/auto/.code=\def\pgfpathfillbetween@reverse@mode{2},%
+	/pgf/fill between/reverse/auto,
+	/pgf/fill between/inner moveto/.is choice,
+	/pgf/fill between/inner moveto/connect/.code=\def\pgfpathfillbetween@inner@moveto{1},
+	/pgf/fill between/inner moveto/keep/.code=\def\pgfpathfillbetween@inner@moveto{2},
+	/pgf/fill between/inner moveto/connect,
+	%
+	% split=true allows to generate individual result paths for every
+	% region induced by the intersection points. Example: 
+	% "color positive region in red and negative region in green".
+	% The case split=false results in just one output path
+	% (simpler+faster, but of course less powerful).
+	/pgf/fill between/split/.is if=pgfpathfillbetween@split,
+	/pgf/fill between/split/.default=true,
+	%
+	% Used to report results. This is mainly useful in conjunction
+	% with split=true: each result segment will be streamed.
+	%
+	% Results are reported in the sequence
+	%   begin
+	%     next ready
+	%     next ready
+	%     ...
+	%   end
+	%
+	% 'begin' has one arguments: the number of following single
+	% streams.
+	/pgf/fill between/result stream/begin/.code=,%
+	%
+	% 'next ready' has macro arguments, but the macro \pgfretval
+	% contains the lowlevel path as result (i.e. you can write
+	% \pgfsetpath\pgfretval to activate it).
+	/pgf/fill between/result stream/next ready/.code={
+		\pgfaddpathandBB{\pgfretval}%
+	},%
+	%
+	% 'end' has no arguments.
+	/pgf/fill between/result stream/end/.code=,%
+}%
+
+% \pgfpathfillbetween[<options>]{<first path>}{<second path>}
+%
+% Generates a new path consisting of the "fill between" of the two arguments.
+% #1: optional arguments with /pgf/fill between prefix
+% #2: a macro containing the first path. More precisely, it is supposed to be a return value of \pgfgetpath.
+% #3: a macro containing the second path (in a format understood by \pgfsetpath). It is supposed to be a return value of \pgfgetpath.
+\def\pgfpathfillbetween{\pgfutil@ifnextchar[{\pgfpathfillbetween@opt}{\pgfpathfillbetween@opt[]}}%
+\def\pgfpathfillbetween@opt[#1]#2#3{%
+	\begingroup
+	\pgfqkeys{/pgf/fill between}{#1}%
+	%
+	% remove any special round-corner-tokens:
+	\pgfprocessround{#2}{#2}%
+	\pgfprocessround{#3}{#3}%
+	%
+	\if1\pgfpathfillbetween@inner@moveto
+		% inner moveto=connect:
+		\pgfpathfillbetween@connect@inner@movetos#2%
+		\pgfpathfillbetween@connect@inner@movetos#3%
+	\fi
+	%
+	\if2\pgfpathfillbetween@reverse@mode
+		% reverse=auto
+		\expandafter\pgfpathfillbetween@heuristics@get@direction#2\pgf@stop
+		\let\pgfpath@filled@dir@first=\pgfretval
+		\expandafter\pgfpathfillbetween@heuristics@get@direction#3\pgf@stop
+		\let\pgfpath@filled@dir@second=\pgfretval
+		%
+		\ifx\pgfpath@filled@dir@first\pgfpath@filled@dir@second
+			% Ok, they (seem to) have the same direction. Reverse one of them:
+			\def\pgfpathfillbetween@reverse@mode{1}%
+		\else
+			\def\pgfpathfillbetween@reverse@mode{0}%
+		\fi
+	\fi
+	%
+	% softclip, if configured (no-op otherwise):
+	\pgfpathcomputesoftclippath{#2}{\pgfpathfillbetween@softclip@A}\let#2=\pgfretval%
+	\pgfpathcomputesoftclippath{#3}{\pgfpathfillbetween@softclip@B}\let#3=\pgfretval%
+	%
+	\ifx#2\pgfutil@empty
+		\pgfpathfillbetween@warning{first}%
+	\else
+		\ifx#3\pgfutil@empty
+			\pgfpathfillbetween@warning{second}%
+		\else
+			%
+			\ifpgfpathfillbetween@split
+				\pgfpathfillbetween@compute@splitted{#2}{#3}%
+			\else
+				\pgfkeys{/pgf/fill between/result stream/begin=1}%
+				\pgfpathfillbetween@compute{#2}{#3}%
+				\pgfpathfillbetween@invoke{result stream/next ready}%
+				\pgfpathfillbetween@invoke{result stream/end}%
+			\fi
+		\fi
+	\fi
+	%
+	%
+	\endgroup
+}%
+
+\def\pgfpathfillbetween@warning#1{%
+	\pgfwarning{fill between skipped: the #1 input path is empty.}%
+}%
+
+% Replaces all 'moveto' operations inside of the soft path '#1' by
+% 'lineto'. This excludes the first moveto.
+%
+% The motivation is that fillbetween should ignore inner movetos.
+%
+% UPDATE: it turned out that replacing inner movetos is necessary, but
+% not sufficient. Now, this macro does more:
+% - it replaces isolated inner movetos by lineto
+% - if two successive inner movetos occur, it throws away the first
+%   one replaces the second by lineto
+% - if one or more trailing movetos occur in a path, these will be
+%   thrown away.
+\def\pgfpathfillbetween@connect@inner@movetos#1{%
+	\expandafter\pgfpathfillbetween@connect@inner@movetos@#1\pgf@stop%
+	\let#1=\pgfretval
+}
+\def\pgfpathfillbetween@connect@inner@movetos@#1#2\pgf@stop{%
+	\ifx#1\pgfsyssoftpath@movetotoken
+		\pgfpathfillbetween@connect@inner@movetos@@{#2}%
+		\expandafter\def\expandafter\pgfretval\expandafter{\expandafter\pgfsyssoftpath@movetotoken\pgfretval}%
+	\else
+		\pgfpathfillbetween@connect@inner@movetos@@{#1#2}%
+	\fi
+}%
+
+% Substitute all movetotokens by linetotokens.
+%
+% In addition, it should *deduplicate* movetos, i.e.
+% "moveto{<x>}{<y}moveto{<x2>}{<y2>}"
+% -> "moveto{<x2>}{<y2>}"
+%
+% and: trailing movetos should be discarded.
+\def\pgfpathfillbetween@connect@inner@movetos@@#1{%
+	% this implementation is derived from \pgfutilstrreplace - it does
+	% almost the same as
+	% s/\pgfsyssoftpath@movetotoken/pgfsyssoftpath@linetotoken/g
+	% -> but with the extra additions of deduplication and trailing
+	%  moveto removal.
+	\def\pgfretval{}%
+	\pgfpathfillbetween@search@and@replace@loop{#1}%
+}
+\def\pgfpathfillbetween@connect@inner@moveto@foundit@#1\pgfsyssoftpath@movetotoken#2#3#4{%
+	\ifx#4\pgf@EOI
+		% ah - a trailing moveto.
+		% In this case, we remember all until the moveto, but we omit
+		% the trailing moveto and its arguments.
+		\expandafter\def\expandafter\pgfretval\expandafter{\pgfretval #1}%
+		%
+		% ... and stop searching.
+		\let\pgf@loc@TMPa\relax
+	\else
+		\ifx#4\pgfsyssoftpath@movetotoken
+			% DEDUPLICATE: we have at least two successive movetos.
+			% silently skip the first moveto and its arguments and go on
+			% with the second moveto.
+			\def\pgf@loc@TMPa{\pgfpathfillbetween@connect@inner@moveto@foundit@#1\pgfsyssoftpath@movetotoken}%
+		\else
+			% substitute it by a lineto.
+			\expandafter\def\expandafter\pgfretval\expandafter{\pgfretval #1\pgfsyssoftpath@linetotoken{#2}{#3}}%
+			%
+			% ... continue the standard loop which skips over paths
+			% until the next moveto. Remember to re-insert '#4':
+			\def\pgf@loc@TMPa{\pgfpathfillbetween@connect@inner@moveto@foundit@@ #4}%
+		\fi
+	\fi
+	\pgf@loc@TMPa
+}%
+\def\pgfpathfillbetween@connect@inner@moveto@foundit@@#1\pgf@EOI{%
+	\pgfpathfillbetween@search@and@replace@loop{#1}%
+}%
+
+\def\pgfpathfillbetween@search@and@replace@loop#1{%
+	\pgfutil@in@{\pgfsyssoftpath@movetotoken}{#1}%
+	\ifpgfutil@in@
+		\def\pgf@loc@TMPa{\pgfpathfillbetween@connect@inner@moveto@foundit@ #1\pgf@EOI}%
+	\else
+		\expandafter\def\expandafter\pgfretval\expandafter{\pgfretval #1}%
+		\let\pgf@loc@TMPa=\relax
+	\fi
+	\pgf@loc@TMPa
+}%
+
+\def\pgfpathfillbetween@invoke#1{\pgfkeysvalueof{/pgf/fill between/#1/.@cmd}\pgfeov}
+
+\def\pgfpathfillbetween@replace@first@moveto#1#2\pgf@stop{%
+	\ifx#1\pgfsyssoftpath@movetotoken
+		\def\pgfretval{\pgfsyssoftpath@linetotoken #2}%
+	\else
+		\def\pgfretval{#1#2}%
+	\fi
+}%
+
+\def\pgfpathfillbetween@compute@splitted#1#2{%
+	% 0. normalize path sequences.
+	%  ATTENTION : there are implicit assumptions on the INTERNAL ORDER of the two paths!
+    %    This implementation needs to loop over them synchronously, i.e. it processes
+	%       the 0.th segment of a and the 0th of b, 
+	%       the 1.th segment of a and the 1th of b, 
+	%    and so on. Here, "i th segment" implies a sort order in ascending x direction.
+	%    This is, however, a weakness of \pgfintersectionofpaths - it does not really support this kind of sorting.
+	%    
+	%   I work around this by restricting the implementation to the "common use-cases", i.e. to two plots of functions which do not intersect themselves (i.e. to "functions" in the original sense). This will probably (almost surely) fail for parametric functions or circles.
+    %  
+	\if0\pgfpathfillbetween@reverse@mode
+		% reverse=false
+		%
+		% This means one plot is in direction '+' and one in '-', i.e.
+		% a:  x ---> x ---> x
+		% b:  x <--- x <--- x
+		%
+		% However, we have the implicit assumption that both paths can be processed synchronously, i.e. that they have the SAME direction.
+		% To this end, we have to reverse one of them here (since \pgfintersectionofpaths does not automatically sort results in a suitable way):
+		%
+		\pgf@reverse@path{#2}%
+		\let#2=\pgfretval
+		%
+		% However, we need to re-reverse the individual segments later-on...
+		% So: set 'reverse=true'. Will be respected when assembling the splitted segments...
+		\def\pgfpathfillbetween@reverse@mode{1}%
+	\fi
+	%
+	% 1. compute intersection points:
+	\pgf@intersect@sort@by@second@pathfalse
+	%
+	% FIXME : do we want to sort by time!? That might be needed for curvetos ... ?
+	\pgf@intersect@sortfalse
+	\pgfintersectionofpaths%
+		{%
+			\pgfsetpath#1%
+		}%
+		{%
+			\pgfsetpath#2%
+		}%
+	%
+	% FIXME : computing the intersections is fine... but it would be
+	% even finer to report the resulting points back to tikz!
+	% -> call the *tikz* intersection lib through some sort of callback!?
+	%
+	% 2.  split the first involved path into the
+	% segments induced by the intersection points:
+	\pgfcomputeintersectionsegments{1}%
+	\let\pgfpathfilled@a@segments=\pgfretval
+%
+	% 2. split the second involved path into the
+	% segments induced by the intersection points:
+	\pgfcomputeintersectionsegments{2}%
+	\let\pgfpathfilled@b@segments=\pgfretval
+	%
+	\ifnum\pgfpathfilled@a@segments=\pgfpathfilled@b@segments\relax
+	\else
+		\pgferror{Illegal internal state encountered: the number segments induced by the intersection points of the two paths DIFFER between the first and the second path: first path has \pgfpathfilled@a@segments\space whereas the second has \pgfpathfilled@b@segments.}%
+	\fi
+	%
+	\pgfkeys{/pgf/fill between/result stream/begin=\pgfpathfilled@a@segments}%
+	% Recombine the pairs of segments (a_i, b_i), i = 0,..., N-1 in a
+	% filled way:
+	\def\c@pgfpathfilled@counter{0}%
+	\pgfmathloop
+	\ifnum\c@pgfpathfilled@counter<\pgfpathfilled@a@segments\relax
+		\expandafter\let\expandafter\pgf@loc@path@a\csname pgf@intersect@path@split@a@\c@pgfpathfilled@counter\endcsname
+		\expandafter\let\expandafter\pgf@loc@path@b\csname pgf@intersect@path@split@b@\c@pgfpathfilled@counter\endcsname
+		%
+		\pgfpathfillbetween@compute{\pgf@loc@path@a}{\pgf@loc@path@b}%
+		% report to the result stream. It knows how to deal with it:
+		\pgfpathfillbetween@invoke{result stream/next ready}%
+		%
+		\pgfutil@advancestringcounter\c@pgfpathfilled@counter
+	\repeatpgfmathloop
+	\pgfpathfillbetween@invoke{result stream/end}%
+}
+
+\def\pgfpathfillbetween@compute#1#2{%
+%\message{Combination of ^^J  \meaning#1\space and ^^J \meaning#2...^^J}%
+	%
+	\if1\pgfpathfillbetween@reverse@mode
+		% reverse=true
+		%
+		% Ok, then reverse one of the paths. We choose the second one as that is easier to debug.
+		% FIXME : might make sense to determine which one is shorter...
+		\pgf@reverse@path{#2}%
+		\let#2=\pgfretval
+	\fi
+	%
+	% FIXME: what should I do if I have closed paths!? What is the
+	% expected behavior!? I know that the combination of two closed
+	% paths should probably be used as is, perhaps with even-odd-rule.
+	% This here should do the job.
+	%
+	% NOTE: I believe the 'split' fails to work with closed paths.
+	\pgfpathfillbetween@contains@closepathtoken{#1}%
+	\let\b@pgfpathfillbetween@contains@close@a=\pgfretval
+	\pgfpathfillbetween@contains@closepathtoken{#2}%
+	\let\b@pgfpathfillbetween@contains@close@b=\pgfretval
+	%
+	\def\b@pgfpathfillbetween@contains@close{0}%
+	\if1\b@pgfpathfillbetween@contains@close@b
+		\def\b@pgfpathfillbetween@contains@close{1}%
+	\fi
+	\if1\b@pgfpathfillbetween@contains@close@a
+		\def\b@pgfpathfillbetween@contains@close{1}%
+	\fi
+	%
+	\if0\b@pgfpathfillbetween@contains@close@b
+		\expandafter\pgfpathfillbetween@replace@first@moveto#2\pgf@stop
+		\let#2=\pgfretval
+	\fi
+	%
+	\t@pgf@toka=\expandafter{#1}%
+	\t@pgf@tokb=\expandafter{#2}%
+	%
+	\if0\b@pgfpathfillbetween@contains@close
+		% we need to close the resulting combined path, otherwise decorations will look strange:
+		\expandafter\pgfpathfillbetween@get@first@coord#1\pgf@stop
+		\t@pgf@tokc=\expandafter{\expandafter\pgfsyssoftpath@closepathtoken\pgfretval}%
+	\else
+		\t@pgf@tokc={}%
+	\fi
+	%
+	\edef\pgfretval{\the\t@pgf@toka\the\t@pgf@tokb\the\t@pgf@tokc}%
+	%
+%\message{^^J   = \meaning\pgfretval^^J}%
+	% that's it.
+}
+
+% #1 a macro containing a softpath
+% OUTPUT:
+%   \pgfretval = 1 if the path contains \pgfsyssoftpath@closepathtoken
+%   and 0 otherwise.
+\def\pgfpathfillbetween@contains@closepathtoken#1{%
+	\expandafter\pgfutil@in@\expandafter\pgfsyssoftpath@closepathtoken\expandafter{#1}%
+	\ifpgfutil@in@
+		\def\pgfretval{1}%
+	\else
+		\def\pgfretval{0}%
+	\fi
+}
+
+\def\pgfpathfillbetween@get@first@coord#1#2#3#4\pgf@stop{%
+	\def\pgfretval{{#2}{#3}}%
+}%
+
+% A utility function like \pgfsetpath which calls \pgfsetpath *and* protocols
+% the size of each path segment (i.e. compute the bounding box).
+%
+% #1 a macro containing a softpath (i.e. something returned by
+% \pgfgetpath)
+%
+% SIDE--EFFECT: defines \pgfpointlastofsetpath  to be the last point of path #1
+\def\pgfsetpathandBB#1{%
+	\let\pgfpointlastofsetpath=\pgfutil@empty
+	\expandafter\pgfsetpath@loop#1\pgf@stop
+	%
+	\pgfsetpath{#1}%
+}%
+
+% Like \pgfsetpathandBB, but this here *appends* to the existing
+% softpath.
+%
+% #1 a macro containing a softpath (i.e. something returned by
+% \pgfgetpath)
+% SIDE--EFFECT: defines \pgfpointlastofsetpath  to be the last point of path #1
+\def\pgfaddpathandBB#1{%
+	\let\pgfpointlastofsetpath=\pgfutil@empty
+	\expandafter\pgfsetpath@loop#1\pgf@stop
+	\pgfaddpath#1%
+}
+
+% Like \pgfsetpath, but this here *appends* to the existing
+% softpath.
+%
+% #1 a macro containing a softpath (i.e. something returned by
+% \pgfgetpath)
+\def\pgfaddpath#1{%
+	% append to any previous path elements:
+	\pgfgetpath\pgf@temp
+	\t@pgf@tokc=\expandafter{\pgf@temp}%
+	\t@pgf@toka=\expandafter{#1}%
+	\edef\pgfretval{\the\t@pgf@tokc\the\t@pgf@toka}%
+	\pgfsetpath{\pgfretval}%
+}
+
+% Takes a softpath on input, replaces its first moveto by a lineto,
+% and returns it as softpath.
+% #1: a macro containing a softpath (i.e. the result of \pgfgetpath)
+% 
+% On output, \pgfretval contains a modified path.
+\def\pgfpathreplacefirstmoveto#1{%
+	\ifx#1\pgfutil@empty
+		\let\pgfretval=#1%
+	\else
+		\expandafter\pgfpathfillbetween@replace@first@moveto#1\pgf@stop
+	\fi
+}
+
+% Defines \pgfretval to be '+' if the path's direction is "ascending"
+% and "-" otherwise.
+%
+% Here, "ascending" means that its first two coordinates have
+% ascending X coordinates. If the X coordinates are equal, the Y
+% coordinates are used instead.
+\def\pgfpathfillbetween@heuristics@get@direction#1#2#3{%
+	\pgfutil@ifnextchar\pgf@stop{%
+		% wow. it has just one path element... we can do nothing.
+		\def\pgfretval{+}%
+		\pgfutil@gobble
+	}{%
+		\pgfpathfillbetween@heuristics@get@direction@{#1}{#2}{#3}%
+	}%
+}%
+
+% example: \pgfsyssoftpath@movetotoken{#2}{#3}\pgfsyssoftpath@linetotoken{#5}{#6}#7\pgf@stop
+% example: 
+%	\pgfsyssoftpath@movetotoken{#2}{#3}
+%	\pgfsyssoftpath@curvetosupportatoken{<x>}{<y>}
+%	\pgfsyssoftpath@curvetosupportbtoken{<x>}{<y>}
+%	\pgfsyssoftpath@curvetotoken{<x>}{<y>}\pgf@stop
+\def\pgfpathfillbetween@heuristics@get@direction@#1#2#3#4#5#6#7\pgf@stop{%
+	\def\pgf@temp{#4}%
+	\def\pgf@tempb{\pgfsyssoftpath@curvetosupportatoken}%
+	\ifx\pgf@temp\pgf@tempb
+		% Ah - a curveto! Use the end-point for the heuristics.
+		\pgfpathfillbetween@heuristics@get@direction@curveto #1{#2}{#3}#4{#5}{#6}#7\pgf@stop
+	\else
+		% Ok, assume it is line to (or its variants):
+		\pgfpathfillbetween@heuristics@get@direction@@{#2}{#3}{#5}{#6}%
+	\fi
+}%
+
+\def\pgfpathfillbetween@heuristics@get@direction@curveto#1#2#3\pgfsyssoftpath@curvetosupportatoken#4\pgfsyssoftpath@curvetotoken#5#6#7\pgf@stop{%
+	\pgfpathfillbetween@heuristics@get@direction@@{#2}{#3}{#5}{#6}%
+}%
+
+% #1: x1
+% #2: y1
+% #3: x2
+% #4: y2
+\def\pgfpathfillbetween@heuristics@get@direction@@#1#2#3#4{%
+	\edef\pgfretval{%
+		\ifdim #1<#3\space
+			+%
+		\else 
+			\ifdim #1=#3\space
+				\ifdim #2<#4\space
+					+%
+				\else
+					-%
+				\fi
+			\else
+				-%
+			\fi
+		\fi
+	}%
+}
+
+% Accumulates the path's bounding box, the last moveto, and the last
+% coord.
+\def\pgfsetpath@loop#1{%
+	\ifx#1\pgf@stop%
+		\let\pgfsetpathBB@protocolsizesnext=\relax%
+	\else%
+		\ifx#1\pgfsyssoftpath@movetotoken%
+			\let\pgfsetpathBB@protocolsizesnext=\pgfsetpathBB@protocolsizestoken@moveto%
+		\else%
+			\ifx#1\pgfsyssoftpath@linetotoken%
+				\let\pgfsetpathBB@protocolsizesnext=\pgfsetpathBB@protocolsizestoken@simple%
+			\else%
+				\ifx#1\pgfsyssoftpath@closepathtoken%
+					\let\pgfsetpathBB@protocolsizesnext=\pgfsetpathBB@protocolsizestoken@simple%
+				\else%
+					\ifx#1\pgfsyssoftpath@curvetosupportatoken%
+						\let\pgfsetpathBB@protocolsizesnext=\pgfsetpathBB@protocolsizestoken@curveto%
+					\else%
+						\ifx#1\pgfsyssoftpath@rectcornertoken%
+							\let\pgfsetpathBB@protocolsizesnext=\pgfsetpathBB@protocolsizestoken@rect%
+						\fi%
+					\fi%
+				\fi%
+			\fi%
+		\fi%
+	\fi%
+	\pgfsetpathBB@protocolsizesnext}
+
+\def\pgfsetpathBB@protocol@lastmoveto#1#2{%
+	\gdef\pgfsyssoftpath@lastmoveto{{#1}{#2}}%
+}
+
+\def\pgfsetpathBB@protocolsizestoken@moveto#1#2{%
+	% required for --cycle, among others:
+	\pgfsetpathBB@protocol@lastmoveto{#1}{#2}%
+	\pgfsetpathBB@protocolsizestoken@simple{#1}{#2}%
+}
+\def\pgfsetpathBB@protocolsizestoken@simple#1#2{%
+	\def\pgfpointlastofsetpath{\pgfqpoint{#1}{#2}}%
+	\pgf@protocolsizes{#1}{#2}%
+	\pgfsetpath@loop%
+}
+
+\def\pgfsetpathBB@protocolsizestoken@curveto#1#2\pgfsyssoftpath@curvetosupportbtoken#3#4\pgfsyssoftpath@curvetotoken#5#6{%
+	\def\pgfpointlastofsetpath{\pgfqpoint{#5}{#6}}%
+	\pgf@protocolsizes{#1}{#2}%
+	\pgf@protocolsizes{#3}{#4}%
+	\pgf@protocolsizes{#5}{#6}%
+	\pgfsetpath@loop
+}
+
+\def\pgfsetpathBB@protocolsizestoken@rect#1#2\pgfsyssoftpath@rectsizetoken#3#4{%
+	\pgf@protocolsizes{#1}{#2}%
+	\pgf@xa=#1\relax%
+	\advance\pgf@xa by#3\relax%
+	\pgf@ya=#2\relax%
+	\advance\pgf@ya by#4\relax%
+	\pgf@protocolsizes{\pgf@xa}{\pgf@ya}%
+	\pgfsetpath@loop
+}%
+
+% Defines \pgfretval to be the reversed path of #1.
+%
+% #1 is supposed to be a macro containing a path without rounding specials (i.e. a result
+% of \pgfprocessround)
+\def\pgfcomputereversepath#1{%
+	% unfortunately, this is already used by internal macros...
+	\pgf@reverse@path#1%
+}%
+\def\pgf@reverse@path#1{%
+	% ATTENTION: this here is a special implementation which
+	% operates directly on softpaths. It does not make use of \pgf@decorate@inputsegmentobjects@reverse (reverse path decoration)
+	% because (a) decorations require their own special format and (b)
+	% this implementation is faster (both with respect to runtime asymptotics and runtime constant).
+	\def\pgf@reverse@first@type{}%
+	\def\pgf@reverse@last@pt{}%
+	\def\b@pgf@reversepath@last@is@close{0}%
+	\pgfprependlistnewempty{pgfretval}%
+	\let\pgfreverse@iterate=\pgfreverse@checkfirst@then
+	\expandafter\pgf@reverse@loop#1\pgf@stop
+	%
+	\if 0\b@pgf@reversepath@last@is@close%
+		\expandafter\pgfreverse@prepend@last\expandafter{\pgf@reverse@first@type}{x}{x}%
+	\else
+		% as soon as a closepathtoken is encountered, the associated
+		% moveto is processed right away.
+		%
+		% FIXME : I doubt that the implementation works if more than
+		% one closepathtoken is in here ...
+	\fi
+	\pgfprependlistlet\pgfretval={pgfretval}%
+	%
+}%
+
+\def\pgf@reverse@loop#1{%
+	\ifx#1\pgf@stop%
+		\let\pgfreverse@next=\relax%
+	\else%
+		\def\b@pgf@reversepath@last@is@close{0}%
+		\ifx#1\pgfsyssoftpath@movetotoken%
+			\let\pgfreverse@next=\pgfreverse@token@moveto%
+		\else%
+			\ifx#1\pgfsyssoftpath@linetotoken%
+				\let\pgfreverse@next=\pgfreverse@token@lineto%
+			\else%
+				\ifx#1\pgfsyssoftpath@closepathtoken%
+					\let\pgfreverse@next=\pgfreverse@token@close%
+				\else%
+					\ifx#1\pgfsyssoftpath@curvetosupportatoken%
+						\let\pgfreverse@next=\pgfreverse@token@curveto%
+					\else%
+						\ifx#1\pgfsyssoftpath@rectcornertoken%
+							\let\pgfreverse@next=\pgfreverse@token@rect%
+						\fi%
+					\fi%
+				\fi%
+			\fi%
+		\fi%
+	\fi%
+	\pgfreverse@next}
+
+\def\pgfreverse@checkfirst@then#1{%
+	\def\pgf@reverse@first@type{#1}%
+	\let\pgfreverse@iterate=\pgfutil@gobble
+}%
+
+\def\pgfreverse@prepend@last#1#2#3{%
+	\ifx\pgf@reverse@last@pt\pgfutil@empty
+	\else
+		\t@pgf@toka={#1}%
+		\t@pgf@tokb=\expandafter{\pgf@reverse@last@pt}%
+		\edef\pgf@marshal{\the\t@pgf@toka\the\t@pgf@tokb}%
+		\expandafter\pgfprependlistpushfront\pgf@marshal\to{pgfretval}%
+	\fi
+	\def\pgf@reverse@last@pt{{#2}{#3}}%
+}%
+
+\def\pgfreverse@token@moveto#1#2{%
+	\pgfreverse@iterate{\pgfsyssoftpath@movetotoken}%
+	\pgfreverse@prepend@last\pgfsyssoftpath@movetotoken{#1}{#2}%
+	\pgf@reverse@loop%
+}
+
+\def\pgfreverse@token@lineto#1#2{%
+	\pgfreverse@iterate{\pgfsyssoftpath@linetotoken}%
+	\pgfreverse@prepend@last\pgfsyssoftpath@linetotoken{#1}{#2}%
+	\pgf@reverse@loop
+}
+\def\pgfreverse@token@close#1#2{%
+	% close tokens are complicated: they always correspond to the most
+	% recent moveto token.
+	%
+	% First: remember that the last encountered token was 'close': if
+	% this is the lastmost token, we must not insert a final moveto.
+	\def\b@pgf@reversepath@last@is@close{1}%
+	%
+	% Second: *append*
+	% \pgfsyssoftpath@closepathtoken{<lastx>}{<lasty>}.
+	%
+	% Appending is unsupported by the prepend-list, so we have to
+	% terminate it, append, and reinitialize it with the result:
+	\pgfprependlistlet\pgfretval={pgfretval}%
+	\t@pgf@toka=\expandafter{\pgfretval}%
+	\t@pgf@tokb={\pgfsyssoftpath@closepathtoken}%
+	\t@pgf@tokc=\expandafter{\pgf@reverse@last@pt}%
+	\edef\pgf@marshal{\the\t@pgf@toka\the\t@pgf@tokb\the\t@pgf@tokc}%
+	%
+	% ... create a new list with the result:
+	\pgfprependlistnewempty{pgfretval}%
+	\expandafter\pgfprependlistpushfront\pgf@marshal\to{pgfretval}%
+	%
+	% and prepend a moveto.
+	\pgfreverse@prepend@last\pgfsyssoftpath@movetotoken{#1}{#2}%
+	%
+	\pgf@reverse@loop
+}
+
+\def\pgfreverse@token@curveto#1#2\pgfsyssoftpath@curvetosupportbtoken#3#4\pgfsyssoftpath@curvetotoken#5#6{%
+	\pgfreverse@iterate{\pgfsyssoftpath@curvetosupportatoken{#1}{#2}\pgfsyssoftpath@curvetosupportbtoken{#3}{#4}\pgfsyssoftpath@curvetotoken}%
+	\pgfreverse@prepend@last{\pgfsyssoftpath@curvetosupportatoken{#3}{#4}\pgfsyssoftpath@curvetosupportbtoken{#1}{#2}\pgfsyssoftpath@curvetotoken}{#5}{#6}%
+	\pgf@reverse@loop
+}
+
+\def\pgfreverse@token@rect#1#2\pgfsyssoftpath@rectsizetoken#3#4{%
+	% FIXME: UNTESTED
+	\pgf@xa=#1\relax%
+	\advance\pgf@xa by#3\relax%
+	\pgf@ya=#2\relax%
+	\advance\pgf@ya by#4\relax%
+	\edef\pgf@marshal{%
+		\noexpand\pgfsyssoftpath@movetotoken
+		{%
+			{#1}{#2}%
+			\noexpand\pgfsyssoftpath@linetotoken{\the\pgf@xa}{#2}%
+			\noexpand\pgfsyssoftpath@linetotoken{\the\pgf@xa}{\the\pgf@ya}%
+			\noexpand\pgfsyssoftpath@linetotoken{#1}{\the\pgf@ya}%
+			\noexpand\pgfsyssoftpath@closepathtoken{#1}{#2}%
+		}%
+	}%
+	\pgfreverse@iterate\pgfsyssoftpath@movetotoken
+	\edef\pgf@reverse@last@pt{{#1}{#2}}%
+	\expandafter\pgf@reverse@loop\pgf@marshal%
+}
+
+% ----------------------------------------
+% Given that some intersections have been computed already (and are in
+% the current scope), this command computes the intersection segments
+% for one of the input arguments.
+%
+% On output, both \pgfretval and \pgfintersectionsegments contain the number of computed segments. The
+% segments as such can be accessed via \pgfgetintersectionsegmentpath.
+%
+% #1 : should be '1' if the FIRST argument of
+% \pgfintersectionofpaths should be used and '2' the SECOND
+% argument of \pgfintersectionofpaths should be used on input.
+%
+% EXAMPLE:
+%
+%   	\def\inputValue{%
+%   		\pgfsyssoftpath@movetotoken {56.90549pt}{0.0pt}%
+%   		\pgfsyssoftpath@linetotoken {85.35823pt}{28.45274pt}%
+%   		\pgfsyssoftpath@linetotoken {113.81097pt}{0.0pt}%
+%   		\pgfsyssoftpath@linetotoken {142.26372pt}{28.45274pt}%
+%   		\pgfsyssoftpath@linetotoken {170.71646pt}{0.0pt}%
+%   	}
+%
+%   	\pgfpointintersectionsolution{1}%
+%   	\pgfplotsassertequalstok{\the\pgf@x, \the\pgf@y}{71.13918pt, 14.2278pt}{solution 1}
+%   	\pgfpointintersectionsolution{2}%
+%   	\pgfplotsassertequalstok{\the\pgf@x, \the\pgf@y}{99.59497pt, 14.2278pt}{solution 2}
+%   	\pgfpointintersectionsolution{3}%
+%   	\pgfplotsassertequalstok{\the\pgf@x, \the\pgf@y}{128.05057pt, 14.2278pt}{solution 3}
+%   	\pgfpointintersectionsolution{4}%
+%   	\pgfplotsassertequalstok{\the\pgf@x, \the\pgf@y}{156.50636pt, 14.2278pt}{solution 4}
+%   	
+%   
+%   	\pgfcomputeintersectionsegments{1}%
+%   
+%   	\message{OUTPUT: \meaning\pgfretval^^J}%
+%   	\expandafter\def\csname expected@a@0\endcsname{%
+%   		\pgfsyssoftpath@movetotoken {56.90549pt}{0.0pt}%
+%   \pgfsyssoftpath@linetotoken{71.13918pt}{14.2278pt}%
+%   	}
+%   	\expandafter\def\csname expected@a@1\endcsname{%
+%   		\pgfsyssoftpath@movetotoken{71.13918pt}{14.2278pt}%
+%   		\pgfsyssoftpath@linetotoken {85.35823pt}{28.45274pt}%
+%   \pgfsyssoftpath@linetotoken{99.59497pt}{14.2278pt}%
+%   	}
+%   	\expandafter\def\csname expected@a@2\endcsname{%
+%   		\pgfsyssoftpath@movetotoken{99.59497pt}{14.2278pt}%
+%   		\pgfsyssoftpath@linetotoken {113.81097pt}{0.0pt}%
+%   \pgfsyssoftpath@linetotoken{128.05057pt}{14.2278pt}%
+%   	}
+%   	\expandafter\def\csname expected@a@3\endcsname{%
+%   		\pgfsyssoftpath@movetotoken{128.05057pt}{14.2278pt}%
+%   		\pgfsyssoftpath@linetotoken {142.26372pt}{28.45274pt}%
+%   \pgfsyssoftpath@linetotoken{156.50636pt}{14.2278pt}%
+%   	}
+%   	\expandafter\def\csname expected@a@4\endcsname{%
+%   		\pgfsyssoftpath@movetotoken{156.50636pt}{14.2278pt}%
+%   		\pgfsyssoftpath@linetotoken {170.71646pt}{0.0pt}%
+%   	}
+%   % 
+\def\pgfcomputeintersectionsegments#1{%
+	\pgfcomputeintersectionsegments@set@src{#1}%
+	\ifnum\pgfintersectionsolutions=0 %
+		\pgfutil@namelet{pgf@intersect@path@split@\pgf@insert@intersections@src @0}{pgf@intersect@path@\pgf@insert@intersections@src}%
+		\def\pgfretval{0}%
+	\else
+		%
+		% This algorithm *relies* on an increasing sort order. Sort
+		% them:
+		\pgfintersectionsolutionsortbytime@@%
+		%
+		%
+		\pgfapplistnewempty{pgfretval@tmp}%
+		\def\pgf@insert@cursolution{1}%
+		\def\c@pgf@path@result{0}%
+		\let\c@pgf@path@segment=\c@pgf@countd
+		\let\c@pgf@path@segment@trg=\c@pgf@countc
+		\c@pgf@path@segment=0 %
+		\pgf@fillbetween@get@time@off{\pgf@insert@intersections@src}{\pgf@insert@cursolution}%
+		\c@pgf@path@segment@trg=\pgfretval\relax
+		%
+		\pgfutil@namelet{pgf@loc@TMPa}{pgf@intersect@path@\pgf@insert@intersections@src}%
+		\expandafter\pgf@insert@intersections@loop\pgf@loc@TMPa\pgf@stop
+		%
+		\pgfapplistlet\pgf@loc@TMPa={pgfretval@tmp}%
+		\expandafter\let\csname pgf@intersect@path@split@\pgf@insert@intersections@src @\c@pgf@path@result\endcsname=\pgf@loc@TMPa%
+		\pgfutil@advancestringcounter\c@pgf@path@result%
+		\let\pgfretval=\c@pgf@path@result%
+	\fi
+	\let\pgfintersectionsegments=\pgfretval
+}%
+
+% Defines \pgfretval to contain the desired path segment as softpath.
+%
+% @see \pgfsetpath
+% @see \pgfsetpathandBB
+% @see \pgfaddpathandBB
+%
+% #1: the value '1' if results for the FIRST argument of
+% \pgfintersectionofpaths are requested or '2' if results for the
+% SECOND path are requested (compare \pgfcomputeintersectionsegments).
+% #2: the segment index (a number 0<= #2 < numbersegments).
+%  The number of segments is \pgfintersectionsegments
+\def\pgfgetintersectionsegmentpath#1#2{%
+	\pgfcomputeintersectionsegments@set@src{#1}%
+	\pgfmathparse{#2}%
+	\afterassignment\pgfcomputeintersectionsegments@set@src@gobble
+	\c@pgf@countc=\pgfmathresult\relax%
+	\ifnum\c@pgf@countc<0
+		\advance\c@pgf@countc by \pgfintersectionsegments\relax
+	\fi
+	\expandafter\let\expandafter\pgfretval\csname pgf@intersect@path@split@\pgf@insert@intersections@src @\the\c@pgf@countc\endcsname
+	\ifx\pgfretval\relax
+		\pgferror{There is no intersection segment '#2' in path '#1'}%
+	\fi
+}%
+\def\pgfcomputeintersectionsegments@set@src@gobble#1\relax{}
+
+\def\pgfcomputeintersectionsegments@set@src#1{%
+	\ifcase#1\relax
+		% 0
+		\pgferror{illegal argument supplied.}
+	\or
+		\def\pgf@insert@intersections@src{a}%
+	\or
+		\def\pgf@insert@intersections@src{b}%
+	\else
+		\pgferror{illegal argument supplied.}
+	\fi
+}%
+
+\def\pgfintersectionsolutionsortbytime@@{%
+	% this is an O(n^2) sort method. It might suffice provided that
+	% the number of intersections is small... and it is the same
+	% runtime as that of the intersection lib as such (which is, in
+	% fact, worse).
+	%
+	% Note that this bubble-sort-approach has the benefit that if the
+	% input sequence *is* actually sorted, that it will have no effect
+	% at all (linear time).
+	\pgf@intersect@solutions@sortfinishtrue%
+	\pgfmathloop%
+		\ifnum\pgfmathcounter<\pgfintersectionsolutions\relax%
+			\pgfutil@tempcnta=\pgfmathcounter%
+			\advance\pgfutil@tempcnta by1\relax%
+			%
+			% acquire the sort keys...
+			\pgfintersectiongetsolutiontimes{\pgfmathcounter}{\pgf@loc@tmp@A@a}{\pgf@loc@tmp@A@b}%
+			\pgfintersectiongetsolutiontimes{\the\pgfutil@tempcnta}{\pgf@loc@tmp@B@a}{\pgf@loc@tmp@B@b}%
+			%
+			\ifdim\csname pgf@loc@tmp@A@\pgf@insert@intersections@src\endcsname pt>%
+				\csname pgf@loc@tmp@B@\pgf@insert@intersections@src\endcsname pt\relax%
+				\pgf@intersect@solutions@sortfinishfalse%
+				%
+				\pgfintersectionsolutionsortbytime@swap{pgfpoint@intersect@solution@\pgfmathcounter}%
+					{pgfpoint@intersect@solution@\the\pgfutil@tempcnta}%
+				%
+				\pgfintersectionsolutionsortbytime@swap{pgf@intersect@solution@props@\pgfmathcounter}%
+					{pgf@intersect@solution@props@\the\pgfutil@tempcnta}%
+			\fi%
+	\repeatpgfmathloop%
+	\ifpgf@intersect@solutions@sortfinish%
+	\else%
+		\expandafter\pgfintersectionsolutionsortbytime@@%
+	\fi%
+}
+
+
+% #1: either 'a' or 'b', depending on the required part
+% #2: the solution index (starting with 1)
+% Defines \pgfretval to contain the result.
+\def\pgf@fillbetween@get@time@off#1#2{%
+	\pgfintersectiongetsolutionsegmentindices{#2}{\pgf@temp@a}{\pgf@temp@b}%
+	\edef\pgfretval{\csname pgf@temp@#1\endcsname}%
+}%
+
+% ----------------------------------------------------------------------------------
+
+
+% Splits a Bezier curve at a designated time 't'
+% using decasteljau
+%--------------------------------------------------
+% Point lerp(float t, Point A, Point B) {
+% return A*(1-t) + B*t; // + and * overloaded for Points
+% }
+% 
+% void split(t, Point P[4], Point L[4], Point R[4]) {
+% 	Point P01 = lerp(t, P[0], P[1]);
+% 	Point P12 = lerp(t, P[1], P[2]);
+% 	Point P23 = lerp(t, P[2], P[3]);
+% 	Point P012 = lerp(t, P01, P12);
+% 	Point P123 = lerp(t, P12, P13);
+% 	Point Q = lerp(t, P012, P123);
+% 	L[0] = P[0]; L[1] = P01; L[2] = P012; L[3] = Q;
+% 	R[0] = Q;
+% 	R[1] = P123; R[2] = P23; R[3] = P[3];
+% }
+%-------------------------------------------------- 
+% INPUT:
+%  #1: a value in the range [0,1] which determines the split point
+%  #2,#3,#4,#5: the points of the curve, each of the form {<x>}{<y>}
+% 
+% OUTPUT:
+%  \pgfretval@L{{<A>}{<B>}{<C>}{<D>}}
+%  \pgfretval@R{{<A>}{<B>}{<C>}{<D>}}
+%
+% @see \pgf@split@curveto@softpaths
+\def\pgf@split@curveto#1#2#3#4#5{%
+	\begingroup
+	\pgf@xa=-#1pt %
+	\advance\pgf@xa by1pt %
+	\edef\pgf@split@one@m@t{\pgf@sys@tonumber\pgf@xa}%
+	%
+	\pgf@split@curveto@lerp{#1}{\pgf@split@one@m@t}{#2}{#3}%
+	\pgf@split@curveto@tomacro\pgf@split@curveto@p@AB
+	%
+	\pgf@split@curveto@lerp{#1}{\pgf@split@one@m@t}{#3}{#4}%
+	\pgf@split@curveto@tomacro\pgf@split@curveto@p@BC
+	%
+	\pgf@split@curveto@lerp{#1}{\pgf@split@one@m@t}{#4}{#5}%
+	\pgf@split@curveto@tomacro\pgf@split@curveto@p@CD
+	%
+	\pgf@split@curveto@lerp{#1}{\pgf@split@one@m@t}{\pgf@split@curveto@p@AB}{\pgf@split@curveto@p@BC}%
+	\pgf@split@curveto@tomacro\pgf@split@curveto@p@ABC
+	%
+	\pgf@split@curveto@lerp{#1}{\pgf@split@one@m@t}{\pgf@split@curveto@p@BC}{\pgf@split@curveto@p@CD}%
+	\pgf@split@curveto@tomacro\pgf@split@curveto@p@BCD
+	%
+	\pgf@split@curveto@lerp{#1}{\pgf@split@one@m@t}{\pgf@split@curveto@p@ABC}{\pgf@split@curveto@p@BCD}%
+	\pgf@split@curveto@tomacro\pgf@split@curveto@p@Q
+	%
+	\xdef\pgf@marshal{%
+		\edef\noexpand\pgfretval@L{{#2}{\pgf@split@curveto@p@AB}{\pgf@split@curveto@p@ABC}{\pgf@split@curveto@p@Q}}%
+		\edef\noexpand\pgfretval@R{{\pgf@split@curveto@p@Q}{\pgf@split@curveto@p@BCD}{\pgf@split@curveto@p@CD}{#5}}%
+	}%
+	\endgroup
+	\pgf@marshal
+}
+
+% Splits a Bezier curve at a designated time 't'
+%
+% This variants takes a part of a softpath as input:
+%
+% #1: a curveto- a macro containing a softpath of the form 
+%   <x><y>\pgfsyssoftpath@curvetosupportatoken<x><y>\pgfsyssoftpath@curvetosupportbtoken<x><y>\pgfsyssoftpath@curvetotoken<x><y>
+% #2: t in [0,1]
+%
+% OUTPUT: \pgfretval@L contains the LEFT segment (in the same softpath format) and \pgfretval@R contains the RIGHT segment (in the softpath format), \pgfretval contains the intersection point (i.e. the point evaluated at 't')
+\def\pgf@split@curveto@softpaths#1#2{%
+	\expandafter\pgf@split@curveto@softpaths@#1{#2}%
+}
+
+\def\pgf@split@curveto@softpaths@#1#2\pgfsyssoftpath@curvetosupportatoken#3#4\pgfsyssoftpath@curvetosupportbtoken#5#6\pgfsyssoftpath@curvetotoken#7#8#9{%
+	\pgf@split@curveto{#9}%
+		{{#1}{#2}}%
+		{{#3}{#4}}%
+		{{#5}{#6}}%
+		{{#7}{#8}}%
+	\expandafter\pgf@split@curveto@softpaths@@\pgfretval@L\pgfretval@L
+	\expandafter\pgf@split@curveto@softpaths@@\pgfretval@R\pgfretval@R
+}%
+
+\def\pgf@split@curveto@softpaths@@#1#2#3#4#5{%
+	% we can silently omit the moveto component.
+	\def#5{\pgfsyssoftpath@curvetosupportatoken#2\pgfsyssoftpath@curvetosupportbtoken#3\pgfsyssoftpath@curvetotoken#4}%
+	\def\pgfretval{#1}%
+}%
+
+% ----------------------------------------------------------------------------------
+
+% defines \pgf@x, \pgf@y to be A*(1-t) + B*t
+% #1: the scalar value 't' in [0,1]
+% #2: the scalar value '1-t' in [0,1]
+% #3: a 2d point 'A' of the form {<x>}{<y>}
+% #4: a 2d point 'B' of the form {<x>}{<y>}
+\def\pgf@split@curveto@lerp#1#2#3#4{%
+	\pgfpointadd
+		{\pgfqpointscale{#2}{\expandafter\pgfqpoint#3}}%
+		{\pgfqpointscale{#1}{\expandafter\pgfqpoint#4}}%
+}%
+
+\def\pgf@split@curveto@tomacro#1{%
+	\edef#1{{\the\pgf@x}{\the\pgf@y}}%
+}
+
+
+\def\pgfcomputeintersectionsegments@@{%
+%\message{processing segment \the\c@pgf@path@segment\space (current solution \pgf@insert@cursolution/\pgfintersectionsolutions; target segment \the\c@pgf@path@segment@trg, currentxy \pgfinsert@intersect@tok@currentxy, lastxy \pgfinsert@intersect@tok@lastxy)^^J}%
+	\pgfmathloop
+	% we need to loop: it is fully acceptable if more than one
+	% solution is on the same segment.
+	\ifnum\c@pgf@path@segment=\c@pgf@path@segment@trg
+		%
+		\pgf@insert@intersections@split@segment
+		\expandafter\pgfapplistpushback\pgfretval\to{pgfretval@tmp}%
+		%
+		%
+		% report the current result segment!
+		\pgfapplistlet\pgf@loc@TMPa={pgfretval@tmp}%
+		\expandafter\let\csname pgf@intersect@path@split@\pgf@insert@intersections@src @\c@pgf@path@result\endcsname=\pgf@loc@TMPa%
+		\pgfutil@advancestringcounter\c@pgf@path@result%
+		% ... and start a new result segment. Keep in mind that it
+		% should start with a moveto:
+		\pgfapplistnewempty{pgfretval@tmp}%
+		\csname pgfpoint@intersect@solution@\pgf@insert@cursolution\endcsname%
+		\edef\pgf@loc@TMPa{\noexpand\pgfsyssoftpath@movetotoken{\the\pgf@x}{\the\pgf@y}}%
+		\expandafter\pgfapplistpushback\pgf@loc@TMPa\to{pgfretval@tmp}%
+		%
+		%
+		% OK, iterate:
+		\ifnum\pgf@insert@cursolution=\pgfintersectionsolutions\relax
+			% collect all remaining ones:
+			\c@pgf@path@segment@trg=10000000 %
+		\else
+			\pgfutil@advancestringcounter\pgf@insert@cursolution
+			\pgf@fillbetween@get@time@off{\pgf@insert@intersections@src}{\pgf@insert@cursolution}%
+			\c@pgf@path@segment@trg=\pgfretval\relax
+		\fi
+	\repeatpgfmathloop
+	\expandafter\pgfapplistpushback\pgfinsert@intersect@tok\to{pgfretval@tmp}%
+	\let\pgfinsert@intersect@tok@lastxy=\pgfinsert@intersect@tok@currentxy
+	\advance\c@pgf@path@segment by1 %
+}%
+
+% INPUT:
+%  - \pgfinsert@intersect@tok@type is the current type (one of \pgfsyssoftpath@linetotoken or \pgfsyssoftpath@curvetotoken)
+%  - \pgf@insert@cursolution is the current intersection index
+%  - \pgfinsert@intersect@tok is the current path segment. On output, it is the *remaining* path segment.
+%  - \pgfinsert@intersect@tok@lastxy the (x,y) coordinates of the last seen coordinate.
+%
+% OUTPUT:
+%  - \pgfretval the segment which has been splitted off. It will be appended to the result.
+%  - \pgfinsert@intersect@tok the remaining path segment which is to be processed
+%  - \pgfinsert@intersect@tok@lastxy the (x,y) coordinates of the last seen coordinate which is to be processed.
+\def\pgf@insert@intersections@split@segment{%
+	\ifx\pgfinsert@intersect@tok@type\pgfsyssoftpath@linetotoken
+		\csname pgfpoint@intersect@solution@\pgf@insert@cursolution\endcsname%
+		\edef\pgfretval{\noexpand\pgfsyssoftpath@linetotoken{\the\pgf@x}{\the\pgf@y}}%
+		% ... and keep \pgfinsert@intersect@tok at its current value (it is \pgfsyssoftpath@linetotoken{<next x>}{<next y>})
+	\else
+		\ifx\pgfinsert@intersect@tok@type\pgfsyssoftpath@curvetotoken
+			% Ah; a curveto. That's more involved!
+			% First, get the time offset of the current intersection:
+			%
+			% Get the global time:
+			\pgfintersectiongetsolutiontimes{\pgf@insert@cursolution}{\pgf@split@it@time@a}{\pgf@split@it@time@b}%
+			% Get time at the beginning of the current solution segment:
+			\pgfintersectiongetsolutionsegmentindices{\pgf@insert@cursolution}{\pgf@split@it@timeoff@a}{\pgf@split@it@timeoff@b}%
+			% compute local time within the current solution segment:
+			\pgf@xa=\csname pgf@split@it@time@\pgf@insert@intersections@src\endcsname pt %
+			\advance\pgf@xa by-\csname pgf@split@it@timeoff@\pgf@insert@intersections@src\endcsname pt %
+			\edef\pgf@split@it@time{\pgf@sys@tonumber\pgf@xa}%
+			%
+			\let\pgf@split@it@start=\pgfinsert@intersect@tok@lastxy
+			% we have to insert the last XY coordinates:
+			\t@pgf@toka=\expandafter{\pgf@split@it@start}%
+			\t@pgf@tokb=\expandafter{\pgfinsert@intersect@tok}%
+			\edef\pgf@temp{\the\t@pgf@toka\the\t@pgf@tokb}%
+			% Split into TWO curveto operations!
+			\pgf@split@curveto@softpaths{\pgf@temp}{\pgf@split@it@time}%
+			% ok, the first returned sub-curveto is the result of this method...
+			\let\pgfretval=\pgfretval@L
+			% ... and the second is the "remainder" which is still to be processed.
+			\let\pgfinsert@intersect@tok=\pgfretval@R
+		\else
+			\pgferror{Unsupported path type \meaning\pgfinsert@intersect@tok@type. Cannot process these paths.}%
+		\fi
+	\fi
+	%
+	\csname pgfpoint@intersect@solution@\pgf@insert@cursolution\endcsname%
+	\edef\pgfinsert@intersect@tok@lastxy{{\the\pgf@x}{\the\pgf@y}}%
+}%
+
+\def\pgf@insert@intersections@loop#1{%
+	\ifx#1\pgf@stop%
+		\let\pgfinsert@intersect@tok\pgfutil@empty%
+		\let\pgfinsert@intersect@tok@type\pgfutil@empty
+		\pgfcomputeintersectionsegments@@%
+		\let\pgfinsert@intersect@next=\relax%
+	\else%
+		\ifx#1\pgfsyssoftpath@movetotoken%
+			\let\pgfinsert@intersect@next=\pgfinsert@intersect@token@moveto%
+		\else%
+			\ifx#1\pgfsyssoftpath@linetotoken%
+				\let\pgfinsert@intersect@next=\pgfinsert@intersect@token@lineto%
+			\else%
+				\ifx#1\pgfsyssoftpath@closepathtoken%
+					\let\pgfinsert@intersect@next=\pgfinsert@intersect@token@close%
+				\else%
+					\ifx#1\pgfsyssoftpath@curvetosupportatoken%
+						\let\pgfinsert@intersect@next=\pgfinsert@intersect@token@curveto%
+					\else%
+						\ifx#1\pgfsyssoftpath@rectcornertoken%
+							\let\pgfinsert@intersect@next=\pgfinsert@intersect@token@rect%
+						\fi%
+					\fi%
+				\fi%
+			\fi%
+		\fi%
+	\fi%
+	\pgfinsert@intersect@next}
+
+\def\pgfinsert@intersect@token@moveto#1#2{%
+	\def\pgfinsert@intersect@tok{\pgfsyssoftpath@movetotoken{#1}{#2}}%
+	\let\pgfinsert@intersect@tok@type\pgfsyssoftpath@movetotoken
+	\def\pgfinsert@intersect@tok@lastxy{{#1}{#2}}%
+	\expandafter\pgfapplistpushback\pgfinsert@intersect@tok\to{pgfretval@tmp}%
+	\pgf@insert@intersections@loop%
+}
+
+\def\pgfinsert@intersect@token@lineto#1#2{%
+	\def\pgfinsert@intersect@tok{\pgfsyssoftpath@linetotoken{#1}{#2}}%
+	\let\pgfinsert@intersect@tok@type\pgfsyssoftpath@linetotoken
+	\def\pgfinsert@intersect@tok@currentxy{{#1}{#2}}%
+	\pgfcomputeintersectionsegments@@%
+	\pgf@insert@intersections@loop
+}
+\def\pgfinsert@intersect@token@close#1#2{%
+	\def\pgfinsert@intersect@tok{\pgfsyssoftpath@closepathtoken{#1}{#2}}%
+	\let\pgfinsert@intersect@tok@type\pgfsyssoftpath@linetotoken
+	\def\pgfinsert@intersect@tok@currentxy{{#1}{#2}}%
+	\pgfcomputeintersectionsegments@@%
+	\pgf@insert@intersections@loop
+}
+
+\def\pgfinsert@intersect@token@curveto#1#2\pgfsyssoftpath@curvetosupportbtoken#3#4\pgfsyssoftpath@curvetotoken#5#6{%
+	\def\pgfinsert@intersect@tok{\pgfsyssoftpath@curvetosupportatoken{#1}{#2}\pgfsyssoftpath@curvetosupportbtoken{#3}{#4}\pgfsyssoftpath@curvetotoken{#5}{#6}}%
+	\let\pgfinsert@intersect@tok@type\pgfsyssoftpath@curvetotoken
+	\def\pgfinsert@intersect@tok@currentxy{{#5}{#6}}%
+	\pgfcomputeintersectionsegments@@%
+	\pgf@insert@intersections@loop
+}
+
+\def\pgfinsert@intersect@token@rect#1#2\pgfsyssoftpath@rectsizetoken#3#4{%
+	\pgf@xa=#1\relax%
+	\advance\pgf@xa by#3\relax%
+	\pgf@ya=#2\relax%
+	\advance\pgf@ya by#4\relax%
+	\edef\pgf@marshal{%
+		\noexpand\pgfsyssoftpath@movetotoken{#1}{#2}%
+		\noexpand\pgfsyssoftpath@linetotoken{#1}{\the\pgf@ya}%
+		\noexpand\pgfsyssoftpath@linetotoken{\the\pgf@xa}{\the\pgf@ya}%
+		\noexpand\pgfsyssoftpath@linetotoken{\the\pgf@xa}{#2}%
+		\noexpand\pgfsyssoftpath@closepathtoken{#1}{#2}%
+	}%
+	\expandafter\pgf@insert@intersections@loop\pgf@marshal%
+}
+
+
+% #1: a macro containing the clip path. More precisely, it is supposed to be a return value of \pgfgetpath.
+\def\pgffillbetweensetsoftclippathfirst#1{%
+	\let\pgfpathfillbetween@softclip@A=#1%
+}%
+
+% #1: a macro containing the clip path. More precisely, it is supposed to be a return value of \pgfgetpath.
+\def\pgffillbetweensetsoftclippathsecond#1{%
+	\let\pgfpathfillbetween@softclip@B=#1%
+}%
+
+% #1: a macro containing the clip path. More precisely, it is supposed to be a return value of \pgfgetpath.
+\def\pgffillbetweensetsoftclippath#1{%
+	\pgffillbetweensetsoftclippathfirst{#1}%
+	\pgffillbetweensetsoftclippathsecond{#1}%
+}
+
+% Default: no clip paths
+\pgffillbetweensetsoftclippathfirst{\pgfutil@empty}
+\pgffillbetweensetsoftclippathsecond{\pgfutil@empty}
+\endinput

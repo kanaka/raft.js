@@ -1,0 +1,121 @@
+%--------------------------------------------
+%
+% Package pgfplots.sty
+%
+% Provides a user-friendly interface to create function plots (normal
+% plots, semi-logplots and double-logplots).
+% 
+% It is based on Till Tantau's PGF package.
+%
+% Copyright 2007-2013 by Christian Feuersänger.
+%
+% This program is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, either version 3 of the License, or
+% (at your option) any later version.
+% 
+% This program is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public License
+% along with this program.  If not, see <http://www.gnu.org/licenses/>.
+%
+%--------------------------------------------
+\IfFileExists{pgfplots.revision.tex}{\input pgfplots.revision.tex } {%
+	\def\pgfplotsrevision{0}%
+	\def\pgfplotsversion{0.0}%
+    \def\pgfplotsversiondatetime{2014-07-01 00:00:00 +100}%
+    \def\pgfplotsrevisiondatetime{2014-07-01 00:00:00 +100}%
+	\def\pgfplotsversiondate{2014/07/01}%
+	\def\pgfplotsrevisiondate{2014/07/01}%
+}
+\ProvidesPackage{pgfplots}[\pgfplotsversiondate\space v\pgfplotsversion\space Data Visualization (\pgfplotsrevision)]
+
+% ATTENTION:
+% you MAY need one of
+%   \def\pgfsysdriver{pgfsys-dvipdfm.def}
+%   \def\pgfsysdriver{pgfsys-pdftex.def}
+%   \def\pgfsysdriver{pgfsys-dvips.def}
+%
+% BEFORE the first \usepackage{pgf}, \usepackage{tikz} or
+% \usepackage{pgfplots}.
+% Default is
+%   'dvips' for 'latex'
+%   'pdftex' for 'pdflatex'
+% -> dvipdfm needs special attention.
+
+\RequirePackage{tikz}
+
+% This is *identical* to \pgfutil@IfUndefined . I copied it here
+% because pgf up to and including version 2.10 does not contain it.
+\def\pgfplotsutil@IfUndefined#1{%
+  \begingroup\expandafter\expandafter\expandafter\endgroup
+  \expandafter\ifx\csname#1\endcsname\relax
+    \expandafter\pgfutil@firstoftwo
+  \else
+    \expandafter\pgfutil@secondoftwo
+  \fi
+}
+\pgfplotsutil@IfUndefined{directlua}{}{%
+	% I need \newcatcodetable
+	\RequirePackage{luatexbase}%
+}%
+
+\def\pgfplots@texdist@protect{\protect}%
+
+\input pgfplots.code.tex
+
+
+% checks for xcolor configuration options and will override
+%   mesh/colorspace explicit color output
+% and
+%	colormap default colorspace
+% if needed.
+\def\pgfplots@check@global@colorspace@overrides{%
+	% "bOverridesColorspace"
+	\pgfplots@loc@tmpfalse
+	\ifconvertcolorsD
+		% xcolor converts at *definition* time:
+		\pgfplots@loc@tmptrue
+	\else
+		\ifconvertcolorsU
+			% xcolor converts at *usage* time:
+			\pgfplots@loc@tmptrue
+		\fi
+	\fi
+	%
+	\ifpgfplots@loc@tmp
+		\let\pgfplots@loc@TMPb=\pgfutil@empty%
+		\ifx\XC@tgt@mod\pgfplots@XC@tgt@mod@rgb \def\pgfplots@loc@TMPb{rgb}\fi
+		\ifx\XC@tgt@mod\pgfplots@XC@tgt@mod@RGB \def\pgfplots@loc@TMPb{rgb}\fi
+		\ifx\XC@tgt@mod\pgfplots@XC@tgt@mod@cmyk\def\pgfplots@loc@TMPb{cmyk}\fi
+		\ifx\XC@tgt@mod\pgfplots@XC@tgt@mod@cmy \def\pgfplots@loc@TMPb{cmyk}\fi
+		\ifx\XC@tgt@mod\pgfplots@XC@tgt@mod@gray \def\pgfplots@loc@TMPb{gray}\fi
+		\ifx\XC@tgt@mod\pgfplots@XC@tgt@mod@Gray \def\pgfplots@loc@TMPb{gray}\fi
+		%
+		\ifx\pgfplots@loc@TMPb\pgfutil@empty
+		\else
+			\edef\pgfplots@loc@TMPa{%
+				mesh/colorspace explicit color output=\pgfplots@loc@TMPb,%
+				colormap default colorspace=\pgfplots@loc@TMPb,%
+			}%
+			\pgfplots@log3{Overriding colorspace to \pgfplots@loc@TMPb\space due to xcolor configuration.}%
+			\expandafter\pgfplotsset\expandafter{\pgfplots@loc@TMPa}%
+		\fi
+	\fi
+}%
+
+\def\pgfplots@XC@tgt@mod@rgb#1{rgb}
+\def\pgfplots@XC@tgt@mod@RGB#1{rgb}
+\def\pgfplots@XC@tgt@mod@cmyk#1{cmyk}
+\def\pgfplots@XC@tgt@mod@cmy#1{cmy}
+\def\pgfplots@XC@tgt@mod@gray#1{gray}
+\def\pgfplots@XC@tgt@mod@Gray#1{gray}
+
+\usetikzlibrary{plotmarks}
+
+
+
+\endinput

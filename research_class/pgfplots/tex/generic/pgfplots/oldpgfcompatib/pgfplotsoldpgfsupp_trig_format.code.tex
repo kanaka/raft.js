@@ -1,0 +1,380 @@
+% This file contains patches to support 'trig format'
+%
+%%% This file is a copy of some part of PGF/Tikz.
+%%% It has been copied here to provide :
+%%%  - compatibility with older PGF versions
+%%%  - availability of PGF contributions by Christian Feuersaenger
+%%%    which are necessary or helpful for pgfplots.
+%%%
+%%% This file contains just the functionality for trig format (written by Christian Feuersaenger).
+%%% 
+% Support for the contents of this file will NOT be done by the PGF/TikZ team. 
+% Please contact the author and/or maintainer of pgfplots (Christian Feuersaenger) if you need assistance in conjunction
+% with the deployment of this patch or partial content of PGF. Note that the author and/or maintainer of pgfplots has no obligation to fix anything:
+% This file comes without any warranty as the rest of pgfplots; there is no obligation for help.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\pgfkeys{
+	/pgf/trig format/.is choice,
+	/pgf/trig format/deg/.code={\def\pgfmath@trig@format@choice{0}},
+	/pgf/trig format/rad/.code={\def\pgfmath@trig@format@choice{1}},
+	/pgf/trig format/deg,
+}
+
+% Executes #1 if 'trig format=deg' and #2 otherwise.
+\def\pgfmathiftrigonometricusesdeg#1#2{%
+	\if0\pgfmath@trig@format@choice
+		#1%
+	\else
+		#2%
+	\fi
+}%
+
+\pgfutil@ifundefined{pgfmath@multiply@thousand}{%
+	% Oh - we are working against PGF 2.10 . Apply more patches:
+	%
+	\def\pgfmath@multiply@thousand#1.#2#3#4#5\relax{%
+	  \edef\pgfmathresult{#1#2#3#4.#5}%
+	}%
+	% Defines \pgfmath@x to be the result of the table lookup for value
+	% '#1' in table '#2'
+	%
+	% #1: a value for which lookup should be performed
+	% #2: the table's prefix name
+	% #3: the table's size
+	\def\pgfmath@table@lookup#1#2#3{%
+	  \pgfmath@x=#1\relax
+	  \expandafter\pgfmath@table@lookup@\the\pgfmath@x\relax{#2}{#3}%
+	}
+	\def\pgfmath@table@lookup@#1.#2\relax#3#4{%
+	  \edef\pgf@temp{\Pgf@geT#2}% strip 'pt' suffix.
+	  %
+	  % prepare constant interpolant (i.e. the value at node '#1'):
+	  \pgfmath@x=\csname #3#1\endcsname pt %
+	  %
+	  \c@pgfmath@countc=#1 %
+	  \advance\c@pgfmath@countc by1 %
+	  \ifnum\c@pgfmath@countc<#4 %
+		% Ah - we have enough elements in the table.
+		%
+		% perform linear interpolation:
+		\pgfmath@ya=\csname #3\the\c@pgfmath@countc\endcsname pt %
+		\advance\pgfmath@ya by-\pgfmath@x %
+		\advance\pgfmath@x by0.\pgf@temp\pgfmath@ya
+	  \fi
+	}%
+}{}%
+
+
+
+\def\pgfmath@scale@rad@to@deg#1{%
+    #1=57.29577#1\relax% 57.29577 = 360/(2*pi)
+}%
+\def\pgfmath@scale@deg@to@rad#1{%
+    #1=3.14159#1% 
+    \divide#1180\relax%
+}%
+
+\def\pgfmathsin@#1{%
+  % Let #1 = a.b
+  % Then sin(#1) \approx (1-b)*sin(a) + b*sin(a+1)
+  %
+  \begingroup%
+    \expandafter\pgfmath@x#1pt\relax%
+	\if1\pgfmath@trig@format@choice
+		% trig format=rad
+		\pgfmath@scale@rad@to@deg\pgfmath@x
+	\fi
+    \advance\pgfmath@x-90pt\relax%
+    \afterassignment\pgfmath@gobbletilpgfmath@
+    \expandafter\c@pgfmath@counta\the\pgfmath@x\relax\pgfmath@
+    \divide\c@pgfmath@counta360\relax%
+    \multiply\c@pgfmath@counta-360\relax%
+    \advance\pgfmath@x\c@pgfmath@counta pt\relax%
+    \ifdim\pgfmath@x<0pt\relax\pgfmath@x-\pgfmath@x\fi%
+    \ifdim\pgfmath@x<180pt\relax%
+    \else
+      \pgfmath@x-\pgfmath@x%
+      \advance\pgfmath@x360pt\relax%
+    \fi%
+    % Now 0 <= x < 179. So split x into integer and decimal...
+    %
+    \afterassignment\pgfmath@xa%
+    \expandafter\c@pgfmath@counta\the\pgfmath@x\relax%
+    %
+    % ...if #1 is an integer, don't do anything fancy.
+    \ifdim\pgfmath@xa=0pt%
+      \expandafter\pgfmath@x\csname pgfmath@cos@\the\c@pgfmath@counta\endcsname pt\relax%
+    \else%
+      \pgfmath@x-\pgfmath@xa%
+      \advance\pgfmath@x1pt\relax%
+      \expandafter\pgfmath@x\csname pgfmath@cos@\the\c@pgfmath@counta\endcsname\pgfmath@x%
+      \advance\c@pgfmath@counta1\relax%
+      \ifnum\c@pgfmath@counta=181\relax\c@pgfmath@counta179\relax\fi%
+      \expandafter\advance\expandafter\pgfmath@x\csname pgfmath@cos@\the\c@pgfmath@counta\endcsname\pgfmath@xa%
+    \fi%
+    \pgfmath@returnone\pgfmath@x%
+  \endgroup
+}
+
+% \pgfmathcos
+% 
+% Calculate the cosine of #1 (in degrees).
+%
+\def\pgfmathcos@#1{%
+  % Let x = a.b
+  % Then cos(x) \approx (1-b)*cos(a) + b*cos(a+1)
+  %
+  \begingroup%
+    \expandafter\pgfmath@x#1pt\relax%
+	\if1\pgfmath@trig@format@choice
+		% trig format=rad
+		\pgfmath@scale@rad@to@deg\pgfmath@x
+	\fi
+    \afterassignment\pgfmath@gobbletilpgfmath@%
+    \expandafter\c@pgfmath@counta\the\pgfmath@x\relax\pgfmath@% 
+    \divide\c@pgfmath@counta360\relax%
+    \multiply\c@pgfmath@counta-360\relax%
+    \advance\pgfmath@x\c@pgfmath@counta pt\relax%
+    \ifdim\pgfmath@x<0pt\relax\pgfmath@x-\pgfmath@x\fi%
+    \ifdim\pgfmath@x<180pt\relax%
+    \else%
+      \pgfmath@x-\pgfmath@x%
+      \advance\pgfmath@x360pt\relax%
+    \fi%
+    % Now 0 <= x < 179. So split x into integer and decimal...
+    %
+    \afterassignment\pgfmath@xa%
+    \expandafter\c@pgfmath@counta\the\pgfmath@x\relax%
+    %
+    % ...if #1 is an integer, don't do anything fancy.
+    \ifdim\pgfmath@xa=0pt%
+      \expandafter\pgfmath@x\csname pgfmath@cos@\the\c@pgfmath@counta\endcsname pt%
+    \else%
+      \pgfmath@x-\pgfmath@xa%
+      \advance\pgfmath@x1pt\relax%
+      \expandafter\pgfmath@x\csname pgfmath@cos@\the\c@pgfmath@counta\endcsname\pgfmath@x%
+      \advance\c@pgfmath@counta1\relax%
+      \ifnum\c@pgfmath@counta=181\relax\c@pgfmath@counta179\relax\fi%
+      \expandafter\advance\expandafter\pgfmath@x\csname pgfmath@cos@\the\c@pgfmath@counta\endcsname\pgfmath@xa%
+    \fi%
+    \pgfmath@returnone\pgfmath@x%
+  \endgroup%
+}
+
+\def\pgfmathasin@#1{%
+  \begingroup%
+    \pgfmath@x=#1pt %
+    \pgfmath@xa\pgfmath@x%
+    \edef\pgf@temp{\pgf@sys@tonumber\pgfmath@x}%
+    % compute lossless '*1000' operation:
+    \expandafter\pgfmath@multiply@thousand\pgf@temp 000\relax
+    \pgfmath@x=\pgfmathresult pt %
+    \ifdim\pgfmath@x<0pt\relax%
+      \pgfmath@x-\pgfmath@x%
+    \fi%
+    \pgfmath@table@lookup{\pgfmath@x}{pgfmath@acos@}{1001}%
+    \pgfmath@x=-\pgfmath@x
+    \advance\pgfmath@x90pt\relax%
+    \ifdim\pgfmath@xa<0pt\relax%
+      \pgfmath@x-\pgfmath@x%
+    \fi%
+	\if1\pgfmath@trig@format@choice
+		% trig format=rad
+		\pgfmath@scale@deg@to@rad\pgfmath@x
+	\fi
+    \pgfmath@returnone\pgfmath@x%
+  \endgroup%
+}
+\def\pgfmathacos@#1{%
+  \begingroup%
+    \pgfmath@x#1pt\relax%
+    \pgfmath@xa\pgfmath@x%
+    \edef\pgf@temp{\pgf@sys@tonumber\pgfmath@x}%
+    % compute lossless '*1000' operation:
+    \expandafter\pgfmath@multiply@thousand\pgf@temp 000\relax
+    \pgfmath@x=\pgfmathresult pt %
+    \ifdim\pgfmath@x<0pt\relax%
+      \pgfmath@x-\pgfmath@x%
+    \fi%
+    \pgfmath@table@lookup{\pgfmath@x}{pgfmath@acos@}{1001}%
+    \ifdim\pgfmath@xa<0pt\relax%
+      \pgfmath@x-\pgfmath@x%
+      \advance\pgfmath@x by180pt\relax%
+    \fi%
+	\if1\pgfmath@trig@format@choice
+		% trig format=rad
+		\pgfmath@scale@deg@to@rad\pgfmath@x
+	\fi
+    \pgfmath@returnone\pgfmath@x%
+  \endgroup%
+}
+
+\def\pgfmathatan@#1{%
+  \begingroup%
+    \expandafter\pgfmath@x#1pt\relax%
+    \pgfmath@xa\pgfmath@x%
+    \ifdim\pgfmath@x<0pt\relax%
+      \pgfmath@x-\pgfmath@x%
+    \fi%
+    \pgfmath@xb\pgfmath@x%
+    \ifdim\pgfmath@x>1pt\relax%
+      \edef\pgfmath@temp{\pgfmath@tonumber{\pgfmath@x}}%
+      \pgfmathreciprocal@{\pgfmath@temp}%
+      \pgfmath@x\pgfmathresult pt\relax%
+    \fi%
+    % compute lossless '*1000' operation:
+    \edef\pgf@temp{\pgf@sys@tonumber\pgfmath@x}%
+    \expandafter\pgfmath@multiply@thousand\pgf@temp 000\relax
+    \pgfmath@x=\pgfmathresult pt %
+    \pgfmath@table@lookup{\pgfmath@x}{pgfmath@atan@}{1001}%xxx
+    \ifdim\pgfmath@xb>1pt\relax%
+      \pgfmath@x=-\pgfmath@x%
+      \advance\pgfmath@x90pt%
+    \fi%
+    \ifdim\pgfmath@xa<0pt\relax%
+      \pgfmath@x-\pgfmath@x%
+    \fi%
+	\if1\pgfmath@trig@format@choice
+		% trig format=rad
+		\pgfmath@scale@deg@to@rad\pgfmath@x
+	\fi
+    \pgfmath@returnone\pgfmath@x%
+  \endgroup%
+}
+
+\expandafter\def\csname pgfmathatan2@\endcsname#1#2{%
+  % Note: first parameter is y (!), second is x (!)
+  \begingroup%
+    \pgfmath@y=#1pt\relax%
+    \ifdim\pgfmath@y<0pt\relax%
+      \pgfmath@y=-\pgfmath@y%
+    \fi%
+    \ifdim\pgfmath@y<0.001pt\relax%
+      \ifdim#2pt<0pt\relax%
+        \pgfmath@x=-180pt\relax%
+      \else%
+        \ifdim#2pt>0pt\relax%
+          \pgfmath@x=0pt\relax%
+        \else%
+          \ifdim#1pt<0pt%
+            \pgfmath@x=-90pt\relax%
+          \else%
+            \pgfmath@x=90pt\relax%
+          \fi%
+        \fi%
+      \fi%
+    \else%
+      \pgfmathabs@{#1}\let\pgfmath@tempa\pgfmathresult%
+      \pgfmathabs@{#2}\let\pgfmath@tempb\pgfmathresult%
+      \ifdim\pgfmath@tempa pt>\pgfmath@tempb pt%
+        \pgfmathdivide@{#2}{\pgfmath@tempa}%
+        \expandafter\pgfmathatan@\expandafter{\pgfmathresult}%
+        \pgfmath@x=90pt%
+        \advance\pgfmath@x by-\pgfmathresult pt\relax%
+      \else%
+        \pgfmathdivide@{\pgfmath@tempa}{#2}%
+        \expandafter\pgfmathatan@\expandafter{\pgfmathresult}%
+        \pgfmath@x=\pgfmathresult pt\relax%
+        \ifdim#2pt<0pt%
+          \advance\pgfmath@x by180pt\relax%
+        \fi%
+      \fi%
+      \ifdim#1pt<0pt\relax%
+        \pgfmath@x=-\pgfmath@x%
+      \fi%
+    \fi%
+	\if1\pgfmath@trig@format@choice
+		% trig format=rad
+		\pgfmath@scale@deg@to@rad\pgfmath@x
+	\fi
+    \pgfmath@returnone\pgfmath@x%
+  \endgroup%    
+}
+
+% FPU:
+
+
+\let\pgfmath@basic@sin@=\pgfmathsin@
+\let\pgfmath@basic@cos@=\pgfmathcos@
+\let\pgfmath@basic@tan@=\pgfmathtan@
+\let\pgfmath@basic@atan@=\pgfmathatan@
+\let\pgfmath@basic@asin@=\pgfmathasin@
+\let\pgfmath@basic@acos@=\pgfmathacos@
+\let\pgfmath@basic@cot@=\pgfmathcot@
+\let\pgfmath@basic@sec@=\pgfmathsec@
+\let\pgfmath@basic@cosec@=\pgfmathcosec@
+
+% Computes #1(#2) where #1 is a trigonometric function, i.e.
+% #1(#2) = #1( #2 + r*360 )
+%
+% #1 is a one-argument macro which assigns \pgfmathresult.
+\def\pgfmathfloatTRIG@#1#2{%
+	\if0\pgfmath@trig@format@choice
+		% trig format=deg
+		\expandafter\ifx\csname pgfmathfloatTRIG@NUM\endcsname\relax%
+			% Lazy evaluation:
+			\pgfmathfloatcreate{1}{3.6}{2}%
+			\global\let\pgfmathfloatTRIG@NUM=\pgfmathresult
+			\pgfmathfloatcreate{1}{2.77777777777778}{-3}%
+			\global\let\pgfmathfloatTRIG@NUM@INV=\pgfmathresult
+		\fi
+		\pgfmathfloatmodknowsinverse@{#2}{\pgfmathfloatTRIG@NUM}{\pgfmathfloatTRIG@NUM@INV}%
+	\else
+		% trig format=rad
+		\expandafter\ifx\csname pgfmathfloatTRIG@rad@NUM\endcsname\relax%
+			% Lazy evaluation:
+			\pgfmathfloatcreate{1}{6.28318530717959}{0}%
+			\global\let\pgfmathfloatTRIG@rad@NUM=\pgfmathresult
+			\pgfmathfloatcreate{1}{1.59154943091895}{-1}%
+			\global\let\pgfmathfloatTRIG@rad@NUM@INV=\pgfmathresult
+		\fi
+		\pgfmathfloatmodknowsinverse@{#2}{\pgfmathfloatTRIG@rad@NUM}{\pgfmathfloatTRIG@rad@NUM@INV}%
+	\fi
+	\pgfmathfloattofixed@{\pgfmathresult}%
+	\expandafter#1\expandafter{\pgfmathresult}%
+	\pgfmathfloatparsenumber{\pgfmathresult}%
+}%
+
+\def\pgfmathfloatsin@#1{\pgfmathfloatTRIG@\pgfmath@basic@sin@{#1}}
+\let\pgfmathfloatsin=\pgfmathfloatsin@
+\def\pgfmathfloatcos@#1{\pgfmathfloatTRIG@\pgfmath@basic@cos@{#1}}
+\let\pgfmathfloatcos=\pgfmathfloatcos@
+\def\pgfmathfloatsec@#1{\pgfmathfloatTRIG@\pgfmath@basic@cos@{#1}\pgfmathfloatreciprocal@{\pgfmathresult}}
+\let\pgfmathfloatsec=\pgfmathfloatsec@
+\def\pgfmathfloatcosec@#1{\pgfmathfloatTRIG@\pgfmath@basic@sin@{#1}\pgfmathfloatreciprocal@{\pgfmathresult}}
+\let\pgfmathfloatcosec=\pgfmathfloatcosec@
+
+\def\pgfmathfloatatan@#1{%
+	\begingroup
+	\expandafter\ifx\csname pgfmathfloatatan@TMP\endcsname\relax% 
+		\pgfmathfloatcreate{1}{1.6}{4}%
+		\global\let\pgfmathfloatatan@TMP=\pgfmathresult
+		\pgfmathfloatcreate{2}{1.6}{4}%
+		\global\let\pgfmathfloatatan@TMPB=\pgfmathresult
+	\fi
+	\pgfmathfloatgreaterthan@{#1}{\pgfmathfloatatan@TMP}%
+	\ifpgfmathfloatcomparison
+		\pgfmathiftrigonometricusesdeg{%
+			\pgfmathfloatcreate{1}{9.0}{1}%
+		}{%
+			\pgfmathfloatcreate{1}{1.570796326794}{0}%
+		}%
+	\else
+		\pgfmathfloatlessthan{#1}{\pgfmathfloatatan@TMPB}%
+		\ifpgfmathfloatcomparison
+			\pgfmathiftrigonometricusesdeg{%
+				\pgfmathfloatcreate{2}{9.0}{1}%
+			}{%
+				\pgfmathfloatcreate{2}{1.570796326794}{0}%
+			}%
+		\else
+			\pgfmathfloattofixed@{#1}%
+			\expandafter\pgfmath@basic@atan@\expandafter{\pgfmathresult}%
+			\pgfmathfloatparsenumber{\pgfmathresult}%
+		\fi
+	\fi
+	\pgfmath@smuggleone\pgfmathresult
+	\endgroup
+}%
+\endinput

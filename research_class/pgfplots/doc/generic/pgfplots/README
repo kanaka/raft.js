@@ -1,0 +1,308 @@
+pgfplots - Create normal/logarithmic plots in two and three dimensions for LaTeX/TeX/ConTeXt.
+
+pgfplotstable - Loads, rounds, formats and postprocesses numerical tables.
+
+PGFPlots draws high--quality function plots in normal or logarithmic scaling
+with a user-friendly interface directly in TeX. The user supplies axis labels,
+legend entries and the plot coordinates for one or more plots and PGFPlots
+applies axis scaling, computes any logarithms and axis ticks and draws the
+plots. It supports line plots, scatter plots, piecewise constant plots, bar
+plots, area plots, mesh-- and surface plots, patch plots, contour plots, quiver
+plots, histogram plots, polar axes, ternary diagrams, smith charts and some
+more.
+
+Pgfplots is based on Till Tantau's package PGF/TikZ (pgf).
+
+Pgfplotstable displays numerical tables rounded to desired precision in various
+display formats, for example scientific format, fixed point format or integer,
+using TeX's math facilities for pretty printing. Furthermore, it provides
+methods for table postprocessing.
+
+Please take a look at 
+  doc/latex/pgfplots/pgfplots.pdf
+and
+  doc/latex/pgfplots/pgfplotstable.pdf.
+
+Copyright 2007-2014 by Christian Feuersaenger.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+
+HISTORY:
+
+1.12.1: minor bugfix release
+- fixed bug: incompatibility of 1.12 with unicode-math
+- fixed bug: lua backend failed to work with table input and dependency on \coordindex
+- fixed bug: lua backend failed with 'forget plot'
+
+1.12: scalability + performance
+- scalability: reduced TeX memory consumption for huge inline tables
+- scalability: lualatex allows bigger 3d graphics
+- scalability: lualatex now reduces compilation time for huge 3d graphics 
+   (requires \pgfplotsset{compat=newest} at the time of this writing)
+   	surf shader=faceted: time reduced to 61% of pdflatex
+		(\addplot3[surf,samples=70] {exp(-x^2-y^2 +x*y)})
+	
+	surf shader=interp: time reduced to 25% of pdflatex
+	 	(\addplot3[surf,shader=interp,samples=70] {exp(-x^2-y^2 +x*y)})
+
+	surf shader=interp, parametric: time reduced to 36% of pdflatex
+		(\addplot3[surf,shader=interp,z buffer=sort, samples=50,domain=-1:0,y domain=0:2*pi] ({sqrt(1-x^2) * cos(deg(y))}, {sqrt( 1-x^2 ) * sin(deg(y))}, x);)
+
+	surf shader=faceted, parametric: time reduced to 40% of pdflatex
+		(\addplot3[surf,z buffer=sort, samples=50,domain=-1:0,y domain=0:2*pi] ({sqrt(1-x^2) * cos(deg(y))}, {sqrt( 1-x^2 ) * sin(deg(y))}, x);)
+
+- scalability: lualated now reduces compilation time for boxplots.
+    10000 input points from table: time reduced to 23% of pdflatex
+- fixed bug: 3d axes where all axes used log scale produced compile failure
+- fixed bug: axis equal did not respect "disabledatascaling"
+- fixed bug: mesh legend was confused by color input=explicit
+- fixed bug: colorbar style did not reset zmin/zmax
+- fixed bug: memory allocation in FPU consumed too much memory 
+- fixed bug: boxplots: removed compilation error due to spurious spaces in options list
+- fixed bug: boxplots: now uses standard quantile estimators: has all 9 estimators of R and uses the same as in Excel as default (as of compat=1.12)
+- fixed bug: boxplots: sometimes failed to compute boxplot statistics for special inputs
+- fixed bug: boxplots: now, it sets 'mark=*' for outliers if there is no mark (compat=1.12)
+- fixed regression: compat=1.11 broke arcs inside of axis
+- new feature: ensured that arcs inside of axis make use of 'axis cs' and 'axis direction cs' automatically
+- new feature: ensured that (0:1) is evaluated with axis cs
+- fixed bug: precision of transformation cartesian to polar was too low (added atan2 to fpu)
+- fixed bug: z buffer caused 'mesh legend' to produce a compile error
+- new feature: added 'y filter/.expression={y==3 ? nan : y}' to simplify coordinate filters
+
+1.11: usability + bug fixes.
+- new feature: "hide obscured x ticks=false" to disable the feature which hides ticks
+- simplified UI for symbolic coords: now, it accepts unexpandable
+  dictionary entries including umlauts, undefined macros, math mode, ...
+- simplified UI for symbolic coords: added magic prefix 
+	[normalized]<number> to allow something like xmin={[normalized]0.7}
+- simplified UI for custom annotations: one does not need to say "axis cs" any longer;
+  coordinates like (1,2) are now automatically interpreted as (axis cs:1,2)
+- new feature: 'type ticklabels with struts' improves baseline alignment of tick labels
+- new feature: 'trig format plots=rad' allows to use radians in trigonometric evaluations
+- simplified 'external lib': added driver auto-detection for pdflatex, lualatex, xelatex, dvips
+	(\usepgfplotslibrary{external}, or, with the next PGF release, \usetikzlibrary{external})
+- simplified UI for \addplot coordinates: now, it expands macros as it goes.
+- new feature: 'intersection segments' now accepts negative indices to count from the last backwards
+- simplified UI: 'intersection segments' now accepts new syntax with 1-based indices (old 0-based are still supported)
+- fixed bug: fillbetween has had a problem with pins on input paths
+- fixed bug: now, 'stacked ignores zero' is no longer applied to error bars.
+- fixed bug: tick lines were drawn incorrectly for centered axis lines in 3d
+- fixed bug: variable=u failed to work in some contexts
+- fixed bug: fill between implicitly activated layers, but did not install the
+   correct layers for grid lines etc.
+- fixed bug: z grid style was applied to y grid style
+- fixed bug: using 'x=1cm' failed to work in axis descriptions (legends)
+- fixed bug: mesh legend failed to work with 'shader=interp'
+- fixed bug: bounding box of shader=interp was wrong if there were transformations.
+- fixed bug: added support for \addplot graphics in ConTeXt
+- fixed bug: external lib failed to work with dvips (since PGF 3.0.0 I suppose); now it produces correct bounding boxes
+- fixed bug: \pgfplotstablenew can now overwrite existing tables.
+- fixed bug: extra ticks near intersections of axis lines were hidden
+- fixed bug: 'intersection segments' did not work with '--cycle'
+- fixed bug: 'intersection segments' did not update the last tikz point
+- fixed bug: tick lines/grid lines have been clipped when they were near the boundary
+- fixed bug: soft clip decoration failed to apply the transformation matrix
+- fixed bug: polar axes and units library resulted in broken bounding box
+- fixed bug: \addplot[stack plots=false] used to work up to 1.8, but failed until now. Fixed.
+- fixed bug: hist/density was broken since some time
+
+
+1.10:
+- new feature: fill between plots (library fillbetween)
+- new feature: concatenate intersection segments (library fillbetween)
+- fixed bug: xelatex failed to run contour external
+- fixed incompatibility with \label and \usepackage{mcaption}
+- fixed bug: histograms produced wrong point meta
+- fixed bug: histograms reported the wrong 'plot name' and confused shifts of bar plots
+
+1.9:
+- new feature: asymmetric error bars
+- new feature: activated math parser for axis limit arguments, arguments in axis cs, and domain argument in log plots
+- new feature: stacked bar plots place their 'nodes near coords' correctly in the middle and print the increment (compat=1.9)
+- new feature: stacked bar plots suppress empty increments (compat=1.9).
+- new feature: 'scatter/position=relative|absolute' allow to position 'nodes near coords' absolutely.
+   use-case: bar plots + nodes near coords which are at, say, y=0 rather than their y value
+- new feature: integration of smooth shadings & auto-CMYK conversion
+    \usepackage[cmyk]{xcolor} or \selectcolormodel{cmyk} will reconfigure pgfplots to use CMYK (document-wide)
+- new feature (advanced audience only): programmatic access to data coordinates during the visualization phase
+	-> allows much more customization for error bars, stacked plots, nodes near coords.
+- wrote beginner tutorials
+- fixed bug: error bars and point meta did not work together
+- fixed bug: stacked plots did not respect 'visualization depends on'
+- fixed bug: luatex 0.76 is not backwards compatible; added version switch 
+- fixed bug: ternary library precision has been improved
+- fixed bug: problem with axis limits very close to 0
+- fixed bug: colormap specification limit case produced out of bounds exception
+
+
+1.8:
+- new feature: tight bounding box even if the axis is no box and bb excludes clip path
+- new feature: mesh/color input=explicit 
+- new feature: shader=interp now has drivers for both dvipdfmx and xetex
+- new feature: support for more color spaces in colormap definitions
+- new feature: shader=interp and device-level gray colorspaces 
+- new feature: 'contour/contour dir=[xyz]' to draw contours in different directions
+- new feature: statistics library with boxplot handler (both boxplot prepared and automatic computation)
+- fixed bug: 3d centered axis lines and label placement (requires compat=1.8 or higher)
+- fixed bug: axis lines and placement of labels, tick scale labels, and reversed axes
+    (requires compat=1.8 or higher)
+- fixed bug: filtering out coords from a mesh plot failed
+- fixed bug: every legend image post was not respected inside of \ref{plotlabel}
+- fixed bug: high-order patches computed the shader=flat mean in a wrong way.
+- fixed bug: remember picture inside of pgfplots axes failed (due to cell picture)
+- fixed bug: now, the tick scale label will be omitted if there are no ticks
+- fixed bug: axis box path was not closed
+- fixed bug: the bounding box was non-empty even if the axis was hidden.
+- fixed bug: auto-alignment of nodes near coords failed for xbar plots
+- fixed bug: providing bar width / bar shift in terms of axis units did
+    not work with [xy]bar and nodes near coords
+- fixed bug: transformation 'data cs=cart' -> polar is more robust now
+- fixed bug: code did not compile against pgf 2.00
+- fixed bug: patch plot lib and shader=interp,patch type=biquadratic
+- fixed bug: context path searching issue (pgfplots.lua)
+- fixed bug: shader=interp and dvips driver 
+- fixed bug: error bars with explicit relative input failed
+
+1.7 
+- added feature: 'bar shift' and 'bar width' can now be expressed in terms of axis units (compat=1.7 or higher)
+- fixed incompatibility regression pgfplots 1.6.1 pgf 2.10: layers
+- fixed incompatibility pgfplots and imakeidx
+- added feature: 'enlargelimits={abs=1cm}', i.e. enlarge by dimension rather than unit
+- patchplots lib: added patch type=bicubic
+- patchplots lib: added support for global paths (fillable)
+- patchplots lib: added patch type sampling feature
+- patchplots lib: improved usability (documentation and improvements)
+- fixed path issues in context: moved lua input file to tex/generic
+- fixed bug: \ref{legendimage} inside of legend text was wrong.
+
+1.6.1:
+- fixed incompatibility lualatex,shader=interp, and german package (introduced in 1.6)
+
+1.6:
+- added support for layered graphics (main use case: multiple axes and layers)
+- added support for second colormap in mesh plots (mesh/interior colormap name)
+- added support for scopes inside of axes
+- contour plots: added ability to provide list of discrete labels (mesh/levels)
+- empty lines are interpreted as interruptions in data plots (was undocumented since 1.4)
+- added more scaling options to 'scale mode=scale uniformly' (affects axis equal in 3d
+  and \addplot3 graphics)
+- fixed wrong implementation of 'axis equal' and 'unit vector ratio' in 3d
+  (backwards compatible for 2d, but not for 3d - the 3d implementation was plain wrong)
+- fixed incompatibility of lualatex and shader=interp
+- fixed bugs/added features around \addplot3 graphics
+- fixed bug: colorbar did not support ymode=log
+- fixed a couple of minor bugs
+- fixed bounding box computation for clip=false,axis lines=none
+
+1.5.1:
+- more operations for FPU library (==, !=,<=,>=,?)
+- fixed bug in usage of decorations in \addplot
+- bugfix for contour prepared format=matlab
+- added 'const plot mark mid' and 'jump mark mid' plot handlers
+- nodes on a plot (\addplot ... node[pos=<fraction>] {};)
+- 'trim axis group left' and 'trim axis group right'
+- bugfixes for polar axes and log+stacked plots
+- added style 'log ticks with fixed point'
+- introduced patched tikz paths to simplify circles and ellipses within an axis
+- patchplots lib: patch type=polygon
+- some more bugfixes
+
+1.5:
+ - Contour plots,
+ - Histograms,
+ - Quiver plots,
+ - patch plots (library)
+      - Triangle Meshes
+      - Bilinear Elements
+      - Quadratic Triangles
+      - Biquadratic Quadrilaterals
+      - Coons Patches
+ - Discrete colorbars,
+ - Table sorting,
+ - Linear regression,
+ - Ternary diagrams,
+      - Tieline Plots
+ - Smith Charts
+ - Polar axes,
+ - Empty lines in input files result in interrupted plots,
+ - PDF user defined coordinate mouse popups
+ - CMYK colormaps and shadings,
+ - new markers and cycle lists
+ - access to axis limits,
+ - \addplot3 graphics: pgfplots draws an appropriate axis for a three-dimensional(!) external png graphics
+ - 3D axes: support to provide explicit unit vectors:
+ 	- explicit unit vectors
+	- explicit unit vectors which are uniformly rescaled to match width/height
+ - 3D axes: improved support for unit vector ratios
+ - improvements of the groupplot styles
+ - preliminary support for (2d) bar plots in 3d axes
+ - new shader 'faceted interp'
+ - table package: 
+ 	- 'every nth row' style
+	- 'comment chars' key to define comment characters in input files
+	- 'skip first n' style
+ - lots of smaller bugfixes (see ChangeLog for details)
+
+
+1.4.1:
+- improved compatibility to gnuplot 4.4
+
+1.4:
+Version 1.4 contains several new features, mostly work on details.
+It fixes many bugs and provides the following improvements:
+- detached legends 
+- detached colorbars
+- ybar (and similar plots) can now be mixed with other plot types 
+  like line plots.
+- improved legend formatting
+- added 'restrict x to domain*' which cups coordinates outside of a specified domain (same for y and z)
+- Added support for linear regression
+- Inline tables,
+- Lots of bug fixes
+
+The next version will make a greater step when it is stable.
+
+
+1.3.1:
+Version 1.3.1 is a bugfix release containing
+- improved parametric plots with gnuplot
+- improved normalsize, small and footnotesize scale styles and added tiny
+- a lot of bugfixes
+
+1.3:
+- improvements for two dimensional visualization, among them
+	- axis equal,
+	- color bars,
+	- nodes near coords,
+	- jumps in plots,
+	- improved description positioning, 
+	- reverseable axis directions,
+	- simpler alignment of adjacent axes,
+	- units and a simplified user interface,
+- new three dimensional line, scatter, mesh and surface plots,
+- a copy of the automatic pdf externalization library, 
+- an improved manual enhanced with a lot of pdf cross references.
+
+1.2.2:
+- fixed a problem with the samples key, 
+- provides some smaller fixes and some manual improvements.
+- added plot graphics.
+
+1.2:
+- completely rewritten math expression parser with extended data range, 
+- colormaps for scatter plots
+- fine tuning for plot parameters.
+- table package has been extended and is now a fully featured table typesetting, computing and postprocessing tool.
+

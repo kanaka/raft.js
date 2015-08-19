@@ -1,0 +1,187 @@
+%--------------------------------------------
+%
+% Package pgfplots
+%
+% Provides a user-friendly interface to create function plots (normal
+% plots, semi-logplots and double-logplots).
+% 
+% It is based on Till Tantau's PGF package.
+%
+% Copyright 2013 by Christian Feuersaenger
+%
+% This program is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, either version 3 of the License, or
+% (at your option) any later version.
+% 
+% This program is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public License
+% along with this program.  If not, see <http://www.gnu.org/licenses/>.
+%
+%--------------------------------------------
+
+
+% This library adds support for high-level instructions for "fill area
+% between two arbitrary plots of functions".
+%
+% It activates the syntax
+%
+% 	\addplot fill between[of=A and B];
+%
+% where A and B are two plots named by 'name path='.
+%
+% In fact, this here is not much more than a low-level invocation of
+% \pgfpathfillbetween
+% and a couple of styles. It could become a TikZ library because it
+% actually works on any two named paths, but it has its restrictions
+% regarding the supported input paths: both need to be plots of
+% functions (non-intersecting, should have at most one function value
+% for each canvas X coord)
+
+\pgfutil@IfUndefined{pgfplotsset}{%
+	\pgferror{Please load pgfplots before pgfplots.fillbetween.}%
+	\endinput
+}{}%
+
+\usetikzlibrary{fillbetween}
+\usepgfplotslibrary{decorations.softclip}
+
+\pgfkeys{
+	/pgfplots/every fill between plot/.style={/pgfplots/area legend,/tikz/fill},
+	/tikz/soft clip assign/domain/.code args={#1:#2}{%
+		\pgfplotsifisvisualizationphase{%
+			\edef\pgfplots@loc@TMPa{%
+				(axis cs:#1,\pgfkeysvalueof{/pgfplots/ymin}) 
+				rectangle (axis cs:#2,\pgfkeysvalueof{/pgfplots/ymax})}%
+			\pgfkeysalso{/tikz/soft clip assign/path/.expand once=\pgfplots@loc@TMPa}%
+		}{}%
+	},%
+	/tikz/soft clip assign/y domain y/.style={/tikz/soft clip assign/domain y={#1}},
+	/tikz/soft clip assign/domain y/.code args={#1:#2}{%
+		\pgfplotsifisvisualizationphase{%
+			\edef\pgfplots@loc@TMPa{%
+				(axis cs:\pgfkeysvalueof{/pgfplots/xmin},#1) 
+				rectangle (axis cs:\pgfkeysvalueof{/pgfplots/xmax},#2)}%
+			\pgfkeysalso{/tikz/soft clip assign/path/.expand once=\pgfplots@loc@TMPa}%
+		}{}%
+	},%
+	%
+	/pgfplots/execute at begin axis@@/.add={}{%
+		\gdef\pgfplotsfillbetween@list@of@layers@with@clippath{}%
+		\gdef\b@pgfplotsfillbetween@list@has@set@layers{0}%
+	},
+}
+
+% #1: the value of /tikz/fill between/on layer
+\def\pgfplotsfillbetween@ensure@clipping@on@layer{%
+	\ifpgfplots@clip
+		\pgfkeysgetvalue{/tikz/fill between/on layer}\pgfplots@loc@TMPa
+		\edef\pgfplots@loc@TMPa{\pgfplots@loc@TMPa}%
+		%
+		% check if 'pre main,' is inside of the already prepared layers:
+		\def\pgfplots@loc@TMPb{\expandafter\pgfutil@in@\expandafter{\pgfplots@loc@TMPa,}}%
+		\expandafter\pgfplots@loc@TMPb\expandafter{\pgfplotsfillbetween@list@of@layers@with@clippath}%
+		%
+		\ifpgfutil@in@
+			% ah - already prepared. Good, nothing left to do.
+		\else
+			\pgfplots@log3{fill between: found 'clip=true'. Preparing pgfplotsextra instruction with clip path for layer '\pgfplots@loc@TMPa'...}%
+			\xdef\pgfplotsfillbetween@list@of@layers@with@clippath{\pgfplots@loc@TMPa,\pgfplotsfillbetween@list@of@layers@with@clippath}%
+			%
+			\edef\pgfplots@loc@TMPb{%
+				\noexpand\pgfplotsextra{%
+					\noexpand\pgfplotsonlayer{\pgfplots@loc@TMPa}%
+					\noexpand\pgfplotspathaxisoutline
+					\noexpand\pgfusepath{clip}%
+					\noexpand\endpgfplotsonlayer
+				}%
+			}%
+			\pgfplots@loc@TMPb
+			%
+		\fi
+	\fi
+}%
+
+% The options are from 
+% \addplot[#1] fill between[#2] #3;
+%
+% This method is invoked from the global \addplot dispatching.
+\def\pgfplotslibraryfillbetween@addplot#1#2#3{%
+	%
+	\pgfplots@start@plot@with@behavioroptions{/pgfplots/every fill between plot,#1}%
+	%
+	\pgfkeysvalueof{/pgfplots/execute at end survey}%
+	\pgfplots@remember@survey@option@list
+	%
+	%
+	\pgfplotslibraryfillbetweenpreparecurrentlayer
+	%
+	\pgfplots@addplot@enqueue@coords{%
+		% precmd
+	}{%
+		% empty - this here is a TikZ instruction, not a "real" \addplot command
+	}{%
+		% the path instruction:
+		\tikzfillbetween[#2]{%
+			/pgfplots/.search also=/tikz,%
+			/pgfplots/.cd,%
+			/tikz/fill between/every last segment/.append style={/tikz/fill between/path after segment={#3}},%
+			#1%
+		}%
+	}{%	
+		% post command.
+	}%
+}
+
+% ONLY TO BE USED AS LATER OPTION!
+\pgfkeysdef{/pgfplots/fill between/@ensure layers}{%
+	\ifpgfplots@layered@graphics
+	\else
+		\pgfplots@log3{fill between: activating layered graphics}%
+		\pgfplotsset{set layers}%
+		\pgfplots@set@options@of@layered@graphics
+	\fi
+}%
+
+% SIDE-EFFECT: modifies \b@pgfplotsfillbetween@list@has@set@layers and
+% \pgfplotsfillbetween@list@of@layers@with@clippath
+\def\pgfplotslibraryfillbetweenpreparecurrentlayer{%
+	\pgfkeysgetvalue{/tikz/fill between/on layer}\pgfplots@loc@TMPa
+	\ifx\pgfplots@loc@TMPa\pgfutil@empty
+	\else
+		\if0\b@pgfplotsfillbetween@list@has@set@layers
+			%
+			\pgfplotssetlateoptions{fill between/@ensure layers}%
+			\gdef\b@pgfplotsfillbetween@list@has@set@layers{1}%
+		\fi
+		\pgfplotsfillbetween@ensure@clipping@on@layer%
+	\fi
+}
+
+\def\pgfplots@tikzfillbetween{\pgfutil@ifnextchar[{\pgfplots@tikzfillbetween@opt}{\pgfplots@tikzfillbetween@opt[]}}
+\def\pgfplots@tikzfillbetween@opt[#1]#2{%
+	\pgfplots@addplot@enqueue@coords{%
+		% precmd
+	}{%
+		% empty - this here is a TikZ instruction, not a "real" \addplot command
+	}{%
+		% the path instruction:
+		\tikzfillbetween[#1]{#2}%
+	}{%	
+		% post command.
+	}%
+}%
+
+\expandafter\def\expandafter\pgfplots@replace@path@commands\expandafter{\pgfplots@replace@path@commands
+	\let\pgfplots@orig@tikzfillbetween=\tikzfillbetween
+	\let\tikzfillbetween=\pgfplots@tikzfillbetween
+}%
+\expandafter\def\expandafter\pgfplots@restore@path@commands\expandafter{\pgfplots@restore@path@commands
+	\let\tikzfillbetween=\pgfplots@orig@tikzfillbetween
+}
+
+\endinput

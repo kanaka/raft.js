@@ -1,0 +1,84 @@
+%--------------------------------------------
+% Package pgfplots
+%
+% Provides a user-friendly interface to create function plots (normal
+% plots, semi-logplots and double-logplots).
+% 
+% It is based on Till Tantau's PGF package.
+%
+% Copyright 2007/2008 by Christian Feuersänger.
+%
+% This program is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, either version 3 of the License, or
+% (at your option) any later version.
+% 
+% This program is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public License
+% along with this program.  If not, see <http://www.gnu.org/licenses/>.
+%
+%--------------------------------------------
+
+% NOTE: tex4ht support is lousy. For example, \tikz \node {$10^{-6}$};
+% will already break -- because SVG does not support the html tag
+% &minus; produced by tex4ht (and TikZ apparently does not know how to
+% escape it somehow).
+\def\pgfplots@sys@beforenode{%
+	\pgfkeysifdefined{/tikz/tex4ht node/escape/.@cmd}{%
+		\ifpgfplots@has@cell@picture
+			\tikzset{tex4ht node/escape=true}%
+			\pgfplots@warning{ATTENTION: you may want to use '\string\pgfplotsset{cell picture=false}' in your preamble. Otherwise, tex4ht will produce TWO SVG files per plot.^^J}%
+		\fi
+	}{}%
+}%
+
+% see compat/show suggested version
+\newif\ifpgfplots@show@suggested@version
+\pgfplots@show@suggested@versiontrue
+
+\def\pgfplots@show@suggested@compat@value{%
+	\ifpgfplots@show@suggested@version
+		\begingroup
+		\pgfkeysgetvalue{/pgfplots/compat/current}\current
+		\pgfkeysgetvalue{/pgfplots/compat/mostrecent}\mostrecent
+		%
+		\def\b@isnewest{0}%
+		\def\b@shouldupgrade{0}%
+		\ifx\current\mostrecent
+			\def\b@isnewest{1}%
+		\else
+			\def\pgfplots@loc@TMPa{newest}%
+			\ifx\current\pgfplots@loc@TMPa
+				\def\b@isnewest{1}%
+			\else
+				\expandafter\pgfplotsutilifstringequal\expandafter{\current}{pre 1.3}{%
+					\def\b@shouldupgrade{1}%
+				}{}%
+				\expandafter\pgfplotsutilifstringequal\expandafter{\current}{default}{%
+					\def\b@shouldupgrade{1}%
+				}{}%
+			\fi
+		\fi
+		\if1\b@isnewest
+			\pgfplots@message{Package pgfplots notification 'compat/show suggested version=true': document has been generated with the most recent feature set (\string\pgfplotsset{compat=\mostrecent}).^^J}%
+		\else
+			\if1\b@shouldupgrade
+				\pgfplots@warning{running in backwards compatibility mode (unsuitable tick labels; missing features). Consider writing \string\pgfplotsset{compat=\mostrecent} into your preamble.^^J}%
+			\else
+				\pgfplots@message{Package pgfplots notification 'compat/show suggested version=true': you might benefit from \string\pgfplotsset{compat=\mostrecent} (current compat level: \current).^^J}%
+			\fi
+		\fi
+		\endgroup
+	\fi
+}
+
+\pgfutil@IfUndefined{AtBeginDocument}{%
+}{%
+	\AtBeginDocument{%
+		\pgfplots@show@suggested@compat@value
+	}%
+}%

@@ -1,0 +1,102 @@
+%--------------------------------------------
+%
+% Package pgfplots, library for image externalization
+%
+% Copyright 2007/2008/2009 by Christian Feuersänger.
+%
+% This program is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, either version 3 of the License, or
+% (at your option) any later version.
+% 
+% This program is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public License
+% along with this program.  If not, see <http://www.gnu.org/licenses/>.
+%
+%--------------------------------------------
+
+% This file is a wrapper which loads the external library.
+%
+% If we have a recent pgf version, use its external lib. If not: load
+% the copy shipped with pgfplots.
+%
+% NOTE:
+%   the external library has been written by Christian Feuersänger as
+%   part of his work on pgfplots -- since it is general purpose, it is
+%   part of tikz. A copy comes with pgfplots.
+%
+%
+
+% \pgfplots@glob@TMPa = 1 iff we can rely on the external lib shipped
+% with tikz:
+\pgfplotsiffileexists{tikzlibraryexternal.code.tex}{%
+	\pgfplots@ifneedspgfcompabitibilitycode@has@pgf@one@zero@zero{%
+		\def\pgfplots@glob@TMPa{0}%
+	}{%
+		\def\pgfplots@glob@TMPa{1}%
+	}%
+}{%
+	\def\pgfplots@glob@TMPa{0}%
+}%
+
+\def\pgfplots@backw@compat@external@load{%
+	\immediate\write16{Package pgfplots external lib: loading complementary code for your PGF version...}
+	% Backwards compatibility:
+	\let\pgfplots@backw@compat@AtBeginDocument=\AtBeginDocument
+	\def\AtBeginDocument##1{}%
+	\input pgfplotsoldpgfsupp_pgfcoreexternal.code.tex
+	\input pgfplotsoldpgfsupp_tikzlibraryexternal.code.tex
+	\let\AtBeginDocument=\pgfplots@backw@compat@AtBeginDocument
+}%
+
+
+\if1\pgfplots@glob@TMPa
+	\usetikzlibrary{external}%
+	\pgfutil@ifundefined{tikzexternal@driver@pgfsys-pdftex.def}{%
+		\pgfplots@backw@compat@external@load
+	}{}%
+\else
+	\pgfplots@backw@compat@external@load
+\fi
+
+% This here is a section for patches.
+%
+% A patch contains software pieces which add individual functionality.
+%
+% The content is copyright Christian Feuersaenger. I added it to both
+% PGF and TikZ such that it can be distributed easily
+\expandafter\ifx\csname pgfsys@prepare@papersize\endcsname\relax
+	\immediate\write16{Package pgfplots external lib: patching system driver code for your PGF version...}
+	% Patch drivers.... this is needed since recent revisions.
+	\def\pgfsys@prepare@papersize#1#2{\pgfsys@papersize{#1}{#2}}
+	\begingroup
+	\expandafter\def\csname pgfplots@backw@ext@pgfsys-dvips.def\endcsname{%
+		\gdef\pgfsys@prepare@papersize##1##2{%
+			\expandafter\gdef\expandafter\pgfsys@atbegindocument\expandafter{\pgfsys@atbegindocument\special{papersize=##1,##2}}%
+		}
+	}%
+	\expandafter\def\csname pgfplots@backw@ext@pgfsys-dvipdfmx.def\endcsname{%
+		\gdef\pgfsys@prepare@papersize##1##2{%
+			\expandafter\gdef\expandafter\pgfsys@atbegindocument%
+				\expandafter{\pgfsys@atbegindocument
+					\special{papersize=##1,##2}%
+				}
+		}
+	}%
+	\expandafter\def\csname pgfplots@backw@ext@pgfsys-dvipdfm.def\endcsname{%
+		\gdef\pgfsys@prepare@papersize##1##2{%
+			\expandafter\gdef\expandafter\pgfsys@atbegindocument%
+				\expandafter{\pgfsys@atbegindocument
+					\special{papersize=##1,##2}%
+				}
+		}
+	}%
+	\csname pgfplots@backw@ext@\pgfsysdriver\endcsname
+	\endgroup
+\fi
+
+\endinput

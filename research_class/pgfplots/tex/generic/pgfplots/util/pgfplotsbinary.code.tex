@@ -1,0 +1,603 @@
+%--------------------------------------------
+% $Header: /cvsroot/pgfplots/pgfplots/generic/pgfplots/util/pgfplotsbinary.code.tex,v 1.13 2009/07/21 18:18:48 ludewich Exp $
+%
+% Package pgfplots
+%
+% Provides a user-friendly interface to create function plots (normal
+% plots, semi-logplots and double-logplots).
+% 
+% It is based on Till Tantau's PGF package.
+%
+% Copyright 2007/2008 by Christian Feuersänger.
+%
+% This program is free software: you can redistribute it and/or modify
+% it under the terms of the GNU General Public License as published by
+% the Free Software Foundation, either version 3 of the License, or
+% (at your option) any later version.
+% 
+% This program is distributed in the hope that it will be useful,
+% but WITHOUT ANY WARRANTY; without even the implied warranty of
+% MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+% GNU General Public License for more details.
+% 
+% You should have received a copy of the GNU General Public License
+% along with this program.  If not, see <http://www.gnu.org/licenses/>.
+%
+%--------------------------------------------
+
+% This file provides a self-contained package which does only need
+% pgfkeys.
+%
+% It provides a method to convert TeX numbers (integers and
+% dimensions) into binary format (macros with catcode 11 or 12).
+%
+
+\edef\pgfplotsbinaryatcode{\the\catcode`\@ }
+\catcode`\@=11
+
+
+% Returns a single character, which has the
+% binary ASCII code '#1', with catcode 11.
+%
+% #1 (expands to) a number between 0 and 255 (inclusive).
+%
+% @see \pgfplotsgetchar Note that \pgfplotsgetchar is more powerful,
+% but can't be used inside of \edef (it is not expandable) whereas
+% \pgfplotscharno is.
+\def\pgfplotscharno#1{\csname pgfp@bin@#1\endcsname}%
+\let\pgfplotscharno@bincatcode=\pgfplotscharno
+
+\def\pgfplotscharno@lualatex#1{#1,}
+
+\input pgfplotsbinary.data.code.tex
+
+% Defines the LUA (!) value pgfplotsretval to be a binary string
+% containing the pgfplots binary value #1.
+%
+% #1 a pgfplots binary value collected with \pgfplotscharno.
+% More precisely, it should be a comma-separated sequence of numbers
+% of the form '0,255,2,128,' (can be terminated by comma). It will be
+% converted to the respective binary numbers 0x0, 0xff, 0x02,..
+% 
+% example:
+%  \pgfplotsbinarytoluabinary{0, 255,2,128}
+%  \directlua{
+%  		pdf.immediateobj{"stream", pgfplotsretval,"/DataWithBinaryStream"}
+%  }
+\def\pgfplotsbinarytoluabinary#1{%
+	% lualatex does not support binary chars as pdftex does - so we have to resort to LUA
+	% methods. The idea is to use
+	% string.char(1,2,3) which results in a binary string with chars 0x01, 0x02, 0x03 etc.
+	% I only need to get the integer numbers. To this end, I patch \pgfplotscharno 
+	% and create the binary string here:
+	\pgfplotsutil@directlua{%
+		pgfplotsretval = pgfplotsGetLuaBinaryStringFromCharIndices({#1});
+	}%
+}%
+
+% Defines \pgfplotsretval to be the ASCII character for #1, with
+% catcode 11.
+%
+% #1: either a number between 0 and 255 (inclusive) or a description
+% of the character.
+%
+% Examples:
+% \pgfplotsgetchar{35}
+% \pgfplotsgetchar{`\#}   % code for '#'
+% \pgfplotsgetchar{`\^^M} % Newline
+% \pgfplotsgetchar{`\^^ff}% 255
+%
+% @see \pgfplotscharno
+\def\pgfplotsgetchar#1{%
+	\begingroup
+	\count0=#1\relax
+	\edef\pgfplotsretval{\pgfplotscharno{\the\count0 }}%
+	\pgfmath@smuggleone\pgfplotsretval
+	\endgroup
+}%
+
+\def\pgfplotsbinary@apphighorderbytes@BIGENDIAN#1{\xdef\pgfplotsbinaryresult{#1\pgfplotsbinaryresult}}%
+\def\pgfplotsbinary@apphighorderbytes@LITTLEENDIAN#1{\xdef\pgfplotsbinaryresult{\pgfplotsbinaryresult#1}}%
+
+\def\pgfplotsbinaryencode@badic@unsigned@PAD@LITTLEENDIAN{%
+	% pad with zeros:
+	\ifcase\c@pgfplotsbin@byteno
+		% ok.
+	\or
+		% one byte missing.
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO@HIGHEST}%
+	\or
+		% two bytes missing.
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO@HIGHEST}%
+	\or
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO@HIGHEST}%
+	\or
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO@HIGHEST}%
+	\or
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO@HIGHEST}%
+	\or
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO@HIGHEST}%
+	\or
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO@HIGHEST}%
+	\or
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO@HIGHEST}%
+	\else
+		\pgfplots@error{Sorry, I can't process byte no \the\c@pgfplotsbin@byteno... you may need to change bytes=\pgfplotsbinary@bytes.}%
+	\fi
+}%
+\def\pgfplotsbinaryencode@badic@unsigned@PAD@BIGENDIAN{%
+	% pad with zeros:
+	\ifcase\c@pgfplotsbin@byteno
+		% ok.
+	\or
+		% one byte missing.
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO@HIGHEST}%
+	\or
+		% two bytes missing.
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO@HIGHEST\pgfplotsbinary@ZERO}%
+	\or
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO@HIGHEST\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO}%
+	\or
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO@HIGHEST\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO}%
+	\or
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO@HIGHEST\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO}%
+	\or
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO@HIGHEST\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO}%
+	\or
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO@HIGHEST\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO}%
+	\or
+		\pgfplotsbinary@apphighorderbytes{\pgfplotsbinary@ZERO@HIGHEST\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO}%
+	\else
+		\pgfplots@error{Sorry, I can't process byte no \the\c@pgfplotsbin@byteno... you may need to change bytes=\pgfplotsbinary@bytes.}%
+	\fi
+}%
+
+\expandafter\def\csname pgfplotsbinarysetbytes@1\endcsname{%
+	\def\pgfplotsbinary@add@signed@largest@absolute{\advance\c@pgfplotsbin@input by 127 }%
+	\def\pgfplotsbinaryencodesignedmaplinearly@prepare{%
+		% warning: \pgfplotsbinary@bytes is NOT necessarily 1 (ASCII
+		% encoding features)
+		\c@pgfplotsbin@byteno=\pgfplotsbinary@bytes\relax
+		\c@pgfplotsbin@basis=\pgfplotsbinary@basis\relax
+		\divide\c@pgfplotsbin@input by16909320 % ~= (2^31-1) /  (2^(8*1-1) -1)
+	}%
+}%
+\expandafter\def\csname pgfplotsbinarysetbytes@2\endcsname{%
+	\def\pgfplotsbinary@add@signed@largest@absolute{\advance\c@pgfplotsbin@input by 32767 }%
+	\def\pgfplotsbinaryencodesignedmaplinearly@prepare{%
+		\c@pgfplotsbin@byteno=\pgfplotsbinary@bytes\relax
+		\c@pgfplotsbin@basis=\pgfplotsbinary@basis\relax
+		\divide\c@pgfplotsbin@input by65538 % ~= (2^31-1) /  (2^(8*2-1) -1)
+	}%
+}%
+\expandafter\def\csname pgfplotsbinarysetbytes@3\endcsname{%
+	\def\pgfplotsbinary@add@signed@largest@absolute{\advance\c@pgfplotsbin@input by 8388607 }%
+	\def\pgfplotsbinaryencodesignedmaplinearly@prepare{%
+		\c@pgfplotsbin@byteno=\pgfplotsbinary@bytes\relax
+		\c@pgfplotsbin@basis=\pgfplotsbinary@basis\relax
+		\divide\c@pgfplotsbin@input by256 % ~= (2^31-1) /  (2^(8*3-1) -1)
+	}%
+}%
+\expandafter\def\csname pgfplotsbinarysetbytes@4\endcsname{%
+	\def\pgfplotsbinary@add@signed@largest@absolute{%
+		\advance\c@pgfplotsbin@input by 2147483647 % this is the *absolute* largest int that TeX can handle.
+	}%
+	\def\pgfplotsbinaryencodesignedmaplinearly@prepare{%
+		\c@pgfplotsbin@byteno=\pgfplotsbinary@bytes\relax
+		\c@pgfplotsbin@basis=\pgfplotsbinary@basis\relax
+	}%
+}%
+\def\pgfplotsbinarysetbytes@@{%
+	\def\pgfplotsbinaryencodesignedmaplinearly@prepare{%
+		\c@pgfplotsbin@byteno=\pgfplotsbinary@bytes\relax
+		\c@pgfplotsbin@basis=\pgfplotsbinary@basis\relax
+		\pgfplots@error{Sorry, but I can't perform \string\pgfplotsbinaryencodesignedmaplinearly\space for bytes=\pgfplotsbinary@bytes\space yet... bytes=4 is the maximum.}%
+	}%
+	\def\pgfplotsbinary@add@signed@largest@absolute{
+		\advance\c@pgfplotsbin@input by 2147483647 
+	}%
+}%
+\expandafter\let\csname pgfplotsbinary@bytes@5\endcsname=\pgfplotsbinarysetbytes@@
+\expandafter\let\csname pgfplotsbinary@bytes@6\endcsname=\pgfplotsbinarysetbytes@@
+\expandafter\let\csname pgfplotsbinary@bytes@7\endcsname=\pgfplotsbinarysetbytes@@
+\expandafter\let\csname pgfplotsbinary@bytes@8\endcsname=\pgfplotsbinarysetbytes@@
+
+\pgfqkeys{/pgfplots/bin}{%
+	% ordering not yet implemented; uses always BIG ENDIAN.
+	ordering/.is choice,%
+	ordering/big endian/.code={%
+		\def\pgfplotsbinary@byteorder{0}%
+		\let\pgfplotsbinary@apphighorderbytes=\pgfplotsbinary@apphighorderbytes@BIGENDIAN
+		\let\pgfplotsbinaryencode@badic@unsigned@PAD=\pgfplotsbinaryencode@badic@unsigned@PAD@BIGENDIAN
+	},%
+	ordering/net/.style={/pgfplots/bin/ordering/big endian},%
+	ordering/little endian/.code={%
+		\def\pgfplotsbinary@byteorder{1}%
+		\let\pgfplotsbinary@apphighorderbytes=\pgfplotsbinary@apphighorderbytes@LITTLEENDIAN
+		\let\pgfplotsbinaryencode@badic@unsigned@PAD=\pgfplotsbinaryencode@badic@unsigned@PAD@LITTLEENDIAN
+	},
+	ordering/big endian,%
+	%
+	% The standard method - it results in binary encoded numbers.
+	binary encoding/.code={%
+		\pgfutil@IfUndefined{directlua}{%
+			\let\pgfplotscharno=\pgfplotscharno@bincatcode
+		}{%
+			% Ah - we use LuaTeX!
+			% At the time of this writing, LUA does not allow binary output which has been
+			% created by means of catcode modifications & TeX string concatenation.
+			% binary output in LUA needs to be (re)implemented in LUA (see inline code 
+			% comments below).
+			%
+			% There are two possible work-arounds: 
+			% (a) Base64 encoding
+			% (b) binary encoding using special LUA handling. 
+			% This is what I do. Set the 'encode filter' such that it reinitializes the encoder:
+			% we patch \pgfplotscharno with a special routine which collects
+			% only the integer indices:
+			\let\pgfplotscharno=\pgfplotscharno@lualatex
+			% later, the user has to convert this list into a binary lua
+			% string before he can use it. See \pgfplotsbinarytoluabinary
+		}%
+		\edef\pgfplotsbinary@ZERO{\pgfplotscharno0}%
+		\edef\pgfplotsbinary@ZERO@LINEARMAP{\pgfplotscharno{128}}%
+		\let\pgfplotsbinary@ZERO@HIGHEST=\pgfplotsbinary@ZERO
+		\def\pgfplotsbinary@basis{256}%
+		\let\pgfplotsbinary@hook=\relax
+		\def\pgfplotsbinary@hook@signed@linearmap{%
+			\ifnum\c@pgfplotsbin@byteno=0
+				\advance\c@pgfplotsbin@input by128
+				\ifnum\c@pgfplotsbin@input>255
+					\pgfplotsbinary@hook@signed@linearmap@error
+				\fi
+			\fi
+		}%
+		\def\pgfplotsbinarysetbytes##1{%
+			\pgfutil@ifundefined{pgfplotsbinarysetbytes@##1}{%
+				\pgfplots@error{Sorry, I can't write binary output with '##1' bytes yet...}%
+			}{%
+				\edef\pgfplotsbinary@bytes{##1}%
+				\csname pgfplotsbinarysetbytes@##1\endcsname
+			}%
+		}%
+	},%
+	%
+	% This applies 'binary encoding' and encodes the resulting bytes
+	% in Hex. It corresponds to the ASCIIHexEncode in postscript or
+	% pdf.
+	% Please note that 'bytes' sets the number of binary bytes - the
+	% actual encoding length is exactly twice as large.
+	ASCIIHexEncode/.code={%
+		\let\pgfplotscharno=\pgfplotscharno@bincatcode
+		\edef\pgfplotsbinary@ZERO{\pgfplotscharno{48}}%
+		\edef\pgfplotsbinary@ZERO@LINEARMAP{\pgfplotscharno{56}}%
+		\let\pgfplotsbinary@ZERO@HIGHEST=\pgfplotsbinary@ZERO
+		\pgfkeysalso{/pgfplots/bin/ordering/big endian}%
+		\def\pgfplotsbinary@basis{16}%
+		\def\pgfplotsbinary@hook@hex{%
+			\ifnum\c@pgfplotsbin@input<10
+				\advance\c@pgfplotsbin@input by48
+			\else
+				\advance\c@pgfplotsbin@input by55
+			\fi
+		}%
+		\let\pgfplotsbinary@hook=\pgfplotsbinary@hook@hex
+		\def\pgfplotsbinary@hook@signed@linearmap{%
+			\ifnum\c@pgfplotsbin@byteno=0
+				\advance\c@pgfplotsbin@input by8
+				\ifnum\c@pgfplotsbin@input>16
+					\pgfplotsbinary@hook@signed@linearmap@error
+				\fi
+			\fi
+			\pgfplotsbinary@hook@hex
+		}%
+		\def\pgfplotsbinarysetbytes##1{%
+			\pgfutil@ifundefined{pgfplotsbinarysetbytes@##1}{%
+				\pgfplots@error{Sorry, I can't write binary output with '##1' bytes yet...}%
+			}{%
+				\csname pgfplotsbinarysetbytes@##1\endcsname
+				\begingroup
+					\count0=##1\relax
+					\multiply\count0 by2
+					\xdef\pgfplotsbinary@glob@TMP{\the\count0 }%
+				\endgroup
+				\let\pgfplotsbinary@bytes=\pgfplotsbinary@glob@TMP
+			}%
+		}%
+	},%
+	%
+	% 
+	% This applies 'binary encoding' and encodes the resulting bytes
+	% using a base 85 encoding. It corresponds to the ASCII85Encode in postscript or
+	% pdf.
+	% Handle this method with care - it works just for ONE number, not for a stream of
+	% numbers as in pdf. Therefore, it might not be useful at all.
+	% Please note that 'bytes' will be ignored; ASCII85Encode assumes
+	% 4 binary bytes and uses 5 bytes to encode them.
+	%
+	% @ATTENTION bytes is ALWAYS 4, regardless of the setting of
+	% 'bytes'!
+	ASCII85Encode/.code={%
+		\let\pgfplotscharno=\pgfplotscharno@bincatcode
+		\edef\pgfplotsbinary@ZERO{\pgfplotscharno{33}}%
+		\edef\pgfplotsbinary@ZERO@LINEARMAP{\pgfplotscharno{42}}%
+		\let\pgfplotsbinary@ZERO@HIGHEST=\pgfplotsbinary@ZERO
+		\pgfkeysalso{/pgfplots/bin/ordering/big endian}%
+		\edef\pgfplotsbinary@ASCII@specialzero{\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO\pgfplotsbinary@ZERO}%
+		\expandafter\def\expandafter\pgfplotsbinaryencode@badic@unsigned@PAD\expandafter{%
+			\pgfplotsbinaryencode@badic@unsigned@PAD
+			\ifx\pgfplotsbinaryresult\pgfplotsbinary@ASCII@specialzero
+				% PDF standard: 0 is encoded as 'z':
+				\gdef\pgfplotsbinaryresult{z}%
+			\fi
+		}%
+		\def\pgfplotsbinary@basis{85}%
+		\def\pgfplotsbinary@hook{%
+			\advance\c@pgfplotsbin@input by33
+		}%
+		\def\pgfplotsbinary@hook@signed@linearmap{%
+			\advance\c@pgfplotsbin@input by33
+			\ifnum\c@pgfplotsbin@byteno=0
+				\advance\c@pgfplotsbin@input by42
+				\ifnum\c@pgfplotsbin@input>85
+					\pgfplotsbinary@hook@signed@linearmap@error
+				\fi
+			\fi
+		}%
+		% I know, that does only work efficiently if bytes=4 for every
+		% encoded number.
+		\def\pgfplotsbinarysetbytes##1{%
+			\def\pgfplotsbinary@bytes{5}%
+			\csname pgfplotsbinarysetbytes@4\endcsname
+		}%
+		\pgfplotsbinarysetbytes4%
+	},%
+	binary encoding,%
+	%
+	bytes/.code={\pgfplotsbinarysetbytes{#1}},%
+	bytes=4,
+	%
+	% Irreversibly change to VERBATIM output for debugging:
+	debug mode/.code={%
+		\let\pgfplotsbinary@apphighorderbytes@ORIG=\pgfplotsbinary@apphighorderbytes
+		\def\pgfplotsbinary@ZERO{[Pad-0]}%
+		\let\pgfplotsbinary@ZERO@HIGHEST=\pgfplotsbinary@ZERO
+		\def\pgfplotsbinary@ZERO@LINEARMAP{[Pad-128]}%
+		\def\pgfplotsbinary@apphighorderbytes##1{%
+			\pgfutil@ifnextchar\pgfplotscharno{%
+				\pgfplotsbinary@apphighorderbytes@DEBUG@csname
+			}{%
+				\pgfplotsbinary@apphighorderbytes@DEBUG@normal
+			}%
+			##1\relax
+		}%
+	},%
+	% Write pdf objects in binary form. This does only work with
+	% pdftex, and its output is only useful in conjunction with
+	% \pdfcompresslevel=0
+	% and a text editor.
+	% Usage:
+	% \pgfkeys{/pgfplots/bin/debug to pdf={\pgfplotsbinaryencodeunsigned}{1,2,3,...,16}}
+	%
+	% works only with pdftex
+	debug to pdf/.code 2 args={%
+		\foreach \num in {#2} {%
+			#1{\num}%
+			\immediate \pdfobj stream attr {
+				/Decimal \num\space
+				/Routine (\string#1)
+			} {%
+				\pgfplotsbinaryresult
+			}%
+		}%
+	},%
+}
+
+
+\def\pgfplotsbinary@hook@signed@linearmap@error{%
+	\pgfplots@error{Sorry, there are not enough bytes to store the current number. I tried to write \the\c@pgfplotsbin@input...}%
+}%
+
+\def\pgfplotsbinary@apphighorderbytes@DEBUG@csname\pgfplotscharno#1\relax{%
+	\pgfplotsbinary@apphighorderbytes@ORIG{[#1]}%
+}%
+\def\pgfplotsbinary@apphighorderbytes@DEBUG@normal#1\relax{%
+	\pgfplotsbinary@apphighorderbytes@ORIG{#1}%
+}%
+
+%\pgfkeys{/pgfplots/bin/debug mode}
+
+
+\countdef\c@pgfplotsbin@input=0
+\countdef\c@pgfplotsbin@tmpa=1
+\countdef\c@pgfplotsbin@tmpb=2
+\countdef\c@pgfplotsbin@byteno=3
+\countdef\c@pgfplotsbin@basis=4
+\def\pgfplotsbinaryempty{}
+
+%--------------------------------------------------
+% input:    unsigned int x, b, n;
+% output:   unsigned int y[n];
+% for (i=0; i<n; i++) y[i] = 0;
+% i=0;
+% while (x > 0)
+% { y[i] = x % b; /* entspricht x mod b   */
+%  x = x / b;    /* ganzzahlige Division */
+%  i++;
+%  }
+%-------------------------------------------------- 
+% with x = #1
+% b = basis
+% will store stuff into \pgfplotsbinaryresult in binary format
+%
+% PRECONDITION:
+% - \pgfplotsbinaryresult= empty!
+% - \c@pgfplotsbin@byteno=\pgfplotsbinary@bytes
+\def\pgfplotsbinaryencode@badic@unsigned@{%
+	\ifnum\c@pgfplotsbin@input>0
+		\c@pgfplotsbin@tmpa=\c@pgfplotsbin@input
+		\divide\c@pgfplotsbin@tmpa by\c@pgfplotsbin@basis\relax
+		\c@pgfplotsbin@tmpb=\c@pgfplotsbin@tmpa\relax
+		\multiply\c@pgfplotsbin@tmpa by\c@pgfplotsbin@basis\relax
+		\advance\c@pgfplotsbin@input by -\c@pgfplotsbin@tmpa\relax
+		\advance\c@pgfplotsbin@byteno by-1
+		\pgfplotsbinary@hook% hooks for modifications.
+		\pgfplotsbinary@apphighorderbytes{\pgfplotscharno{\the\c@pgfplotsbin@input}}%
+		\c@pgfplotsbin@input=\c@pgfplotsbin@tmpb
+%\message{RESULT SO FAR byte no \the\c@pgfplotsbin@byteno: \pgfplotsbinaryresult}%
+		\expandafter\pgfplotsbinaryencode@badic@unsigned@
+	\else
+		\pgfplotsbinaryencode@badic@unsigned@PAD
+%\message{RESULT SO FAR byte no \the\c@pgfplotsbin@byteno: \pgfplotsbinaryresult}%
+	\fi
+}%
+
+
+% Defines \pgfplotsbinaryresult to be the binary representation of an
+% unsigned integer.
+%
+% The representation will use unsigned dual number representation.
+%
+% The assignment to \pgfplotsbinaryresult will be globally.
+% #1: an unsigned integer. It won't be transformed in any way, so make
+% sure it fits into the configured number of bytes. It is an error if
+% the number is too large or too small. Please note that only unsigned
+% numbers are supported with this method.
+%
+% FIXME : fix  > 2^30
+\def\pgfplotsbinaryencodeunsigned#1{%
+	\begingroup
+	\global\let\pgfplotsbinaryresult=\pgfplotsbinaryempty
+	\c@pgfplotsbin@input=#1 %
+	\c@pgfplotsbin@byteno=\pgfplotsbinary@bytes\relax
+	\c@pgfplotsbin@basis=\pgfplotsbinary@basis\relax
+	\pgfplotsbinaryencode@badic@unsigned@%
+	\endgroup
+}%
+
+% An implementation for signed integers which maps the signed integer linearly into 
+% the unsigned data range before it proceeds.
+%
+% The idea is thus, to first introduce a linear mapping
+%
+% phi : [- smallest_possible, +largest_possible ] -> [0, 256^bytes-1 ]
+%
+% A signed integer in TeX is in [ - (2^31-1), 2^31-1 ].
+% Thus, we should map
+%
+% phi : [  -(2^31-1), 2^31-1 ] -> [ 0, 2^32-1 ].
+%
+% A simpler case is to employ the symmetry in TeX's registers and
+% leave one out, i.e. to map to 2^32-2:
+%
+% phi : [  -(2^31-1), 2^31-1 ] -> [ 0, 2^32-2 ].
+%
+% Then,
+%
+% phi(x) = ( x + 2^31 -1 ) / (2^31-1 + 2^31-1) * (2^32-2) = x+ 2^31-1.
+%
+% The same map phi(x) = x + 2^31 -1 with target space  [0, 2^32-1 ]
+% could be realized with the input space [- (2^31-1), 2^31 ].
+%
+% I am using this encoding procedure, phi(x) = x + 2^31 -1.
+%
+% As a consequence, the binary pattern FF FF FF FF does never occur as
+% result of the mapping.
+%
+% To invert the mapping (i.e. to decode the result), set up the unique
+% linear map
+%
+% psi : [ 0, 2^32-1 ] -> [ -(2^31-1), 2^31 ].
+%
+% Then, psi( phi(x) ) = x and the decoding procedure is correct.
+%
+% This doesn't need TeX register arithmetics on the whole range.
+%
+% REMARK: the whole operation does also work if bytes<4 (i.e. we have
+% less than 32 bits in the target range). In this case, the mapping is
+% phi : [  -(2^31-1), 2^31-1 ] -> [ 0, 2^{8*bytes}-1 ]
+% and a further, *lossy* quantization still will be applied. The
+% quantization step is an integer division performed in signed number
+% arithmetics (i.e. it is symmetric around 0). 
+\def\pgfplotsbinaryencodesignedmaplinearly#1{%
+	\begingroup
+	\global\let\pgfplotsbinaryresult=\pgfplotsbinaryempty
+	\c@pgfplotsbin@input=#1\relax%
+	\pgfplotsbinaryencodesignedmaplinearly@prepare
+	\ifnum\c@pgfplotsbin@input<0 %
+		% compute + 2^31 - 1
+		\pgfplotsbinary@add@signed@largest@absolute
+	\else
+		% change zero padding such that positive numbers
+		% get the EFFECT of + 2^31.
+		\let\pgfplotsbinary@ZERO@HIGHEST=\pgfplotsbinary@ZERO@LINEARMAP
+		\let\pgfplotsbinary@hook=\pgfplotsbinary@hook@signed@linearmap
+		% and compute the -1 explicitly here:
+		\advance\c@pgfplotsbin@input by-1 %
+	\fi
+	\pgfplotsbinaryencode@badic@unsigned@%
+	\endgroup
+}%
+
+% Encodes a dimen (like 1pt or \dimen0) in binary form.
+%
+% The encoding works by mapping #1 linearly into the allowed integer
+% range using a quantization technique to respect the (possibly)
+% restricted number of bytes.
+%
+% The implementation is fast and uses only integer arithmetics.
+% It relies on \pgfplotsbinaryencodesignedmaplinearly and a scale.
+%
+% So, what we do is to setup a linear map into binary range with k
+% bytes. The range of a TeX dimen is precisely (in units of pt)
+%  [ -(2^30-1) / 2^16, (2^30 -1) / 2^16 ] = [-16383.99998, 16383.99998]
+%
+% Thus, for an input dimen x, we set up the mapping
+% 	phi(x) = 2^16 * x * 2
+% which maps 
+%  phi: [ -(2^30-1) / 2^16, (2^30-1) / 2^16 ] -> [-(2^31 -2), 2^31-2].
+%
+% I simply use the \pgfplotsbinaryencodesignedmaplinearly to process
+% this further. To simplify the computation, I simply compute
+%   phi_signed( phi(x) ), 
+% where phi_signed denotes an application of
+% \pgfplotsbinaryencodesignedmaplinearly:
+%   phi_signed( y ) = y +2^31 -1,
+%   phi_signed( phi(x) ) = 2^16 * 2 * x + 2^31 - 1.
+% This is NOT a linear map to [0,2^32-1] as promised. 
+% But, we can setup an inverse transformation PHI (which is linear) anyway
+% such that
+%   PHI( phi_signed(phi(x)) ) = x
+% and that's all I want. Do do that, we use the unique linear decoder map 
+%   PHI : [ 0,2^32-1 ] -> [ -16383.999992, 16384 ].
+%
+% This is not exacty the input range of before, but using it results
+% in a proper decoder. The difference is due to the non-unique zero
+% representation in TeX's arithmetics.
+% 
+%
+% REMARK: the whole operation does also work if bytes<4 (i.e. we have
+% less than 32 bits in the target range). In this case, a further
+% *lossy* quantization step is applied in phi_signed. The inverse
+% transformations are the same, however. See
+% \pgfplotsbinaryencodesignedmaplinearly for details about the
+% quantization step (or try it out).
+%
+	%
+	%% DEBUG NOTE: This mapping appears to work correctly according to
+	%% my tests.
+	%% For bc -l test codes: 
+	%% ibase=16; 
+	%% -4000 +  809658FA. / (2^20) * 8000
+\def\pgfplotsbinaryencodedimenmaplinearly#1{%
+	\begingroup
+	\dimen0=#1\relax
+	\c@pgfplotsbin@input=\dimen0
+	\multiply\c@pgfplotsbin@input by2
+%\message{LOWLEVEL ENCODING '\the\c@pgfplotsbin@input' with linear map}%
+	\pgfplotsbinaryencodesignedmaplinearly\c@pgfplotsbin@input
+	\endgroup
+}%
+
+\catcode`\@=\pgfplotsbinaryatcode
+\endinput
