@@ -91,7 +91,19 @@
 
 
 \begin{abstract}
-TODO: write an abstract.
+We describe the creation of a browser-based distributed peer-to-peer
+chat application using WebRTC, PeerJS and Raft.js. WebRTC is
+a protocol that modern browsers have begun to integrate which enables
+browser-to-browser communication. PeerJS is a WebRTC client library
+and extensible signalling server. Raft.js is an implementation in
+JavaScript of the Raft distributed consensus protocol. These
+technologies are combined to create a chat application that guarantees
+a shared, consistent and linearized view of the chat history without
+relying on a single centralized server. We also create a series of
+automated tests using the SlimerJS browser automation tool and use
+them to show the correctness of the chat application and also to
+measure the performance and scalability of the application over
+various cluster sizes.
 \end{abstract}
 
 \section{Introduction}
@@ -553,8 +565,7 @@ server described above.
 
 \subsection{Incremental Steps}
 
-During the planning phase, the project was broken down into six
-incremental steps:
+During the planning phase, the project was broken down into ten incremental steps:
 
 \begin{enumerate}
 \item Simple WebRTC messaging: implement a small JavaScript application that uses the PeerJS client library and an unmodified PeerJS signaling server. Demonstrate communication over WebRTC DataChannel using two browser instances (or browser tabs).
@@ -567,10 +578,18 @@ incremental steps:
 
 \item Visual representation: display Raft node state and RPC statistics in addition to the internal Raft log messages.
 
+\item Sessionless/Datagram RPC messages: extend Raft RPC requests and response messages so that RPC responses have enough context to be handled separately from RPC requests. Specifically this enables Raft to support a datagram (sessionless) network transport.
+
+\item Atomic state machine operations: implement a state machine update operation that succeeds against the specified key only if no other operation has been applied to a key since the last time the client read from that key.
+
+\item Automatic client request forwarding: extend the client request RPC to also be sessionless/datagram based. Implement a asynchronous JavaScript function that determines which node is the leader and forwards client request RPCs to the leader. This function must also correlate responses to the client request and invoke the callback for the original request.
+
+\item Chat application: add the ability to send a message to the chat log using the client request forwarding functionality with an atomic state machine operation. Show the current chat history based on the chat entries in the state machine.
+
 \item Server as Raft.js peer (aspirational): enable server nodes (Raft.js running on Node.js) to fully participate as Raft cluster nodes.
 \end{enumerate}
 
-Steps 1-5 were successfully implemented for this paper. Step 6 was an
+Steps 1-9 were successfully implemented for this paper. Step 10 was an
 aspirational goal because this functionality is not yet supported in
 PeerJS although it is being tracked by issue report:
 https://github.com/peers/peerjs/issues/103
@@ -811,26 +830,30 @@ timeout values may be a fruitful area of further study.
 
 \subsubsection{Setup}
 
-TBD: Setup for the automated tests.
-
-Description of SlimerJS
-
-Creation of SlimerJS test scripts using JavaScript.
+TODO: Setup for the automated tests. Description of SlimerJS. Creation of SlimerJS test scripts using JavaScript.
 
 \subsubsection{Outcome}
 
-TBD: Outcome of the automated tests.
+TODO: Outcome of the automated tests.
+
+The following figure shows the amount of time that the cluster takes to
+elect a leader and then reconfigure the cluster to the the final size
+(adding one node a time).
 
 \begin{tikzpicture}
     \begin{axis}[
             title=Initial Cluster Activation,
             xlabel={Nodes},
-            ylabel={Time (ms)},
+            ylabel={Time (seconds)},
             grid=major,
         ]
         \addplot table {data/data_cluster_up.dat};
     \end{axis}
 \end{tikzpicture}
+
+The following figure shows the amount of time that a stable cluster takes to
+propagate, commit and apply a single state machine change to the state
+machines on every cluster node.
 
 \begin{tikzpicture}
     \begin{axis}[
@@ -839,15 +862,21 @@ TBD: Outcome of the automated tests.
             ylabel={Time (ms)},
             grid=major,
         ]
-        \addplot table {data/data_cluster_up.dat};
+        \addplot table {data/data_propagate.dat};
     \end{axis}
 \end{tikzpicture}
+
+The following figure shows the amount of time that it takes for
+a stable cluster to recover (elect a new leader and remove the failed
+servers from the cluster) when one or more nodes fails. The first line
+shows the recovery time when just the leader fails. The second line
+show the recovery time when one less than half of the nodes fail.
 
 \begin{tikzpicture}
     \begin{axis}[
             title=Node Failure Recovery,
             xlabel={Nodes},
-            ylabel={Time (ms)},
+            ylabel={Time (seconds)},
             grid=major,
             legend entries={$Leader Down$,$Half Cluster Down$},
         ]

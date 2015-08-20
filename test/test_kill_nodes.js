@@ -12,16 +12,14 @@ var common = require('common'),
     channel = Math.round(Math.random()*1000000),
     base_address = system.args[1],
     server_count = (system.args.length >= 3) ? parseInt(system.args[2]) : 3,
+    kill_count = (system.args.length >= 4) ? parseInt(system.args[3]) : parseInt((server_count-1)/2, 10),
     up_timeout = (10 + (server_count*server_count)/4)*1000;
     pred_timeout = (1 + (server_count*server_count)/6)*1000;
 
 var pages = [];
 
-// Kill just less than half (including the leader)
-var kill_count = parseInt((server_count-1)/2, 10);
-
-if (kill_count < 1) {
-    console.log("Must start with at least 3 nodes");
+if (kill_count > parseInt((server_count-1)/2, 10)) {
+    console.log('Kill count must be less than half of server count');
     phantom.exit(2);
 }
 
