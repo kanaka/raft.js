@@ -25,7 +25,7 @@
 
 \author{Joel D. Martin}
 \author{David Levine}
-\affil{University of Texas at Arglington}
+\affil{University of Texas at Arlington}
 
 \begin{document}
 
@@ -38,7 +38,7 @@
 We describe the creation of a browser-based distributed peer-to-peer
 application using WebRTC, PeerJS and Raft.js. WebRTC is a protocol that modern
 browsers have begun to integrate which enables browser-to-browser
-communication. PeerJS is a WebRTC client library and extensible signalling
+communication. PeerJS is a WebRTC client library and extensible signaling
 server. Raft.js is an implementation in JavaScript of the Raft distributed
 consensus protocol. These technologies are combined to create a chat
 application that guarantees a shared, consistent and linearized view of the
@@ -120,7 +120,7 @@ understandable and practical without sacrificing safety and
 correctness.
 
 The Raft algorithm breaks the problem of consensus into three core
-subproblems: leader election, log replication, and safety. A full Raft
+sub-problems: leader election, log replication, and safety. A full Raft
 solution must also address: cluster membership changes, log
 compaction, and client interaction. The Raft algorithm implemented and
 discussed in this paper is based on "Consensus: Bridging Theory and
@@ -309,7 +309,7 @@ correctness and does not significantly impact short-running test
 configurations. Full client linearizability is important feature for
 simplifying certain types of distributed applications, however the
 implementation requires some significant additions to the Raft
-implemenation (e.g. assigning client IDs and sequence IDs and tracking
+implementation (e.g. assigning client IDs and sequence IDs and tracking
 timed-out clients). For the chat application, simply adding one atomic
 check-and-set state machine command is sufficient to achieve
 a linearized chat history. This does impose a slight additional cost
@@ -545,7 +545,7 @@ During the planning phase, the project was broken down into ten incremental step
 
 \item Update Raft.js protocol: update the Raft.js implementation to match the latest description of the Raft protocol (as described in "Consensus", Ongaro dissertation). This includes the implementation of the simplified membership change algorithm (sequential changes) and the separation of the log commit and state machine apply concepts. Additionally, the new Raft.js implementation always starts a new Raft cluster as a cluster with a single node and additional nodes are dynamically added to the cluster (as suggested in section 4.4 of the paper).
 
-\item Dynamic Raft.js over WebRTC: enhance the signaling server with support for multiple sessions/channels to enable separate Raft clusters with the same signalling server. Start each cluster with a single node and automatically add and remove Raft nodes as they come and go.
+\item Dynamic Raft.js over WebRTC: enhance the signaling server with support for multiple sessions/channels to enable separate Raft clusters with the same signaling server. Start each cluster with a single node and automatically add and remove Raft nodes as they come and go.
 
 \item Visual representation: display Raft node state and RPC statistics in addition to the internal Raft log messages.
 
@@ -656,7 +656,7 @@ statistics are shown in the application:
 
 \subsubsection{Client Request Redirect Implementation}
 
-In the Raft over WebRTC implemenation each local browser is a client
+In the Raft over WebRTC implementation each local browser is a client
 of the Raft cluster. However in Raft, the leader node is the only node
 that adds entries to the log so clients on follower nodes must have
 a way to communicate with the leader. This is implemented as pair of
@@ -966,7 +966,7 @@ again. The tests scripts files are:
         \emph{test/test\_up.js} but once the cluster is up, the test
         connects to one of the non-leader nodes and and sends a chat
         text line. The test then waits for the chat message to
-        propogate to every other node's state machine. The test
+        propagate to every other node's state machine. The test
         reports both the number of milliseconds for the cluster to
         come up and for the messages to propagate to every node.
 \end{enumerate}
@@ -981,7 +981,7 @@ The tests were all run on a system with the following configuration:
     \item \emph{Docker image}:
     \begin{enumerate}
         \item \emph{OS}: Ubuntu 12.04.5 LTS
-        \item \emph{SlimerJS}: vesion 0.9.6
+        \item \emph{SlimerJS}: version 0.9.6
         \item \emph{XULRunner}: 38.0.5
     \end{enumerate}
 \end{enumerate}
@@ -1397,7 +1397,7 @@ Here are some interesting areas for further exploration:
 \end{enumerate}
 
 
-\section*{Acknowledgements}
+\section*{Acknowledgments}
 I would like to thank my academic supervisor, David Levine, for his
 excellent input and oversight of this project. I would also like to
 thank Diego Ongaro for his amazing work on the Raft protocol and paper
