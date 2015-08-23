@@ -10,17 +10,22 @@
 \usepackage{caption}
 \usepackage{subcaption}
 
+\usepackage{authblk}
+
+\usepackage{microtype}
+
 \usepackage{graphicx}
 \DeclareGraphicsExtensions{.png,.jpg,.pdf,.eps}
 
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.5}
 
-\title{Raft Distributed Consensus Algorithm over WebRTC (Web Real-Time Communication)} % title
 
-\author{Joel D. Martin and David Levine
-\thanks{University of Texas at Arglington}
-}
+\title{Raft Distributed Consensus Algorithm over WebRTC (Web Real-Time Communication)}
+
+\author{Joel D. Martin}
+\author{David Levine}
+\affil{University of Texas at Arglington}
 
 \begin{document}
 
@@ -31,18 +36,16 @@
 
 \begin{abstract}
 We describe the creation of a browser-based distributed peer-to-peer
-chat application using WebRTC, PeerJS and Raft.js. WebRTC is
-a protocol that modern browsers have begun to integrate which enables
-browser-to-browser communication. PeerJS is a WebRTC client library
-and extensible signalling server. Raft.js is an implementation in
-JavaScript of the Raft distributed consensus protocol. These
-technologies are combined to create a chat application that guarantees
-a shared, consistent and linearized view of the chat history without
-relying on a single centralized server. We also create a series of
-automated tests using the SlimerJS browser automation tool and use
-them to show the correctness of the chat application and also to
-measure the performance and scalability of the application over
-various cluster sizes.
+application using WebRTC, PeerJS and Raft.js. WebRTC is a protocol that modern
+browsers have begun to integrate which enables browser-to-browser
+communication. PeerJS is a WebRTC client library and extensible signalling
+server. Raft.js is an implementation in JavaScript of the Raft distributed
+consensus protocol. These technologies are combined to create a chat
+application that guarantees a shared, consistent and linearized view of the
+chat history without relying on a single centralized server. We also create a
+series of automated tests using the SlimerJS browser automation tool and use
+them to show the correctness of the chat application and also to measure the
+performance and scalability of the application over various cluster sizes.
 \end{abstract}
 
 \section{Introduction}
@@ -508,10 +511,13 @@ a PeerJS compatible signaling server, however an application developer
 can also run their own PeerJS signaling service using the PeerServer
 server described above.
 
+
+\section {Design and Implementation}
+
 \end{multicols}
 
 \begin{figure*}[h]
-\centerline{\includegraphics[width=0.8\textwidth]{raft_rtc_architecture}}
+\centerline{\includegraphics[width=0.8\textwidth]{imgs/raft_rtc_architecture}}
 \caption{Raft over RTC Architecture}
   \label{fig:raft_rtc_architecture}
 \end{figure*}
@@ -520,15 +526,12 @@ server described above.
 %\end{multicols}
 
 \begin{figure*}[h]
-\centerline{\includegraphics[width=0.8\textwidth]{raft_rtc_sequence}}
+\centerline{\includegraphics[width=0.8\textwidth]{imgs/raft_rtc_sequence}}
 \caption{Raft over RTC Sequence Diagram}
   \label{fig:raft_rtc_sequence}
 \end{figure*}
 
 \begin{multicols}{2}
-
-
-\section {Design and Implementation}
 
 \subsection{Incremental Steps}
 
@@ -702,8 +705,8 @@ a single leader. Here is a screenshot of the browser after the first
 node is created:
 
 \begin{center}
-    \includegraphics[width=0.4\textwidth]{browser_1.png}
-    \captionof{figure}{Raft over WebRTC Browser with One Node}
+    \includegraphics[width=0.45\textwidth]{imgs/browser_1.png}
+    \captionof{figure}{Basic app with one Node/Tab}
     \label{fig:browser_1}
 \end{center}
 
@@ -712,20 +715,26 @@ on the embedded "create a node" link in the application. Here is
 a screenshot of the browser once four new nodes are added to the
 cluster (5 total):
 
-%\begin{figure*}[Ht]
-%\centerline{\includegraphics[width=15cm]{browser_2}}
-%\caption{Raft over WebRTC Browser with Five Node}
-%  \label{fig:browser_2}
-%\end{figure*}
-
 \begin{center}
-    \includegraphics[width=0.4\textwidth]{browser_2.png}
-    \captionof{figure}{Raft over WebRTC Browser with Five Nodes}
-    \label{fig:browser_2}
+    \includegraphics[width=0.45\textwidth]{imgs/browser_5.png}
+    \captionof{figure}{Basic app with Five Nodes/Tabs}
+    \label{fig:browser_5}
 \end{center}
 
 In addition, the full chat application was also tested manually. TODO:
 more text.
+
+\begin{center}
+    \includegraphics[width=0.45\textwidth]{imgs/chat_1a.png}
+    \captionof{figure}{Chat app with one Node/Tab}
+    \label{fig:browser_chat_1}
+\end{center}
+
+\begin{center}
+    \includegraphics[width=0.45\textwidth]{imgs/chat_5a.png}
+    \captionof{figure}{Chat app with Five Nodes/Tabs}
+    \label{fig:browser_chat_5}
+\end{center}
 
 TODO: image of chat app with one node
 
