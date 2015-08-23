@@ -124,7 +124,7 @@ subproblems: leader election, log replication, and safety. A full Raft
 solution must also address: cluster membership changes, log
 compaction, and client interaction. The Raft algorithm implemented and
 discussed in this paper is based on "Consensus: Bridging Theory and
-Practice" by Diego Ongaro (PhD Dissertation) TODO/CITE.
+Practice" by Diego Ongaro (PhD Dissertation). % TODO/CITE
 
 The Raft protocol is based on the concept of a distributed transaction
 log. Entries in the log represent a sequence of changes to an internal
@@ -262,10 +262,11 @@ already committed new entries).
 \subsection{Raft.js}
 
 Raft.js is an implementation of the Raft algorithm in JavaScript that
-was creator by the author of this paper TODO/CITE. Raft.js is designed
-to run in either a browser environment or within node.js (server-side
-JavaScript). Raft.js implements the Raft algorithm as described in
-"Consensus", Ongaro (dissertation TODO/CITE).
+was creator by the author of this paper. %TODO/CITE
+Raft.js is designed to run in either a browser environment or within
+node.js (server-side JavaScript). Raft.js implements the Raft
+algorithm as described in "Consensus", Ongaro (dissertation).
+% TODO/CITE
 
 \subsubsection{Modular Design}
 
@@ -371,7 +372,7 @@ The WebRTC browser APIs enable web applications written in JavaScript
 to establish browser-to-browser network connectivity in order to
 stream real-time video, audio and data communication. These APIs are
 currently in the process of being standardized by the W3C organization
-(TODO/CITE: http://www.w3.org/TR/webrtc/)
+(http://www.w3.org/TR/webrtc/) % TODO/CITE
 
 There are three primary WebRTC API definitions:
 
@@ -489,8 +490,8 @@ to perform WebRTC signaling on behalf of browser clients. The
 PeerServer server is also extensible so that more advanced services
 can be built with it. The PeerJS project includes an extension to
 PeerServer called ExpressPeerServer that combines a PeerJS signaling
-server with the Node.js based Express web application framework
-(TODO/CITE).
+server with the Node.js based Express web application framework.
+% (TODO/CITE)
 
 \subsubsection{PeerJS Client Library}
 
@@ -632,7 +633,7 @@ the Raft cluster node list. If there are any differences between the
 two lists, then any new clients are added to the Raft cluster and
 missing clients are removed from the Raft cluster one at a time using
 the `addServer` and `removeServer` RPC calls. Servers additions are
-prioritized before removals (as recommended in Ongaro 4.4 TODO/CITE)
+prioritized before removals (as recommended in Ongaro 4.4) % TODO/CITE
 in order to maximize availability.
 
 When an instance of the web application starts that is not
@@ -653,16 +654,44 @@ statistics are shown in the application:
 \item \emph{Append Entries Sent/Received}: the number of `appendEntries` RPCs that have been sent from and received by this node.
 \end{enumerate}
 
-\subsubsection{Client Request Implementation}
+\subsubsection{Client Request Redirect Implementation}
 
-TODO: client request functionality
+In the Raft over WebRTC implemenation each local browser is a client
+of the Raft cluster. However in Raft, the leader node is the only node
+that adds entries to the log so clients on follower nodes must have
+a way to communicate with the leader. This is implemented as pair of
+functions named clientRequest and clientRequestResponse. clientRequest
+is called by the client with the arguments of a client request RPC and
+a callback function to be called once the request is completed. The
+clientRequest/clientRequestResponse functions work as follows:
+
+\begin{enumerate}
+\item the clientRequestResponse is registered with the local Raft.js
+    implementation as the callback function anytime
+    clientRequestResponse RPCs are received.
+\item the clientRequest function keeps track of the current leader ID.
+    If the current leader ID is not set or this node is the leader
+    then the client's request is sent directly to the local Raft node.
+    If the current leader ID is set then the request is sent to that
+    node as a normal RPC request over the WebRTC channel.
+\item when the clientRequestResponse function is called and the status
+    is "NOT\_LEADER" then the current leader ID being tracked by the
+    clientRequest function is set to the leader ID returned in the
+    response. Then the original request is re-issued over the normal
+    WebRTC channel to the leader.
+\item when the clientRequestResponse function is called with
+    a successful status, the original callback argument of the
+    clientRequest function is called with the results from the RPC
+    response.
+\end{enumerate}
 
 \subsection{Chat Application}
 
 The chat application extends the basic Raft.js over WebRTC client. The
 chat application provides a large text area containing the chat
 history and a text entry field below it. When the user clicks on the
-\emph{Send} button (or pressed enter), the text line is added to
+\emph{Send} button (or pressed enter), the current node ID is
+prepended to the beginning of the text line and it is added to
 a pending send queue and the text entry field is blanked. A function
 to flush sends runs periodically (currently every 100ms) and does the
 following:
@@ -686,12 +715,33 @@ following:
     attempt to send again).
 \end{enumerate}
 
-TODO: screenshot.
+The chat application also extends the default set of state machine
+operations to add a seqAppend operation. This is an atomic operation
+that is implemented as follows:
 
-TODO: atomic seqAppend operation
-
-TODO: longer delay for propagation in chat application because each
-addition to chat history take several messages to fully propagate.
+\begin{enumerate}
+\item the seqAppend operation operates on a specially structured
+    key/value pair in the state machine map. The value is
+    a associative map that contains a counter and list structure that
+    contains the actual data. seqAppend operations are sent with both
+    a count and then new value to append.
+\item When a seqAppend operation is applied to the state machine and
+    the count value in the command matches the counter in the state
+    machines value, then the new value in the request is added to the
+    list and the counter is incremented. If the count value does not
+    match then counter then the the operation is not applied. In
+    either case, a list is returned that contains two values: whether
+    the seqAppend operation succeeded and what the current value of
+    the counter.
+\item the first time the seqAppend operation is used on a non-existent
+    key, the structure described above is created with the counter set
+    to 0 and the list structure is created with the single value
+    passed in the seqAppend operation.
+\item clients that call the seqAppend operation should check the
+    status value in the result list. If the status is false, then the
+    client should retry the operation using the counter value as the
+    count in the operation.
+\end{enumerate}
 
 \section{Results}
 
@@ -721,8 +771,13 @@ cluster (5 total):
     \label{fig:browser_5}
 \end{center}
 
-In addition, the full chat application was also tested manually. TODO:
-more text.
+In addition, the full chat application was also tested manually by
+loading the initial chat application landing page to create a Raft
+over WebRTC cluster with a single leader. Then one or more lines of
+text were entered into the text line each followed by clicking the
+Send button.  Here is a screenshot of the browser after the first
+node/tab of the chat application is created and a line of text was
+sent:
 
 \begin{center}
     \includegraphics[width=0.45\textwidth]{imgs/chat_1a.png}
@@ -730,16 +785,18 @@ more text.
     \label{fig:browser_chat_1}
 \end{center}
 
+Then four more Raft nodes were then added to the cluster by clicking
+on the embedded "create more clients" link in the application.
+Finally, on a non-leader node more text lines were entered and sent by
+clicking the Send button. Here is a screenshot of the browser once
+four new nodes/tabs are added to the cluster (5 total) and another
+text line was sent:
+
 \begin{center}
     \includegraphics[width=0.45\textwidth]{imgs/chat_5a.png}
     \captionof{figure}{Chat app with Five Nodes/Tabs}
     \label{fig:browser_chat_5}
 \end{center}
-
-TODO: image of chat app with one node
-
-TODO: image of chat app five nodes
-
 
 After every change was made to the cluster all the nodes were checked
 to ensure that the following steady state properties were observed:
@@ -850,34 +907,180 @@ over the long term because higher performing nodes more are likely to
 start and win elections. This also indicates dynamic adjustment of
 timeout values may be a fruitful area of further study.
 
+In the context of the full chat application the slowdown of background
+pages is even more pronounced because each addition to the chat
+history can take several messages to fully propagate the new date.
+
+
 \subsection{Automated Testing}
 
 \subsubsection{Setup}
 
-TODO: Setup for the automated tests. Description of SlimerJS. Creation of SlimerJS test scripts using JavaScript.
+Automated testing of the Raft over WebRTC system was performed by
+leveraging the SlimerJS scriptable browser environment. SlimerJS
+enables web applications to be scripted by loading pages in a special
+Mozilla rendering environment called XULRunner. The XULRunner instance
+is directed to a X virtual frame buffer (xvfb) which provides
+effectively headless testing.
 
+To simplify the execution of the tests and to make the testing
+infrastructure more portable, a docker container environment was used
+to encapsulate and execute the SlimerJS environment. The container is
+built using \emph{test/Dockerfile} which is in turn derived from
+the "fentas/slimerjs" docker image
+(https://github.com/fentas/docker/blob/master/slimerjs/Dockerfile).
+This custom Dockerfile was created because the upstream version of the
+Dockerfile used an older version of XULRunner that did not support
+more than 7 WebRTC clients communicating together simultaneously.
+% (TODO/CITE)
+
+Writing tests using SlimerJS involves creating JavaScript programs
+that are run within the SlimerJS environment. These scripts can create
+browser instances (basically headless browser tabs), query the status
+of those pages and execute JavaScript within the context of the pages
+themselves.
+
+Three different tests were created to test the Raft over WebRTC
+functionality and the chat application. Each of the tests takes
+a parameter indicating the number of nodes/pages to launch and test
+again. The tests scripts files are:
+
+\begin{enumerate}
+    \item \emph{test/common.js}: a module of common functions used by
+        the other tests scripts.
+    \item \emph{test/test\_up.js}: launch and start an initial leader
+        node/page, then start the rest of the nodes (if any) so that
+        the leader will configure them into the cluster. Then test
+        then waits for every node to be recorded (applied) into the log
+        of every other node of the cluster. The test reports the
+        number of milliseconds for the cluster to reach this state.
+    \item \emph{test/test\_kill\_nodes.js}: similar to
+        \emph{test/test\_up.js} but once all the nodes are configured
+        into the cluster, this script then kills the leader plus
+        a configurable number of nodes. By default the script kills
+        just under half the nodes of the cluster. The test then waits
+        for a new leader to be elected and remove the dead nodes from
+        the cluster. The test reports both the number of milliseconds
+        for the cluster to come up and the recover from the failure.
+    \item \emph{test/test\_chat\_propagate.js}: similar to
+        \emph{test/test\_up.js} but once the cluster is up, the test
+        connects to one of the non-leader nodes and and sends a chat
+        text line. The test then waits for the chat message to
+        propogate to every other node's state machine. The test
+        reports both the number of milliseconds for the cluster to
+        come up and for the messages to propagate to every node.
+\end{enumerate}
+
+The tests were all run on a system with the following configuration:
+
+\begin{enumerate}
+    \item \emph{CPUs}: 8 Intel Core i7 processors running at 3.20GHz
+    \item \emph{Memory}: 12 GB
+    \item \emph{OS}: Ubuntu 14.04.1 LTS
+    \item \emph{Docker}: version 1.3.1
+    \item \emph{Docker image}:
+    \begin{enumerate}
+        \item \emph{OS}: Ubuntu 12.04.5 LTS
+        \item \emph{SlimerJS}: vesion 0.9.6
+        \item \emph{XULRunner}: 38.0.5
+    \end{enumerate}
+\end{enumerate}
+
+Three tests were run at 10 different cluster sizes (odd cluster sizes
+from 3 to 21 nodes): \emph{test/test\_up.js} and
+\emph{test/test\_kill\_nodes.js} in kill one (leader) node and kill
+half nodes. Each of these tests was run with three different Raft election
+timeout values: 100ms, 500ms, 1000ms. The
+\emph{test/test\_chat\_propagate.js} test was run at
+11 different cluster sizes (odd cluster sizes from 1 to 21 nodes).
+Each test mode and cluster size was run 7 times for a total of 707
+test runs (3*10*7*3 + 11*7)
 
 \subsubsection{Outcome}
 
-TODO: Outcome of the automated tests.
+% TODO: programmatic figure numbers
+Figure 7 shows the results of running the
+\emph{test/test\_chat\_propagate.js} test to show the amount of time
+that a stable cluster takes to propagate, commit and apply a single
+state machine command to the state machines on every cluster node.
 
-The following figure shows the amount of time that the cluster takes to
-elect a leader and then reconfigure the cluster to the the final size
-(adding one node a time).
+Figure 7 is a scatterplot with each test run as a blue "x" and a black
+line representing the average at each cluster size.
 
-The following figure shows the amount of time that it takes for
-a stable cluster to recover (elect a new leader and remove the failed
-server from the cluster) when the current leader fails.
+\begin{center}
+    \begin{tikzpicture}
+    \begin{axis}[%
+        xlabel={Nodes}, ylabel={Time (seconds)},
+        xtick=data,
+        grid=major,
+        scatter/classes={%
+            propagate={mark=x,draw=blue},
+            propagate_average={mark=,draw=red}}]
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/data_propagate.dat};
+    \addplot[scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/data_propagate_averages.dat};
+    \end{axis}
+    \end{tikzpicture}
+\captionof{figure}{Propagate$,$ Commit$,$ and Apply Command}
+\label{fig:propagate}
+\end{center}
 
-The following figure shows the amount of time that it takes for
-a stable cluster to recover (elect a new leader and remove the failed
-servers from the cluster) when one or more nodes fails. The first line
-shows the recovery time when just the leader fails. The second line
-show the recovery time when one less than half of the nodes fail.
+Figures 8, 9 and 10 show the results of running the
+\emph{test/test\_up.js} and \emph{test/test\_kill\_nodes.js} in both
+modes (kill only leader and kill just under half the nodes). Three
+different scatterplots are shown for each test mode to test different
+values of the Raft election timeout value: 100ms, 500ms, and 1000ms.
+The election timeout value makes very little difference to the average
+time curve line. The reason for this is that the first leader tends to
+stay the leader as new nodes are added so for the most part the
+election timer does not have an impact.
 
-\end{multicols}
+Some specific notes about the figures:
 
-\begin{figure}
+% TODO: link figure numbers
+
+\begin{enumerate}
+    \item \emph{Figure 8 (a)}: The results show that once the cluster
+        size reaches 17, the cluster sometimes does not activate
+        before the test times out (the red "x" marks). Once the
+        cluster reaches 21 nodes, all 7 test runs time out. The reason
+        for this is because at 17 nodes, the leader is not always able
+        to send out appendEntries RPCs to all the other nodes before
+        their election timeout fires. More analysis is needed, but one
+        possible explanation is that the single SlimerJS XULRunner
+        process that is handling all the cluster nodes is not able to
+        give enough CPU time to the leader node to reliable send
+        appendEntries RPCs to all the other nodes within the election
+        timeout value. Increasing the election timeout to 500ms or
+        greater eliminates the failures without significantly changing
+        the average cluster activation time curve.
+    \item \emph{Figure 9 (a)}: The results show that when the cluster
+        size reaches 15, then average amount of time for cluster
+        recovery (after the leader is killed) increases dramatically
+        (not all data points are shown on the plot for size 15). At
+        cluster size 17 the cluster is no longer able to recover
+        within the test timeout period. Increasing the election
+        timeout to 500ms or greater eliminates the failures at the
+        cost of slightly increased recovery time for smaller cluster
+        sizes.
+    \item \emph{Figure 10 (a)}: During this test cluster was unable to
+        activate at cluster size 21 when the election timeout value is
+        set to 100ms (see Figure 8 (a)). This means there was no
+        opportunity for cluster recovery at cluster size 21 so there
+        is no data for that column.
+
+\end{enumerate}
+
+
+Each figure is a scatterplot with each test run as a blue "x" and
+a black line representing the average at each cluster size.
+
+%\end{multicols}
+
+\begin{figure*}[h]
     \begin{subfigure}[b]{0.30\textwidth}
         \centering
         \resizebox{\linewidth}{!}{
@@ -1121,36 +1324,10 @@ show the recovery time when one less than half of the nodes fail.
     \end{subfigure}
     \caption{Recovery from Half Cluster Failure}
     \label{fig:G}
-\end{figure}
+\end{figure*}
 
 
-\begin{multicols}{2}
-
-
-The following figure shows the amount of time that a stable cluster takes to
-propagate, commit and apply a single state machine command to the state
-machines on every cluster node.
-
-\begin{center}
-    \begin{tikzpicture}
-    \begin{axis}[%
-        xlabel={Nodes}, ylabel={Time (seconds)},
-        xtick=data,
-        grid=major,
-        scatter/classes={%
-            propagate={mark=x,draw=blue},
-            propagate_average={mark=,draw=red}}]
-    \addplot[scatter,only marks,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/data_propagate.dat};
-    \addplot[scatter,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/data_propagate_averages.dat};
-    \end{axis}
-    \end{tikzpicture}
-\captionof{figure}{Propagate$,$ Commit$,$ and Apply Command}
-\label{fig:propagate}
-\end{center}
+%\begin{multicols}{2}
 
 
 
