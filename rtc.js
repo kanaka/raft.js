@@ -4,7 +4,17 @@
 var verbose = 1,
     debug = true,
     electionTimeout = 1000,
-    connPollDelay = 3000;
+    // addRemoveServersRetry: smaller values increase the number of
+    // PENDING_CONFIG_CHANGE that will happen when there are multiple
+    // changes pending (more than one server added or removed). Larger
+    // values mean that multiple changes may take longer to complete.
+    addRemoveServersRetry = 50,
+    // addRemoveServersPoll: smaller values increase the CPU usage due
+    // to constant scanning of the PeerJS connections and Raft.js
+    // server map to identify nodes that need to be added or dropped.
+    // Larger values means that it takes longer to detect when cluster
+    // changes happen.
+    addRemoveServersPoll = 500;
 
 // Global state
 var messages = document.getElementById('messages'),
@@ -186,9 +196,9 @@ function addRemoveServersAsync() {
 
     if (changes > 1) {
         // If there is still pending changes then cycle around faster
-        setTimeout(addRemoveServersAsync, 50);
+        setTimeout(addRemoveServersAsync, addRemoveServersRetry);
     } else {
-        setTimeout(addRemoveServersAsync, 500);
+        setTimeout(addRemoveServersAsync, addRemoveServersPoll);
     }
 }
 
