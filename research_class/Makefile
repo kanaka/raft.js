@@ -5,9 +5,17 @@ PWD = $(shell pwd)
 
 DATA = $(wildcard data/*)
 
-paper.pdf: $(DATA)
+REFERENCES = $(wildcard references/*)
+
+paper.pdf: $(DATA) $(REFERENCES)
 
 %.pdf: %.tex
 	pdflatex -halt-on-error $<
+	bibtex $*.aux
+	pdflatex -halt-on-error $<
+	pdflatex -halt-on-error $<
 
 all: paper.pdf
+
+clean:
+	rm -f *.pdf *.bak *.log *.out *.aux *.run.xml paper-blx.bib paper.bbl paper.bcf paper.blg

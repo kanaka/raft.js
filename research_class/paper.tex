@@ -6,6 +6,9 @@
 \usepackage{geometry}
 \geometry{margin=2.0cm}
 
+%\usepackage[utf8]{inputenc}
+\usepackage[backend=bibtex]{biblatex}
+
 \usepackage{hyperref}
 \usepackage{caption}
 \usepackage{subcaption}
@@ -18,7 +21,7 @@
 \DeclareGraphicsExtensions{.png,.jpg,.pdf,.eps}
 
 \usepackage{pgfplots}
-\pgfplotsset{compat=1.5}
+\pgfplotsset{compat=1.9}
 
 
 \title{Raft Distributed Consensus Algorithm over WebRTC (Web Real-Time Communication)}
@@ -26,6 +29,9 @@
 \author{Joel D. Martin}
 \author{David Levine}
 \affil{University of Texas at Arlington}
+
+\addbibresource{references/raft.bib}
+\addbibresource{references/other.bib}
 
 \begin{document}
 
@@ -36,16 +42,18 @@
 
 \begin{abstract}
 We describe the creation of a browser-based distributed peer-to-peer
-application using WebRTC, PeerJS and Raft.js. WebRTC is a protocol that modern
-browsers have begun to integrate which enables browser-to-browser
-communication. PeerJS is a WebRTC client library and extensible signaling
-server. Raft.js is an implementation in JavaScript of the Raft distributed
-consensus protocol. These technologies are combined to create a chat
-application that guarantees a shared, consistent and linearized view of the
-chat history without relying on a single centralized server. We also create a
-series of automated tests using the SlimerJS browser automation tool and use
-them to show the correctness of the chat application and also to measure the
-performance and scalability of the application over various cluster sizes.
+application using WebRTC, PeerJS and Raft.js. WebRTC is a protocol
+that modern browsers have begun to integrate which enables
+browser-to-browser communication. PeerJS is a WebRTC client library
+and extensible signaling server. Raft.js is an implementation in
+JavaScript of the Raft distributed consensus protocol. These
+technologies are combined to create a chat application that guarantees
+a shared, consistent and linearized view of the chat history without
+relying on a single centralized server for communication. We also
+create a series of automated tests using the SlimerJS browser
+automation tool and use them to show the correctness of the chat
+application and also to measure the performance and scalability of the
+application for various cluster sizes.
 \end{abstract}
 
 \section{Introduction}
@@ -1401,14 +1409,20 @@ Here are some interesting areas for further exploration:
 I would like to thank my academic supervisor, David Levine, for his
 excellent input and oversight of this project. I would also like to
 thank Diego Ongaro for his amazing work on the Raft protocol and paper
-which made implementing a Raft implementation a pleasure. There are
-too many people involved in the creation and standardization of WebRTC
-but I would like to thank them for their tireless work to make
-browser-to-browser communication possible. Last but not least, I would
-like to thank my family for putting up with the long nights and
-weekends I spent on this project. Thanks!
+\cite[p.~215]{lamport78} which made implementing
+a Raft implementation a pleasure \cite{lamport78}.
+There are too many people involved in the creation and standardization
+of WebRTC but I would like to thank them for their tireless work to
+make browser-to-browser communication possible. Last but not least,
+I would like to thank my family for putting up with the long nights
+and weekends I spent on this project. Thanks!
 
 % TODO: references
 
 \end{multicols}
+
+\printbibliography
+%\bibliographystyle{plain}
+%\bibliography{references/raft,references/other}
+
 \end{document}
