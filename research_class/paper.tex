@@ -31,6 +31,8 @@
 \affil{University of Texas at Arlington}
 
 \addbibresource{references/raft.bib}
+\addbibresource{references/w3c.bib}
+\addbibresource{references/ietf.bib}
 \addbibresource{references/other.bib}
 
 \begin{document}
@@ -61,10 +63,10 @@ In the past few years, browsers have quickly evolved from document
 rendering engines into powerful platforms for building sophisticated
 applications. Modern browsers are integrating new protocols for
 communication including WebSockets for full-duplex browser-to-server
-communication and WebRTC for direct browser-to-browser communication.
-These new capabilities enable software developers to create
-distributed network applications with browser applications as first
-class citizens.
+communication \cite{websockets:rfc6455} and WebRTC for direct
+browser-to-browser communication \cite{webrtc:feb2015}. These new
+capabilities enable software developers to treat web applications as
+first class participants in distributed network applications.
 
 These new browser capabilities also bring with them the traditional
 challenges of building reliable distributed applications such as:
@@ -72,14 +74,15 @@ concurrency, security, scalability, naming, discovery, replication,
 relocation, etc. The solutions to many of these challenges involve
 the proper management of distributed state. Distributed consensus is
 one category of distributed state management in which multiple nodes
-must come to agreement on the state of single value or set of values.
+must come to agreement on the state of single value or set of values. % TODO/CITE
 The grandparent of distributed consensus algorithms is the Paxos
-algorithm described by Leslie Lamport. However, Paxos has been
-notoriously difficult to understand and to implement correctly. Raft
-is a more recent distributed consensus algorithm that aims for
-understandability and practicality of implementation.
+algorithm described by Leslie Lamport \cite{paxos:lamport98}. However,
+Paxos has been notoriously difficult to understand and to implement
+correctly \cite{paxos:chandra07}. Raft is a more recent distributed
+consensus algorithm that aims for understandability and practicality
+of implementation \cite{raft_thesis:ongaro14}.
 
-In this study we will explore an implementation of the Raft protocol
+In this paper we will describe an implementation of the Raft protocol
 in a browser context using WebRTC as the communication channel. We
 will describe the results of the implementation and look at some of
 unique challenges (and opportunities) we encountered with the
@@ -87,36 +90,67 @@ implementation. We will also explore some ideas for further study.
 
 \section{Motivation/Use Cases}
 The traditional use of distributed consensus is in the data-center
-(private or cloud based) especially as the core coordination component
-of a replicated data-storage system. In these examples, the set of
-nodes that compose the cluster tend to be fairly static and changes to
-cluster membership are usually for the purpose of replacing nodes.
-Changes to the long term size of the cluster are uncommon.
+(private or cloud based) often as the core coordination component
+of a replicated data-storage system. %TODO/CITE
+In these examples, the set of nodes that compose the cluster tend to
+be fairly static and changes to cluster membership are usually for the
+purpose of replacing nodes. Changes to the long-term size of the
+cluster are uncommon. %TODO/CITE
 
-Most existing distributed browser applications are extensions of this
-model in which browsers connect to load-balanced web servers which are
-in close network proximity to the distributed consensus cluster. The
-backend web system delivers the web application to the browser and
-also serves as the conduit for all browser-to-browser communication
-and state management.
+Most existing distributed browser applications are extensions of the
+data-centric model in which browsers connect to load-balanced web
+servers which are in close network proximity to the distributed
+consensus cluster. %TODO/CITE
+The backend web servers deliver the web application to the browser and
+also serve as the conduit for all browser-to-browser communication and
+state management.
 
-However, it is not always desirable for application messages and state
-to traverse the server back-end for various reasons including the
-following:
+However, requiring application messages and application state to
+traverse the back-end servers is not always desirable for various
+reasons including the following:
 
 \begin{enumerate}
-\item \emph{security (privacy)}: application state and user messages may need to traverse directly from browser to browser rather than traversing through a server.
-\item \emph{locality}: the nature of the application may allow clusters of applications that are nearby on a network (e.g. intranet) to communicate and coordinate directly rather than passing all messages and state through a server back-end which may be considerable more remote.
-\item \emph{bandwidth and scale}: a distributed browser based application may be able to avoid expensive bandwidth into and out of the backend data-center by passing messages and state directly between browsers.  Depending on the design of the application this may also enable better scalability then a more centralized model.
+\item \emph{security (privacy)}: application state and user messages
+    may need to traverse directly from browser to browser rather than
+    traversing through a server.
+\item \emph{locality}: the nature of the application may allow
+    clusters of applications that are nearby on a network (e.g.
+    intranet) to communicate and coordinate directly rather than
+    passing all messages and state through a server back-end which may
+    be considerably more remote.
+\item \emph{bandwidth and scale}: a distributed browser based
+    application may be able to avoid expensive bandwidth into and out
+    of the backend data-center by passing messages and state directly
+    between browsers.  Depending on the design of the application this
+    may also enable better scalability then a more centralized model.
 \end{enumerate}
 
+%TODO: better lead in to this paragraph from above
 Here are some specific use cases in which Raft over WebRTC may be
 applicable:
 
 \begin{enumerate}
-\item \emph{Consistent order secure chat}: a chat room system where all users see the same message order but messages never traverse through a central server even though the application code itself is delivered from a central web service. This application was implemented for this study.
-\item \emph{Private multiuser document editing/whiteboard system}: Google Docs among other systems has demonstrated a powerful model for collaborative document creation. However, these systems all user central web services to coordinate shared state and handle browser-to-browser communication. Using a Raft over WebRTC could enable tools with similar functionality but without the central coordination and communication.
-\item \emph{Browser based network games}: most network games have certain states that must be agreed upon by all nodes (e.g. avatar dead or alive, etc). This can be achieved with Raft over WebRTC without requiring any data to traverse a central server. In addition to reducing browser to server bandwidth requirements, this may also allow lower latency gaming if games instances are partitioned by latency locality.
+\item \emph{Consistent order secure chat}: a chat room system where
+    all users see the same message history but the messages never
+    traverse through a central server and there is no central arbiter
+    of trusth. The application code itself may still be delivered from
+    a central web service. This is the use case that was implemented
+    for this paper.
+\item \emph{Private multiuser document editing/whiteboard system}:
+    Google Docs, among other examples has demonstrated a powerful
+    model for collaborative document creation. However, these systems
+    all use a centralized servers to coordinate shared state and
+    handle browser-to-browser communication. %TODO/CITE
+    Using a Raft over WebRTC could enable applications with similar
+    functionality but without the central coordination and
+    communication.
+\item \emph{Browser based network games}: most network games have
+    certain states that must be agreed upon by all nodes (e.g. avatar
+    dead or alive, etc). This can be achieved with Raft over WebRTC
+    without requiring any data to traverse a central server. In
+    addition to reducing browser to server bandwidth requirements,
+    this may also allow lower latency gaming if game instances are
+    partitioned into clusters based on latency.
 \end{enumerate}
 
 \section{Background}
@@ -125,29 +159,31 @@ applicable:
 
 Raft is a new distributed consensus algorithm designed to be
 understandable and practical without sacrificing safety and
-correctness.
+correctness. The Raft algorithm implemented and described in this
+paper is based on Diego Ongaro's dissertation "Consensus: Bridging
+Theory and Practice" \cite{raft_thesis:ongaro14}.
 
 The Raft algorithm breaks the problem of consensus into three core
-sub-problems: leader election, log replication, and safety. A full Raft
-solution must also address: cluster membership changes, log
-compaction, and client interaction. The Raft algorithm implemented and
-discussed in this paper is based on "Consensus: Bridging Theory and
-Practice" by Diego Ongaro (PhD Dissertation). % TODO/CITE
-
-The Raft protocol is based on the concept of a distributed transaction
-log. Entries in the log represent a sequence of changes to an internal
-state machine. If all members of the Raft cluster have the same log
-entries, then their state machine on each node will have exactly the
-same state. Each node of a Raft cluster can be in one of three states:
-follower, candidate, or leader. The responsibility of the leader is to
-accept new transaction log entries and then replicated these entries
-in the same order to all other members of the cluster. The leader is
-the only member of the cluster that may make changes to the
-transaction log. In order to maintain leadership, the leader sends
-heartbeat RPCs to all the followers in the cluster. Followers that
-do not receive a heartbeat RPC within a certain time period become
-candidates and attempt to be elected by the other nodes as the new
-leader of the cluster.
+sub-problems: leader election, log replication, and safety
+\cite[Section~3]{raft_thesis:ongaro14}. A full Raft system must also
+address: cluster membership changes
+\cite[Section~4]{raft_thesis:ongaro14}, log compaction
+\cite[Section~5]{raft_thesis:ongaro14}, and client
+interaction \cite[Section~6]{raft_thesis:ongaro14}. The Raft protocol
+is based on the concept of a distributed transaction log. Entries in
+the log represent a sequence of commands that will be applied to an
+internal state machine. If all members of the Raft cluster have the
+same log entries, then their state machine on each node will have
+exactly the same state. Each node of a Raft cluster can be in one of
+three states: follower, candidate, or leader. The responsibility of
+the leader is to accept new transaction log entries and then
+replicated these entries in the same order to all other members of the
+cluster. The leader is the only member of the cluster that may make
+changes to the transaction log. In order to maintain leadership, the
+leader sends heartbeat RPCs to all the followers in the cluster.
+Followers that do not receive a heartbeat RPC within a certain time
+period become candidates and attempt to be elected by the other nodes
+as the new leader of the cluster \cite[p.~12]{raft_thesis:ongaro14}.
 
 \subsubsection{Leader Election}
 
@@ -164,15 +200,15 @@ However, a node may only vote for one candidate in a given term. If
 a candidate receives votes from more than half of the cluster, then it
 immediately becomes a leader and sends out a appendEntries RPC to
 confirm leadership and reset the election timers on all the other
-nodes.
+nodes \cite[Section~3.4]{raft_thesis:ongaro14}.
 
 \subsubsection{Log Replication}
 
 Each Raft node maintains a transaction log. The entries in the
 transaction log each contain a term value in addition to the action to
 apply to the state machine. Each node also keep track of the most
-recent log entry which is known to be committed (exists on more than
-half the nodes in the cluster).
+recent log entry which is known to be committed (exists in the log of
+more than half the nodes in the cluster).
 
 When a new leader is elected, it begins sending appendEntries RPCs
 to other nodes in the Raft cluster. These RPC messages contain
@@ -187,7 +223,8 @@ until the leader discovers the latest log entry which is agreement
 begin to propagate entries to the node in subsequent appendEntries
 RPCs until the node is caught up. The leader continues sending
 empty appendEntries as heartbeat RPCs to all the nodes until it
-receives a new entry in its transaction log from a client.
+receives a new entry in its transaction log from a client
+\cite[Section~3.5]{raft_thesis:ongaro14}.
 
 \subsubsection{Safety}
 
@@ -201,14 +238,16 @@ a log that is more up-to-date than the voter. A log entry with a later
 term is always more up-to-date. If the log entries have the same term,
 then the entry with a higher index is more up-to-date. In addition,
 Raft leaders may not consider entries from a previous term to be
-committed until it has committed at least one an entry from its own
-term.
+committed until it has committed at least one entry from its own
+term
+\cite[Section~3.6]{raft_thesis:ongaro14}.
 
 Raft nodes must also persist certain properties to durable storage
 before sending or receiving any RPCs. The properties that must be
-persisted are current term, current vote for this term (if any), and
+persisted are: current term, current vote for this term (if any), and
 either the full transaction log or the state machine plus any
-unapplied transaction log entries.
+unapplied transaction log entries
+\cite[Section~3.8]{raft_thesis:ongaro14}.
 
 \subsubsection{Membership Changes}
 
@@ -216,11 +255,12 @@ Raft leverages the replicated transaction log to accomplish live
 cluster membership changes. Membership changes are accomplished by
 adding or removing one Raft node at a time using special add/remove
 log entries. As soon as the new entry is added to the log it becomes
-effective without waiting for the entry to be fully committed across
-the cluster. However, a new cluster change entry may not be added to
-the log until the previous one is committed. Once the change entry is
-committed, the initiator of the change is notified, removed servers
-can be shut down and another change entry may be added to the log.
+effective on that node without waiting for the entry to be fully
+committed across the cluster. However, a new cluster change entry may
+not be added to the log until the previous one is committed. Once the
+change entry is committed, the initiator of the change is notified,
+removed servers can be shut down and another change entry may be added
+to the log \cite[Section~4]{raft_thesis:ongaro14}.
 
 \subsubsection{Log Compaction}
 
@@ -237,25 +277,29 @@ to disk at which point the all previously applied log entries can be
 discarded. Snapshotting the state machine also means that the
 implementation must provide a way for the leader to serialize and send
 the current state machine to other nodes if their transaction log is
-too old (e.g. when a new node is added).
+too old (e.g. when a new node is added)
+\cite[Section~5]{raft_thesis:ongaro14}.
 
 \subsubsection{Client Interaction}
 
 Clients of the Raft cluster are able to interact with the distributed
 state machine by sending RPCs to the leader in order to add command
 entries to the transaction log. Clients first find the address of any
-node in the cluster either via broadcast or via an external directory
-service. Once the client discovers a node of the cluster, that node
-can either forward messages directly to the leader node (if it is not
-the leader) or it can reject client requests with a response
-indicating the address of the leader for the client to redirect to.
+node in the cluster either via broadcast, via an external directory
+service, or directly provided by the user. Once the client discovers
+a node of the cluster, that node can either forward messages directly
+to the leader node (if it is not the leader) or it can reject client
+requests with a response indicating the address of the leader where
+client requests should be redirected
+\cite[Section~6.2]{raft_thesis:ongaro14}.
 
-The Raft protocol should also provide strict linearizable semantics for
-client commands/requests (reads and writes). In order to accomplish
-this, each client is given a unique ID, and the client assigns
-a unique serial number to each command. This prevents a single client
-command from being applied twice to the state machine (in case of
-a leader crash, or network duplication).
+The Raft protocol can also provide strict linearizable semantics for
+client commands/requests (reads and writes) for applications that
+require it. In order to accomplish this, each client is given a unique
+ID, and the client assigns a unique serial number to each command.
+This prevents a single client command from being applied twice (leader
+crash, network duplication) or lost (packet loss)
+\cite[Section~6.3]{raft_thesis:ongaro14}.
 
 Linearizability is important not just for writes/updates to the state
 machine, but also for reads, which means that read requests must also
@@ -266,82 +310,104 @@ necessarily linearizable. For example, a leader may have been deposed
 and not realize it if the cluster is partitioned which could result in
 reads of stale data (the leader of the larger partition may have
 already committed new entries).
+\cite[Section~6.4]{raft_thesis:ongaro14}.
 
 \subsection{Raft.js}
 
 Raft.js is an implementation of the Raft algorithm in JavaScript that
-was creator by the author of this paper. %TODO/CITE
+was created by the author of this paper. %TODO/CITE
 Raft.js is designed to run in either a browser environment or within
-node.js (server-side JavaScript). Raft.js implements the Raft
-algorithm as described in "Consensus", Ongaro (dissertation).
-% TODO/CITE
+Node.js (server-side JavaScript). Raft.js implements the Raft
+algorithm as described in \cite[Consensus:~Diego]{raft_thesis:ongaro14}.
 
 \subsubsection{Modular Design}
 
 The implementation of the Raft algorithm is implemented in the
-RaftServerBase class (in base.js). The base class does not directly
-implement stateful functions such as RPC communication, durable
-storage, scheduling/timeouts, or state machine command/management. In
-order to create a working implementation these functions must be
-provided either as configuration parameters when the class is
-instantiated or by sub-classing the class.
+\texttt{RaftServerBase} class (in \texttt{base.js}). The base class
+omits the implementation of functions with side-effect such as RPC
+communication, durable storage, scheduling/timeouts, or state machine
+command/management. In order to create a working implementation these
+functions must be provided either as configuration parameters when the
+class is instantiated or by sub-classing the class.
 
-The modular design of the Raft.js implementation allows it to be easily
-used in several different contexts. For example, the RaftServerLocal
-class (local.js) implements RPC calls using plain JavaScript function
+The modular design of the Raft.js implementation allows it to be
+easily used in different contexts. For example, the \texttt{RaftServerLocal}
+class (\texttt{local.js}) implements RPC calls using plain JavaScript function
 calls between different instances of the class (nodes) in the same
-execution context. The online Raft visualization at
-http://kanaka.github.io/raft.js/ uses the RaftServerLocal class and
-instantiates it using a scheduling functions that fire when the user
-clicks on the "Step" button rather than due to the passage of time.
+execution context. For example, the online Raft visualization at
+\href{http://kanaka.github.io/raft.js/}{http://kanaka.github.io/raft.js/}
+uses the \texttt{RaftServerLocal} class and instantiates it using
+a scheduling functions that fire when the user clicks on the "Step"
+button rather than due to the passage of time.
 
-The RaftServerHttp class (`http.js`) embeds a simple web server into
-each Raft node and then uses normal HTTP requests to send RPC messages
-between Raft nodes.
+The \texttt{RaftServerHttp} class (\texttt{http.js}) embeds a simple
+web server into each Raft node and then uses normal HTTP requests to
+send RPC messages between Raft nodes.
 
-For this paper, the RaftServerLocal class was extended with the
-capability of sending RPCs over the WebRTC Data Channel.
+For this paper, the \texttt{RaftServerLocal} class was extended with
+the capability of sending RPCs over the WebRTC Data Channel.
 
 \subsubsection{Differences between Raft and Raft.js}
 
-The current Raft.js implementation is based on "Consensus", Ongaro and
-implements most of the Raft algorithm including: leader election, log
-replication, safety, membership changes, basic client interaction, and
-read-only operation optimizations. Log compaction and full client
-linearizability are not currently implemented (clients and client
-transactions are not assigned unique IDs). Log compaction is important
-for long-running production systems in order to limit memory growth
-and allow new nodes to catch up their logs more efficiently. However
-log compaction is not required for verifying overall system
-correctness and does not significantly impact short-running test
-configurations. Full client linearizability is important feature for
-simplifying certain types of distributed applications, however the
-implementation requires some significant additions to the Raft
-implementation (e.g. assigning client IDs and sequence IDs and tracking
-timed-out clients). For the chat application, simply adding one atomic
-check-and-set state machine command is sufficient to achieve
-a linearized chat history. This does impose a slight additional cost
-on the client because it must retry the atomic operations until they
-succeed. The author intends to implement both log compaction and
-full client linearizability in the future but, however these do not
-have a significant impact on the ability to test Raft combined with
-WebRTC.
+The current Raft.js implementation most of the Raft algorithm
+including: leader election, log replication, safety, membership
+changes, basic client interaction, and read-only operation
+optimizations. % TODO: read-only operations needs mentioning earlier
+Log compaction and full client linearizability are not currently
+implemented (clients and client transactions are not assigned unique
+IDs). Log compaction is important for long-running production systems
+in order to limit memory growth and allow new nodes to catch up their
+logs more efficiently. However log compaction is not required for
+verifying overall system correctness and does not significantly impact
+short-running test configurations. Full client linearizability is
+important feature for simplifying certain types of distributed
+applications, however the implementation of linearizability requires
+some significant additions to the Raft implementation (e.g. assigning
+client IDs and sequence IDs and tracking timed-out clients). For the
+chat application, simply adding a single atomic check-and-set state
+machine command is sufficient to achieve a linearized chat history.
+This does impose a slight additional cost on the client because it
+must retry the atomic operations until they succeed. The author
+intends to implement both log compaction and full client
+linearizability in the future, however these do not have a significant
+impact on the ability to test Raft combined with WebRTC.
 
-The Raft protocol description in "Consensus", Ongaro, has undergone
-some revisions since the original draft paper (including incorporation
-of suggestions by the author of this paper). These changes include
+The Raft protocol has undergone some revisions since the original
+draft paper \cite{raft_paper:ongaro14} (including incorporation of
+suggestions by the author of this paper). These changes include
 cluster membership simplifications, separating the concepts of
 committing entries to the log and applying entries to the state
 machine, clearer client interaction, etc. As part of the work for
 implementing Raft over WebRTC, the Raft.js implementation was updated
 to reflect these changes to the Raft protocol definition.
 
-The are also some other differences between Raft.js and the Ongaro
-paper:
+The are also some other differences between Raft.js and Raft as
+described in \cite[Consensus:~Diego]{raft_thesis:ongaro14}:
 
 \begin{enumerate}
-\item The paper describes the Raft RPCs in terms of the traditional request/response model where requests and responses are automatically correlated together by a lower level of the software stack. For example with HTTP 1.0 a separate network session is established for each request/response pair (HTTP 1.0). Other examples including using a unique per session ID to correlate request and response.  WebRTC DataChannel connections are message based rather than request/response based. The original Raft definition of RPC and RPC response messages almost contain enough information to function correctly in an environment without builtin request/response correlation. Raft.js includes a small modification to the response RPCs for requestVote and appendEntries to add a 'sourceId' field.
-\item The Raft paper is clear that each membership change must be delayed until all the previous membership change is committed (sequential).  It is implied that the leader node should track all pending membership change requests and apply them one at a time. However, in Raft.js, if a client requests a membership change while another change request is pending (uncommitted), the leader will reject the change request with a status of 'PENDING\_CONFIG\_CHANGE'. This keeps the core Raft implementation simpler with the trade-off being that the client implementation of membership change requests is slightly more complex.
+\item The paper describes the Raft RPCs in terms of the traditional
+    request/response model where requests and responses are
+    automatically correlated together by a lower level of the software
+    stack. For example with HTTP 1.0 a separate network session is
+    established for each request/response pair (HTTP 1.0). Other
+    examples including using a unique per session ID to correlate
+    request and response.  WebRTC DataChannel connections are message
+    based rather than request/response based. The original Raft
+    definition of RPC and RPC response messages almost contain enough
+    information to function correctly in an environment without
+    builtin request/response correlation. Raft.js includes a small
+    modification to the response RPCs for requestVote and
+    appendEntries to add a 'sourceId' field.
+\item The Raft paper is clear that each membership change must be
+    delayed until all the previous membership change is committed
+    (sequential).  It is implied that the leader node should track all
+    pending membership change requests and apply them one at a time.
+    However, in Raft.js, if a client requests a membership change
+    while another change request is pending (uncommitted), the leader
+    will reject the change request with a status of
+    'PENDING\_CONFIG\_CHANGE'. This keeps the core Raft implementation
+    simpler with the trade-off being that the client implementation of
+    membership change requests is slightly more complex.
 \end{enumerate}
 
 \subsection{WebRTC}
@@ -464,7 +530,7 @@ part of WebRTC:
     \begin{enumerate}
     \item \href{https://tools.ietf.org/html/rfc3264}{RFC3264: An Offer/Answer Model with the Session Description Protocol (SDP)}
     \item \href{https://tools.ietf.org/html/rfc2327}{RFC2327: SDP: Session Description Protocol}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-09}{WebRTC: Javascript Session Establishment Protocol (JSEP)}
+    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-09}{WebRTC: JavaScript Session Establishment Protocol (JSEP)}
     \item \href{https://tools.ietf.org/html/rfc5245}{RFC5245: Interactive Connectivity Establishment (ICE)}
     \item \href{https://tools.ietf.org/html/draft-ietf-mmusic-trickle-ice-02}{RFC5763: Trickle ICE: Incremental Provisioning of Candidates for the Interactive Connectivity Establishment (ICE) Protocol}
     \end{enumerate}
