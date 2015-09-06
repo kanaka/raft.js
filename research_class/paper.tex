@@ -315,10 +315,10 @@ already committed new entries).
 \subsection{Raft.js}
 
 Raft.js is an implementation of the Raft algorithm in JavaScript that
-was created by the author of this paper. %TODO/CITE
-Raft.js is designed to run in either a browser environment or within
-Node.js (server-side JavaScript). Raft.js implements the Raft
-algorithm as described in \cite[Consensus:~Diego]{raft_thesis:ongaro14}.
+was created by the author of this paper \cite{raft.js}.  Raft.js is
+designed to run in either a browser environment or within Node.js
+(server-side JavaScript). Raft.js implements the Raft algorithm as
+described in \cite[Consensus:~Diego]{raft_thesis:ongaro14}.
 
 \subsubsection{Modular Design}
 
@@ -336,9 +336,10 @@ class (\texttt{local.js}) implements RPC calls using plain JavaScript function
 calls between different instances of the class (nodes) in the same
 execution context. For example, the online Raft visualization at
 \href{http://kanaka.github.io/raft.js/}{http://kanaka.github.io/raft.js/}
-uses the \texttt{RaftServerLocal} class and instantiates it using
-a scheduling functions that fire when the user clicks on the "Step"
-button rather than due to the passage of time.
+\cite{raft.js:visualization} uses the \texttt{RaftServerLocal} class
+and instantiates it using a scheduling function that executes one
+scheduled event each time the user clicks on the "Step" button rather
+than due to the passage of time.
 
 The \texttt{RaftServerHttp} class (\texttt{http.js}) embeds a simple
 web server into each Raft node and then uses normal HTTP requests to
@@ -385,38 +386,42 @@ The are also some other differences between Raft.js and Raft as
 described in \cite[Consensus:~Diego]{raft_thesis:ongaro14}:
 
 \begin{enumerate}
-\item The paper describes the Raft RPCs in terms of the traditional
-    request/response model where requests and responses are
+\item The paper describes the Raft RPCs in terms of synchronous stream
+    based request/response model where requests and responses are
     automatically correlated together by a lower level of the software
-    stack. For example with HTTP 1.0 a separate network session is
-    established for each request/response pair (HTTP 1.0). Other
-    examples including using a unique per session ID to correlate
-    request and response.  WebRTC DataChannel connections are message
-    based rather than request/response based. The original Raft
-    definition of RPC and RPC response messages almost contain enough
-    information to function correctly in an environment without
-    builtin request/response correlation. Raft.js includes a small
-    modification to the response RPCs for requestVote and
-    appendEntries to add a 'sourceId' field.
+    stack. For example with HTTP 1.0 \cite{http:rfc1945} client
+    requests are followed by a server response on any given TCP
+    stream. Most remote procedure call mechanims also use
+    a synchronous request/response model. %TODO/CITE
+    WebRTC DataChannel connections are message based rather than
+    request/response stream based. %TODO/CITE
+    The original Raft definition of RPC request and response messages
+    almost contain enough information to function correctly in an
+    environment without builtin request/response correlation such as
+    UDP or SCTP when used with reliable transport disabled. %TODO/CITE
+    Raft.js includes a small modification to the response RPCs for
+    requestVote and appendEntries to add a 'sourceId' field that
+    enables the protocol to function with message based transports.
 \item The Raft paper is clear that each membership change must be
     delayed until all the previous membership change is committed
-    (sequential).  It is implied that the leader node should track all
-    pending membership change requests and apply them one at a time.
-    However, in Raft.js, if a client requests a membership change
-    while another change request is pending (uncommitted), the leader
-    will reject the change request with a status of
-    'PENDING\_CONFIG\_CHANGE'. This keeps the core Raft implementation
-    simpler with the trade-off being that the client implementation of
-    membership change requests is slightly more complex.
+    (sequential) \cite[Section~4.1]{raft_thesis:ongaro14}. It is
+    implied that the leader node should track all pending membership
+    change requests and apply them one at a time.  However, in
+    Raft.js, if a client requests a membership change while another
+    change request is pending (uncommitted), the leader will reject
+    the change request with a status of 'PENDING\_CONFIG\_CHANGE'.
+    This keeps the core Raft implementation simpler with the trade-off
+    being that the client implementation of membership change requests
+    is slightly more complex due to retry logic.
 \end{enumerate}
 
 \subsection{WebRTC}
 
-WebRTC is name of a collection of browser APIs and network protocols
-that are currently being standardized the W3C and IETF respectively.
-Collectively, these APIs and protocols work together to enable
-real-time peer-to-peer video, audio and data communication between
-browsers.
+WebRTC is a collection of browser APIs \cite{webrtc:feb2015} and
+network protocols \cite{draft-rtcweb-overview} that are currently
+being standardized the W3C and IETF respectively. Collectively these
+APIs and protocols enable real-time peer-to-peer video, audio and data
+communication between browsers.
 
 \subsubsection{WebRTC Discovery and Signaling}
 
@@ -426,36 +431,69 @@ environment or user agent (UA) is usually running behind a firewall in
 a private internet subnet. This complicates direct communication in
 several ways: the public Internet address of the user agent is unknown
 and dynamic, inbound connections are denied by default, and outbound
-connections are network address translated (NATed).
+connections are network address translated (NATed)
+\cite[Section~3.4]{draft-rtcweb-transports}.
 
 To establish a direct communication channel between browsers, WebRTC
-uses mechanism that is similar to the Session Initiation Protocol
-(SIP) commonly used for Voice-over-IP (VoIP) communication. This
+uses mechanism called Interactive Connectivity Establishment (ICE)
+that is similar to the Session Initiation Protocol (SIP) commonly used
+for Voice-over-IP (VoIP) communication \cite{RFC5245:ice}. This
 involves a third party server known as a signaling server. Each user
 agent (browser) connects to this server at a well known address in
 order to establish a direct connection to other user agents. The
 signaling server is also uses to communicate session control messages
-(open, close, error) and to negotiate media capabilities. The signaling
-server may optionally provide other services such as higher level
-session management, HTTP serving of the web application, address book
-service, client presence/availability, etc.
+(open, close, error) and to negotiate media capabilities. %TODO/CITE
+The signaling server may optionally provide other services such as
+higher level session management, HTTP serving of the web application,
+address book service, client presence/availability, etc. %TODO/CITE
 
 \subsubsection{WebRTC APIs}
 
 The WebRTC browser APIs enable web applications written in JavaScript
 to establish browser-to-browser network connectivity in order to
-stream real-time video, audio and data communication. These APIs are
-currently in the process of being standardized by the W3C organization
-(http://www.w3.org/TR/webrtc/) % TODO/CITE
+perform real-time video, audio and data communication. These APIs are
+currently in the process of being standardized by the \emph{Web
+Real-Time Communications Working Group} of the World Wide Web
+Consortium (W3C) \cite{webrtc:wg}.
 
-There are three primary WebRTC API definitions:
+There are three primary WebRTC interfaces:
 
 \begin{enumerate}
-\item \href{http://www.w3.org/TR/webrtc/\#rtcpeerconnection-interface}{RTCPeerConnection}: The RTCPeerConnection API represents a direct connection between two browsers. Each RTCPeerConnection object has an associated Interactive Connectivity Establishment (ICE) agent that is used to establish network connectivity through firewalls and NAT services.
+\item \emph{RTCPeerConnection} \cite{webrtc:rtcpeerconnection:feb2015}:
+    The RTCPeerConnection API represents a direct connection between
+    two browsers. Each RTCPeerConnection object has an associated
+    Interactive Connectivity Establishment (ICE) agent that is used to
+    establish network connectivity through firewalls and NAT services.
 
-\item \href{http://www.w3.org/TR/webrtc/\#media-stream-api-extensions-for-network-use}{MediaStream (aka getUserMedia}: The MediaStream API represents a stream of audio or video data.  MediaStreams can easily be sent and received over RTCPeerConnections. The MediaStream API definition provides a mechanism that allows JavaScript to enumerate the native MediaStreams that are provided by the browser such as a local web camera or a live video stream of the desktop (for desktop sharing).  Although support for MediaStreams was the original impetus for the creation of the WebRTC APIs and protocols, the Raft over WebRTC implementation does not make use of the MediaStream API.
+\item \emph{MediaStream~(aka~getUserMedia)} \cite{webrtc:media-stream:feb2015}:
+    The MediaStream API represents a stream of audio or video data.
+    MediaStream data can easily be sent and received over
+    RTCPeerConnections. The MediaStream API definition provides
+    a mechanism that allows JavaScript to enumerate the native
+    MediaStreams that are provided by the browser such as a local web
+    camera or a live video stream of the desktop (for desktop
+    sharing).  Although support for MediaStreams was the original
+    impetus for the creation of the WebRTC APIs and protocols, the
+    Raft over WebRTC implementation does not make use of the
+    MediaStream API.
 
-\item \href{http://www.w3.org/TR/webrtc/\#rtcdatachannel}{RTCDataChannel}: The RTCDataChannel API provides a mechanism for sending and receiving generic data. A single RTCPeerConnection can contain multiple RTCDataChannels. The RTCDataChannel API is modeled after the WebSocket API, however, unlike the WebSocket API which is reliable and guaranteed order transport (like TCP), each RTCDataChannel can be configured with different reliability and ordering settings. For example, by relaxing the reliability and ordering constraints on a RTCDataChannel, the average latency and jitter per message can be decreased even though some messages may be dropped or arrive out of order. The Raft protocol is specifically designed to support dropped or out-of-order messages so the transport options available with RTCDataChannel can be used to gain extra efficiency.
+\item
+    \emph{RTCDataChannel} \cite{webrtc:datachannel:feb2015}:
+    The RTCDataChannel API provides a mechanism for sending and
+    receiving generic data between User Agents (browsers). A single
+    RTCPeerConnection can contain multiple RTCDataChannels. The
+    RTCDataChannel API is modeled after the WebSocket API, however,
+    unlike the WebSocket API which is reliable and guaranteed order
+    transport (like TCP), each RTCDataChannel can be configured with
+    different reliability and ordering settings. For example, by
+    relaxing the reliability and ordering constraints on
+    a RTCDataChannel, the average latency and jitter per message can
+    be decreased even though some messages may be dropped or arrive
+    out of order. The Raft protocol is specifically designed to
+    support dropped or out-of-order messages so the transport options
+    available with RTCDataChannel can be used to gain extra
+    efficiency.
+    %TODO/CITE: more of them above
 \end{enumerate}
 
 
@@ -466,78 +504,37 @@ WebRTC system. The Internet Engineering Task Force (IETF) organization
 is responsible for specifying and/or standardizing (where necessary)
 the protocols that are part of WebRTC. In many cases an existing
 protocol is applicable and is referenced or extended as part of the
-WebRTC suite.
+WebRTC suite. %TODO/CITE
 
-Describing all the protocols that make up the WebRTC suite is beyond
-the scope of the this document. However, here is a (incomplete) list
-of WebRTC protocols drafts and related protocols that are
-part of WebRTC:
+The protocols that make up the WebRTC suite are categorized into
+five general functionality groups:
 
 \begin{enumerate}
-\item General:
-    \begin{enumerate}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-overview-13}{WebRTC: Overview}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-security-arch-11}{WebRTC: Security Architecture}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-security-08}{WebRTC: Security Considerations}
-    \end{enumerate}
-\item Data transport:
-    \begin{enumerate}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-transports-08}{WebRTC: Data transport overview}
-    \item \href{https://tools.ietf.org/html/draft-ietf-tsvwg-rtcweb-qos-03}{WebRTC: DSCP and other packet markings for RTCWeb QoS}
-    \item \href{https://tools.ietf.org/html/draft-ietf-tsvwg-sctp-dtls-encaps-09}{DTLS Encapsulation of SCTP Packets}
-    \item \href{https://tools.ietf.org/html/draft-ietf-mmusic-sctp-sdp-14}{Stream Control Transmission Protocol (SCTP)-Based Media Transport in the Session Description Protocol (SDP)}
-    \item \href{https://tools.ietf.org/html/draft-ietf-tsvwg-sctp-ndata-02}{Stream Schedulers and a New Data Chunk for the Stream Control Transmission Protocol}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-rtp-usage-23}{WebRTC: Media Transport and Use of RTP}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13}{WebRTC: Data Channels}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-data-protocol-09}{WebRTC: Data Channel Establishment Protocol}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-alpn-01}{WebRTC: Application Layer Protocol Negotiation for Web Real-Time Communications (WebRTC)}
-    \item \href{https://tools.ietf.org/html/rfc5245}{RFC5245: Interactive Connectivity Establishment (ICE)}
-    \item \href{https://tools.ietf.org/html/rfc5128}{RFC5128: Peer-to-Peer (P2P) Communication across Network Address Translators (NATs)}
-    \item \href{https://tools.ietf.org/html/rfc5389}{RFC5389: Session Traversal Utilities for NAT (STUN)}
-    \item \href{https://tools.ietf.org/html/rfc3489}{RFC3489: STUN - Simple Traversal of User Datagram Protocol (UDP) Through Network Address Translators (NATs)}
-    \item \href{https://tools.ietf.org/html/rfc5766}{RFC5766: Traversal Using Relays around NAT (TURN)}
-    \item \href{https://tools.ietf.org/html/rfc6156}{RFC6156: Traversal Using Relays around NAT (TURN) Extension for IPv6}
-    \item \href{https://tools.ietf.org/html/rfc6544}{RFC6544: TCP Candidates with Interactive Connectivity  Establishment (ICE)}
-    \item \href{https://tools.ietf.org/html/RFC4571}{RFC4571: Framing Real-time Transport Protocol (RTP) and RTP Control Protocol (RTCP) Packets over Connection-Oriented Transport}
-    \item \href{https://tools.ietf.org/html/rfc5764}{RFC5764: Datagram Transport Layer Security (DTLS) Extension to Establish Keys for the Secure Real-time Transport Protocol (SRTP)}
-    \end{enumerate}
-
-\item Data framing and security
-    \begin{enumerate}
-    \item \href{https://tools.ietf.org/html/rfc3550}{RFC3550: Real-time Transport Protocol (RTP)}
-    \item \href{https://tools.ietf.org/html/rfc3711}{RFC3711: Secure Real-time Transport Protocol (SRTP)}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-rtp-usage-23}{WebRTC: Media Transport and Use of RTP}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-data-channel-13}{WebRTC: Data Channels}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-data-protocol-09}{WebRTC: Data Channel Establishment Protocol}
-    \end{enumerate}
-\item Data formats (audio)
-    \begin{enumerate}
-    \item \href{https://tools.ietf.org/html/draft-cbran-rtcweb-codec-02}{WebRTC: WebRTC Codec and Media Processing Requirements}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-audio-07}{WebRTC: Audio Codec and Processing Requirements}
-    \item \href{https://tools.ietf.org/html/rfc6716}{RFC6716: Opus Audio Codec}
-    \item \href{https://tools.ietf.org/html/draft-ietf-payload-rtp-opus-11}{RTP Payload Format for Opus Speech and Audio Codec}
-    \item \href{https://tools.ietf.org/html/rfc3551}{RFC3551: RTP Profile for Audio and Video Conference}
-    \item \href{https://tools.ietf.org/html/rfc4733}{RFC4733: RTP Payload for DTMF Digits, Telephony Tones, and Telephony Signals}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-audio-codecs-for-interop-01}{WebRTC: Additional WebRTC audio codecs for interoperability with legacy networks}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-video-05}{WebRTC: Video Processing and Codec Requirements}
-    \item \href{https://tools.ietf.org/html/rfc6386}{RFC6386: VP8 Data Format and Decoding Guide}
-    \item \href{http://www.itu.int/rec/T-REC-H.264}{ITU H.264: Advanced video coding for generic audiovisual services}
-    \item \href{https://tools.ietf.org/html/draft-ietf-payload-vp8-15}{RTP Payload Format for VP8 Video}
-    \item \href{https://tools.ietf.org/html/rfc6236}{RFC6236: Negotiation of Generic Image Attributes in the Session Description Protocol (SDP)}
-    \end{enumerate}
-
-\item Connection management
-    \begin{enumerate}
-    \item \href{https://tools.ietf.org/html/rfc3264}{RFC3264: An Offer/Answer Model with the Session Description Protocol (SDP)}
-    \item \href{https://tools.ietf.org/html/rfc2327}{RFC2327: SDP: Session Description Protocol}
-    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-jsep-09}{WebRTC: JavaScript Session Establishment Protocol (JSEP)}
-    \item \href{https://tools.ietf.org/html/rfc5245}{RFC5245: Interactive Connectivity Establishment (ICE)}
-    \item \href{https://tools.ietf.org/html/draft-ietf-mmusic-trickle-ice-02}{RFC5763: Trickle ICE: Incremental Provisioning of Candidates for the Interactive Connectivity Establishment (ICE) Protocol}
-    \end{enumerate}
+    \item data transport
+    \item data framing and security
+    \item connection management
+    \item data formats
+    \item presentation and control
+    \item and local system support functions
 \end{enumerate}
 
-Note: the signaling transport itself is not defined as part of WebRTC.
-This is up to the application designer.
+The last three functionality groups focus on interactive audio and video
+applications and are less relevant to Raft over WebRTC. The WebRTC
+section of the bibliography %TODO: reference link
+has a (incomplete) list of WebRTC specific protocols drafts and other
+related protocol standards for the first three functionality groups
+(data transport, data framing and security, and connection
+management).
+
+The signaling transport itself is not defined as part of WebRTC.
+This is up to the application designer. The JavaScript interface used
+for establishing the initial connection (signaling) in the WebRTC 1.0
+standard is somewhat complicated. A competing standard called Object
+Real-time Communication (ORTC) is working to define a simpler and more
+modular JavaScript API for WebRTC signaling \cite{ortc2014}. However,
+at the time of this paper, the ORTC interface was not yet widely
+supported and still in a state of flux. The use of PeerJS provides an
+abstraction that is likely to transparently support ORTC in the future.
 
 \subsection{PeerJS}
 
@@ -547,15 +544,6 @@ implements a WebRTC signaling server. The second component is
 a JavaScript library that interacts with that signaling server and
 also provides a simpler interface for using the WebRTC APIs.
 
-The JavaScript interface use for establishing the initial connection
-(signaling) in the WebRTC 1.0 standard is somewhat complicated.
-A competing standard called Object Real-time Communication (ORTC) is
-working to define a simpler and more modular JavaScript API for WebRTC
-signaling. However, at the time of this work, the ORTC interface was
-not yet widely supported and still in a state of flux.  The use of
-PeerJS provides a suitable abstraction in the meantime (and will
-likely be modified to support ORTC).
-
 \subsubsection{PeerJS Server}
 
 The PeerJS project provides a simple WebRTC signaling server called
@@ -564,7 +552,7 @@ to perform WebRTC signaling on behalf of browser clients. The
 PeerServer server is also extensible so that more advanced services
 can be built with it. The PeerJS project includes an extension to
 PeerServer called ExpressPeerServer that combines a PeerJS signaling
-server with the Node.js based Express web application framework.
+server with the popular Node.js ExpressJS web application framework.
 % (TODO/CITE)
 
 \subsubsection{PeerJS Client Library}
@@ -572,19 +560,19 @@ server with the Node.js based Express web application framework.
 The PeerJS client library provides an simple abstraction over the
 native browser WebRTC APIs. The WebRTC API standards are not yet
 finalized and so different browsers and browser releases may support
-different versions of the WebRTC draft APIs. The PeerJS client library
-abstracts over these differences and provides a common interface so
-that the application developer does not have to deal directly with
-browser differences.
+different versions of the WebRTC draft APIs. %TODO/CITE
+The PeerJS client library abstracts over these differences and
+provides a common interface so that the application developer does not
+have to deal directly with browser differences.
 
 The PeerJS client library also provides a default signaling mechanism
 that is designed to operate with a PeerJS signaling server. This is
 particularly helpful because much of the WebRTC signaling transport
 and protocol is not defined as part of the WebRTC standardization
-effort. The PeerJS organization provides a cloud-hosted version of
-a PeerJS compatible signaling server, however an application developer
-can also run their own PeerJS signaling service using the PeerServer
-server described above.
+effort. %TODO/CITE
+The PeerJS organization provides a cloud-hosted version of a PeerJS
+compatible signaling server, however an application developer can also
+run their own signaling service using PeerJS PeerServer.
 
 
 \section {Design and Implementation}
@@ -1483,12 +1471,70 @@ make browser-to-browser communication possible. Last but not least,
 I would like to thank my family for putting up with the long nights
 and weekends I spent on this project. Thanks!
 
-% TODO: references
-
 \end{multicols}
 
-\printbibliography
-%\bibliographystyle{plain}
-%\bibliography{references/raft,references/other}
+\printbibliography[title={General references},notkeyword=rtc-general,notkeyword=rtc-transport,notkeyword=rtc-framing]
+
+\nocite{draft-rtcweb-overview}
+\nocite{draft-rtcweb-security-arch}
+\nocite{draft-rtcweb-security}
+\printbibliography[title={WebRTC general references},keyword=rtc-general]
+
+\nocite{draft-rtcweb-transports}
+\nocite{draft-rtcweb-qos}
+\nocite{RFC4960:sctp}
+\nocite{RFC3758:sctp-reliability}
+\nocite{draft-sctp-dtls-encaps}
+\nocite{draft-mmusic-sctp-sdp}
+\nocite{draft-sctp-ndata}
+\nocite{draft-rtcweb-rtp-usage}
+\nocite{draft-rtcweb-data-channel}
+\nocite{draft-rtcweb-data-protocol}
+\nocite{draft-rtcweb-alpn}
+\nocite{RFC5245:ice}
+\nocite{RFC5128:p2p-nat}
+\nocite{RFC5389:stun}
+\nocite{RFC3489:stun-udp}
+\nocite{RFC5766:turn}
+\nocite{RFC6156:turn-ipv6}
+\nocite{RFC6544:tcp-ice}
+\nocite{RFC4571:rtp-rtcp}
+\nocite{RFC5764:dtls-srtp}
+\printbibliography[title={WebRTC data transport},keyword=rtc-transport]
+
+\nocite{RFC3550:rtp}
+\nocite{RFC3711:srtp}
+%\nocite{draft-rtcweb-rtp-usage}
+%\nocite{draft-rtcweb-data-channel}
+%\nocite{draft-rtcweb-data-protocol}
+\printbibliography[title={WebRTC framing and security},keyword=rtc-framing]
+
+\nocite{RFC2327:sdp}
+\nocite{RFC3264:sdp-offer-answer}
+\nocite{draft-rtcweb-jsep}
+%\nocite{RFC5245:ice}
+\nocite{draft-mmusic-trickle-ice}
+\nocite{RFC5763:srtp-using-dtls}
+\printbibliography[title={WebRTC connection management},keyword=rtc-connection]
+
+%%%
+
+%\begin{enumerate}
+%\item Data formats (audio)
+%    \begin{enumerate}
+%    \item \href{https://tools.ietf.org/html/draft-cbran-rtcweb-codec-02}{WebRTC: WebRTC Codec and Media Processing Requirements}
+%    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-audio-07}{WebRTC: Audio Codec and Processing Requirements}
+%    \item \href{https://tools.ietf.org/html/rfc6716}{RFC6716: Opus Audio Codec}
+%    \item \href{https://tools.ietf.org/html/draft-ietf-payload-rtp-opus-11}{RTP Payload Format for Opus Speech and Audio Codec}
+%    \item \href{https://tools.ietf.org/html/rfc3551}{RFC3551: RTP Profile for Audio and Video Conference}
+%    \item \href{https://tools.ietf.org/html/rfc4733}{RFC4733: RTP Payload for DTMF Digits, Telephony Tones, and Telephony Signals}
+%    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-audio-codecs-for-interop-01}{WebRTC: Additional WebRTC audio codecs for interoperability with legacy networks}
+%    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-video-05}{WebRTC: Video Processing and Codec Requirements}
+%    \item \href{https://tools.ietf.org/html/rfc6386}{RFC6386: VP8 Data Format and Decoding Guide}
+%    \item \href{http://www.itu.int/rec/T-REC-H.264}{ITU H.264: Advanced video coding for generic audiovisual services}
+%    \item \href{https://tools.ietf.org/html/draft-ietf-payload-vp8-15}{RTP Payload Format for VP8 Video}
+%    \item \href{https://tools.ietf.org/html/rfc6236}{RFC6236: Negotiation of Generic Image Attributes in the Session Description Protocol (SDP)}
+%    \end{enumerate}
+%\end{enumerate}
 
 \end{document}
