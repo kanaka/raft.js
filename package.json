@@ -6,7 +6,7 @@
     "url": "http://github.com/kanaka"
   },
   "description": "Raft.js is an implementation of the Raft Consensus Algorithm",
-  "license": "MPL-2",
+  "license": "MPL-2.0",
   "version": "0.0.1",
   "repository": {
     "type": "git",
