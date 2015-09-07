@@ -312,6 +312,16 @@ reads of stale data (the leader of the larger partition may have
 already committed new entries).
 \cite[Section~6.4]{raft_thesis:ongaro14}.
 
+\end{multicols}
+
+\begin{figure*}[h]
+\centerline{\includegraphics[width=0.8\textwidth]{imgs/raft_rtc_architecture}}
+\caption{Raft over RTC Architecture}
+  \label{fig:raft_rtc_architecture}
+\end{figure*}
+
+\begin{multicols}{2}
+
 \subsection{Raft.js}
 
 Raft.js is an implementation of the Raft algorithm in JavaScript that
@@ -575,18 +585,7 @@ compatible signaling server, however an application developer can also
 run their own signaling service using PeerJS PeerServer.
 
 
-\section {Design and Implementation}
-
 \end{multicols}
-
-\begin{figure*}[h]
-\centerline{\includegraphics[width=0.8\textwidth]{imgs/raft_rtc_architecture}}
-\caption{Raft over RTC Architecture}
-  \label{fig:raft_rtc_architecture}
-\end{figure*}
-
-%\begin{multicols}{2}
-%\end{multicols}
 
 \begin{figure*}[h]
 \centerline{\includegraphics[width=0.8\textwidth]{imgs/raft_rtc_sequence}}
@@ -595,6 +594,8 @@ run their own signaling service using PeerJS PeerServer.
 \end{figure*}
 
 \begin{multicols}{2}
+
+\section {Design and Implementation}
 
 \subsection{Incremental Steps}
 
@@ -1303,7 +1304,7 @@ a black line representing the average at each cluster size.
         \label{fig:F}
     \end{subfigure}
     \caption{Recovery from Leader Failure}
-    \label{fig:E}
+    \label{fig:recovery-leader-failure}
 
 %%% Next Row
 \rule{\textwidth}{0.3pt}
@@ -1385,7 +1386,7 @@ a black line representing the average at each cluster size.
         \label{fig:I}
     \end{subfigure}
     \caption{Recovery from Half Cluster Failure}
-    \label{fig:G}
+    \label{fig:recovery-half-failure}
 \end{figure*}
 
 
