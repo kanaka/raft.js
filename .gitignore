@@ -2,3 +2,8 @@ research_class/*.log
 research_class/*.aux
 research_class/*.pdf
 research_class/*.out
+research_class/*-blx.bib
+research_class/*.bbl
+research_class/*.blg
+research_class/*.run.xml
+node_modules
