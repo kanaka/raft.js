@@ -602,31 +602,59 @@ run their own signaling service using PeerJS PeerServer.
 During the planning phase, the project was broken down into ten incremental steps:
 
 \begin{enumerate}
-\item Simple WebRTC messaging: implement a small JavaScript application that uses the PeerJS client library and an unmodified PeerJS signaling server. Demonstrate communication over WebRTC DataChannel using two browser instances (or browser tabs).
-
-\item Raft.js over WebRTC: combine the existing Raft.js implementation with the small JavaScript application above to demonstrate Raft over WebRTC. This step uses a statically configured three node cluster (three browser tabs). The PeerJS signaling server is polled to retrieve the list of other clients and the Raft cluster is started when the number of PeerJS clients reaches three.
-
-\item Update Raft.js protocol: update the Raft.js implementation to match the latest description of the Raft protocol (as described in "Consensus", Ongaro dissertation). This includes the implementation of the simplified membership change algorithm (sequential changes) and the separation of the log commit and state machine apply concepts. Additionally, the new Raft.js implementation always starts a new Raft cluster as a cluster with a single node and additional nodes are dynamically added to the cluster (as suggested in section 4.4 of the paper).
-
-\item Dynamic Raft.js over WebRTC: enhance the signaling server with support for multiple sessions/channels to enable separate Raft clusters with the same signaling server. Start each cluster with a single node and automatically add and remove Raft nodes as they come and go.
-
-\item Visual representation: display Raft node state and RPC statistics in addition to the internal Raft log messages.
-
-\item Sessionless/Datagram RPC messages: change Raft RPC requests and response messages so that RPC responses have enough context to be handled separately from RPC requests. Specifically this enables Raft to support datagram (sessionless) network transports like WebRTC.
-
-\item Atomic state machine operations: implement a state machine update operation that only succeeds if no other operation has been applied to the same key since the last time this client read from that key.
-
-\item Automatic client request forwarding: extend the client request RPC to also be sessionless/datagram based. Implement an asynchronous JavaScript function that determines which node is the leader and forwards client request RPCs to the leader. This function must also correlate responses to the client request and invoke the callback for the original request.
-
-\item Chat application: add the ability to send a message to the chat log using the client request forwarding functionality together with atomic state machine operation. Show the current chat history based on the chat entries in the state machine.
-
-\item Server as Raft.js peer (aspirational): enable server nodes (Raft.js running on Node.js) to fully participate as Raft cluster nodes.
+\item Simple WebRTC messaging: implement a small JavaScript
+    application that uses the PeerJS client library and an unmodified
+    PeerJS signaling server. Demonstrate communication over WebRTC
+    DataChannel using two browser instances (or browser tabs).
+\item Raft.js over WebRTC: combine the existing Raft.js implementation
+    with the small JavaScript application above to demonstrate Raft
+    over WebRTC. This step uses a statically configured three node
+    cluster (three browser tabs). The PeerJS signaling server is
+    polled to retrieve the list of other clients and the Raft cluster
+    is started when the number of PeerJS clients reaches three.
+\item Update Raft.js protocol: update the Raft.js implementation to
+    match the latest description of the Raft protocol
+    \cite{raft_thesis:ongaro14}. This includes the implementation of
+    the simplified membership change algorithm (sequential changes)
+    and the separation of the log commit and state machine apply
+    concepts.  Additionally, the new Raft.js implementation always
+    starts a new Raft cluster as a cluster with a single node and
+    additional nodes are dynamically added to the cluster
+    \cite[Section~4.4]{raft_thesis:ongaro14}.
+\item Dynamic Raft.js over WebRTC: enhance the signaling server with
+    support for multiple sessions/channels to enable separate Raft
+    clusters with the same signaling server. Start each cluster with
+    a single node and automatically add and remove Raft nodes as they
+    come and go.
+\item Visual representation: display Raft node state and RPC
+    statistics in addition to the internal Raft logging messages.
+\item Sessionless/Datagram RPC messages: change Raft RPC requests and
+    response messages so that RPC responses have enough context to be
+    handled separately from RPC requests. Specifically this enables
+    Raft to support datagram (sessionless) network transports like
+    WebRTC.
+\item Atomic state machine operation: implement a state machine
+    update operation that only succeeds if no other operation has been
+    applied to the same key since the last time this client read from
+    that key.
+\item Automatic client request forwarding: extend the client request
+    RPC to also be sessionless/datagram based. Implement an
+    asynchronous JavaScript function that determines which node is the
+    leader and forwards client request RPCs to the leader. This
+    function must also correlate RPC responses to the client request
+    and invoke the callback for the original request.
+\item Chat application: add the ability to send a chat message to the
+    log using the client request forwarding functionality together
+    with atomic state machine operation. Show the current chat history
+    based on the chat entries in the state machine.
+\item Server as Raft.js peer (aspirational): enable server nodes
+    (Raft.js running on Node.js) to fully participate as Raft cluster
+    nodes.
 \end{enumerate}
 
 Steps 1-9 were successfully implemented for this paper. Step 10 was an
 aspirational goal because this functionality is not yet supported in
-PeerJS although it is being tracked by issue report:
-https://github.com/peers/peerjs/issues/103
+PeerJS \cite{peerjs:103}.
 
 \subsection{Server}
 
@@ -637,38 +665,55 @@ addition to the signaling function, the server also provides the
 following service endpoints:
 
 \begin{enumerate}
-\item Static web service endpoint: this serves the static HTML, CSS and JavaScript that make up the Raft over WebRTC web application.
+\item Static web service endpoint: this serves the static HTML, CSS
+    and JavaScript that make up the Raft over WebRTC web application.
+\item New channel endpoint: when a browser loads this endpoint, a new
+    PeerJS channel is created and the browser is redirected to a URL
+    for loading the main application (via static file service above).
+    The redirect URL has a query string appended that contains the
+    channel ID of the new channel that was just created. In addition
+    the redirect URL has a fragment identifier (hash/history) that
+    communicates to the web application that this is the first server
+    in the channel.
+\item Peer list endpoint: this endpoint takes a channel ID and returns
+    the list of WebRTC peers (browser user agents) that are currently
+    connected to that channel.
 
-\item New channel endpoint: when a browser loads this endpoint, a new PeerJS channel is created and the browser is redirected to a URL for loading the main application (via static file service above).  The redirect URL has a query string appended that contains the channel ID. In addition the redirect URL has a fragment identifier (hash/history) that communicates to the web application that this is the first server in the channel.
-
-\item Peer list endpoint: this endpoint takes a channel ID and returns the list of WebRTC peers (browser user agents) that are currently registered in that channel.
-
-Refer to the "4.3 Client" section for a description of how these
-endpoints interact.
 \end{enumerate}
 
+Refer to Section~\ref{section:design-client} and
+Figure~\ref{fig:raft_rtc_sequence} for a description of how these
+endpoints interact.
+
 \subsection{Client}
+    \label{section:design-client}
 
 The Raft over WebRTC testing application is designed as a single web
-page (`rtc.html`). The application has different starting behavior
-depending on the value of the URL query string (the URL component
-following the "?" and up to the "\#") and the fragment identifier (the
-URL component after the "\#").
+page (\texttt{rtc.html} or \texttt{chat.html}). The application has
+different starting behavior depending on the value of the URL query
+string (the URL component following the "?" and up to the "\#") and
+the fragment identifier (the URL component after the "\#").
 
-When a new Raft cluster is created, the browser (user agent) connects
-to the server new channel endpoint. This endpoint causes the server to
-create a new channel for PeerJS signaling. Once this is complete the
-server responds to the browser with a redirect message that contains
-the new channel identifier in the query parameter and an indication
-that this is the very first Raft cluster node in the fragment
-identifier.
+When a new Raft cluster is created, the user agent (browser) connects
+to the server's new channel endpoint
+(Figure~\ref{fig:raft_rtc_sequence}~[1]). This endpoint causes the
+server to create a new channel for PeerJS signaling
+(Figure~\ref{fig:raft_rtc_sequence}~[2]). Once this is complete the
+server responds to the browser with a redirect message
+that contains the new channel identifier in the query parameter and an
+indication that this is the very first Raft cluster node in the
+fragment identifier (Figure~\ref{fig:raft_rtc_sequence}~[3]).
 
 The browser follows the redirect and loads the static web application
-at the static file endpoint provided by the server. This includes the
-main application page (`rtc.html`), the core raft algorithm
-(`base.js` and `local.js`), the PeerJS client library (`peer.js`), the
-actual Raft over WebRTC implementation (`rtc.js`), and a layout
-stylesheet (`web/demo.css`).
+at the static file endpoint provided by the server
+(Figure~\ref{fig:raft_rtc_sequence}~[4]). This includes the
+main application page (\texttt{rtc.html} or \texttt{chat.html}), the
+core raft algorithm (\texttt{base.js} and \texttt{local.js}), the
+PeerJS client library (\texttt{peer.js}), the actual Raft over WebRTC
+implementation (\texttt{rtc.js}), a layout stylesheet
+(\texttt{web/demo.css}), and higher-level application code if that is
+being loaded (\texttt{chat.js})
+(Figure~\ref{fig:raft_rtc_sequence}~[5]).
 
 If the URL fragment identifier is set to "firstServer", then this Raft
 node is initialized as the leader of a single node cluster and all
@@ -677,87 +722,106 @@ query parameter contains the ID of this cluster (the PeerJS channel).
 
 Subsequent nodes are added to the same Raft cluster by starting a new
 browser context (separate browser, browser window, or browser tab) and
-loading the same URL (which no longer has the "firstServer" fragment
-identifier). There is a convenience link provided in the application
-page that opens a new window with a new cluster node.
+loading the same URL without the "firstServer" fragment identifier
+(Figure~\ref{fig:raft_rtc_sequence}~[9]). There is a convenience link
+provided in the application page that opens a new browser window with
+a new cluster node (see \ref{fig:browser_1}).
 
-When the page first loads, a PeerJS signaling connection is
-established with the server. Once this connection is established, the
-application will be notified when any PeerJS clients connect to or
-disconnect from the server. After the PeerJS signaling connection is
-established, the client immediately queries the Peer list endpoint to
-discover any clients that were connected prior to when this node
-connected to the server.
+When each page first loads, a PeerJS signaling connection is
+established with the server
+(Figure~\ref{fig:raft_rtc_sequence}~[6]~and~[11]). Once this
+connection is established, the application will be notified when any
+PeerJS clients connect to or disconnect from the server.  After the
+PeerJS signaling connection is established, the client immediately
+queries the Peer list endpoint
+(Figure~\ref{fig:raft_rtc_sequence}~[7]~and~[12]~and~[14]]) to discover
+any clients that were connected prior to when this node connected to
+the server (Figure~\ref{fig:raft_rtc_sequence}~[8]~and~[13]~and~[15]]).
 
 The web application also begins a periodic async polling function
-(`addRemoveServersAsync`) when the page loads. When the node is a Raft
+(\texttt{addRemoveServersAsync}) when the page loads. When the node is a Raft
 leader, the function compares the current active list of PeerJS clients to
-the Raft cluster node list. If there are any differences between the
-two lists, then any new clients are added to the Raft cluster and
+the Raft cluster membership list. If there are any differences between
+the two lists, then any new clients are added to the Raft cluster and
 missing clients are removed from the Raft cluster one at a time using
-the `addServer` and `removeServer` RPC calls. Servers additions are
-prioritized before removals (as recommended in Ongaro 4.4) % TODO/CITE
-in order to maximize availability.
+the \texttt{addServer} and \texttt{removeServer} RPC calls. Servers
+additions are prioritized before removals 
+in order to maximize availability
+\cite[Section~4.4]{raft_thesis:ongaro14}.
 
 When an instance of the web application starts that is not
-a "firstServer", the normal Raft timers are not automatically enabled
-until the server receives an RPC. The prevents the server from
-possibly becoming a leader before it is incorporated into the cluster
-by an appendEntries RPC from the "true" leader.
+a "firstServer", the normal Raft timers are not enabled until the
+server receives its first RPC. The prevents the server from
+trying to becoming a leader before it is incorporated into the cluster
+by an appendEntries RPC from the true cluster leader.
 
 In addition to the low level Raft message log, the following
 statistics are shown in the application:
 
 \begin{enumerate}
 \item \emph{Term}: the current Raft leadership term.
-\item \emph{State}: the current Raft node state (follower, candidate, or leader)
-\item \emph{Cluster Size}: a count of the current Raft cluster membership (number of nodes currently participating in the cluster)
+\item \emph{State}: the current Raft node state (follower, candidate,
+    or leader)
+\item \emph{Cluster Size}: a count of the current Raft cluster
+    membership (number of nodes currently participating in the
+    cluster)
 \item \emph{Log Length}: number of entries in the transaction log.
-\item \emph{Request Votes Sent/Received}: the number of `requestVote` RPCs that have been sent from and received by this node.
-\item \emph{Append Entries Sent/Received}: the number of `appendEntries` RPCs that have been sent from and received by this node.
+\item \emph{Request Votes Sent/Received}: the number of `requestVote`
+    RPCs that have been sent from and received by this node.
+\item \emph{Append Entries Sent/Received}: the number of
+    `appendEntries` RPCs that have been sent from and received by this
+    node.
 \end{enumerate}
 
-\subsubsection{Client Request Redirect Implementation}
+\subsubsection{Client Request Redirects}
 
-In the Raft over WebRTC implementation each local browser is a client
+% TODO: rename clientRequest* function to not clash with RPC names
+% (maybe raftRequest*?)
+
+In the Raft over WebRqTC implementation each local browser is a client
 of the Raft cluster. However in Raft, the leader node is the only node
 that adds entries to the log so clients on follower nodes must have
-a way to communicate with the leader. This is implemented as pair of
-functions named clientRequest and clientRequestResponse. clientRequest
-is called by the client with the arguments of a client request RPC and
+a way to communicate with the leader. This is implemented as a pair of
+functions named \texttt{clientRequest} and
+\texttt{clientRequestResponse}. The \texttt{clientRequest} function is
+called by the client with the arguments of a client request RPC and
 a callback function to be called once the request is completed. The
-clientRequest/clientRequestResponse functions work as follows:
+\texttt{clientRequest}/\texttt{clientRequestResponse} functions work
+as follows:
 
 \begin{enumerate}
-\item the clientRequestResponse is registered with the local Raft.js
-    implementation as the callback function anytime
-    clientRequestResponse RPCs are received.
-\item the clientRequest function keeps track of the current leader ID.
-    If the current leader ID is not set or this node is the leader
-    then the client's request is sent directly to the local Raft node.
-    If the current leader ID is set then the request is sent to that
-    node as a normal RPC request over the WebRTC channel.
-\item when the clientRequestResponse function is called and the status
-    is "NOT\_LEADER" then the current leader ID being tracked by the
-    clientRequest function is set to the leader ID returned in the
-    response. Then the original request is re-issued over the normal
-    WebRTC channel to the leader.
-\item when the clientRequestResponse function is called with
+\item the \texttt{clientRequestResponse} is registered with the local
+    Raft.js implementation as the callback function anytime
+    a \texttt{clientRequestResponse} RPC is received.
+\item the \texttt{clientRequest} function keeps track of the current
+    leader ID.  If the current leader ID is not set or this node is
+    the leader then the client request RPC is sent directly to the
+    local Raft node bypassing the network transport layer.  If the
+    current leader ID is set then the request is sent to that node as
+    a normal RPC request over the WebRTC channel.
+\item when the \texttt{clientRequestResponse} function is called and
+    the status is "NOT\_LEADER" then the current leader ID being
+    tracked by the \texttt{clientRequest} function is set to the
+    leader ID specified in the response. Then the original request is
+    re-issued over the normal WebRTC channel to the leader.
+\item when the \texttt{clientRequestResponse} function is called with
     a successful status, the original callback argument of the
-    clientRequest function is called with the results from the RPC
-    response.
+    \texttt{clientRequest} function is called with the results from
+    the RPC response.
 \end{enumerate}
 
 \subsection{Chat Application}
 
 The chat application extends the basic Raft.js over WebRTC client. The
 chat application provides a large text area containing the chat
-history and a text entry field below it. When the user clicks on the
-\emph{Send} button (or pressed enter), the current node ID is
+history and a text entry field below it
+(see Figure~\ref{fig:browser_chat_1}). When the user clicks on the
+\emph{Send} button (or presses enter), the current node ID is
 prepended to the beginning of the text line and it is added to
 a pending send queue and the text entry field is blanked. A function
 to flush sends runs periodically (currently every 100ms) and does the
 following:
+% TODO: 100ms above should be less
 
 \begin{enumerate}
 \item If there is line of text that has been sent but not yet
@@ -765,45 +829,51 @@ following:
     on the pending send queue, then the function does nothing.
 \item A text line is removed from the head of the pending send queue
     and stored in \emph{curSend} to indicate that a send is in
-    progress. The a client request is made using an atomic
-    \emph{seqAppend} command to add the new text to the state machine.
-    The \emph{seqAppend} operation attempts to append the text line to
-    a list at the \emph{history} key in the state machine.
+    progress. Then a client request is made using an atomic
+    \emph{seqAppend} command to add the new text to the state machine
+    (\emph{seqAppend} is describe below).  The \emph{seqAppend}
+    operation attempts to append the text line to a list at the
+    \emph{history} key in the state machine.
 \item When the atomic \emph{seqAppend} operation completes, it may
     have failed (if another text line was appended first), in which
     case the flush function puts the failed text line back on the
     pending send queue. Whether the send was successful or failed, the
     \emph{curSend} variable is set to nil/null to indicate that no
-    send is in progress (the next time the flush function runs it will
-    attempt to send again).
+    send is in progress. The next time the flush function runs it will
+    attempt to send again. % TODO: reword
 \end{enumerate}
 
+% TODO: normalize use of \texttt and \emph
+
 The chat application also extends the default set of state machine
-operations to add a seqAppend operation. This is an atomic operation
-that is implemented as follows:
+operations to add a \emph{seqAppend} operation. This is an atomic
+operation that is implemented as follows:
 
 \begin{enumerate}
-\item the seqAppend operation operates on a specially structured
-    key/value pair in the state machine map. The value is
-    a associative map that contains a counter and list structure that
-    contains the actual data. seqAppend operations are sent with both
-    a count and then new value to append.
-\item When a seqAppend operation is applied to the state machine and
-    the count value in the command matches the counter in the state
-    machines value, then the new value in the request is added to the
-    list and the counter is incremented. If the count value does not
-    match then counter then the the operation is not applied. In
-    either case, a list is returned that contains two values: whether
-    the seqAppend operation succeeded and what the current value of
-    the counter.
-\item the first time the seqAppend operation is used on a non-existent
+\item the \emph{seqAppend} operation operates on a specially structured
+    key/value pair in the state machine map. The value of the pair is
+    another associative map that contains a counter and list structure
+    where the actual chat lines are accumulated. \emph{seqAppend}
+    operations are sent with both a count and then new value to
+    append.
+\item when a \emph{seqAppend} operation is applied to the state
+    machine and the count value in the command matches the counter in
+    the state machine's value, then the new line in the request is
+    added to the value list and the counter is incremented. If the count
+    value does not match the counter then the the operation is not
+    applied. In either case, a list is returned in the
+    \texttt{clientRequestResponse} that contains two values: a boolean
+    indicating whether the \emph{seqAppend} operation succeeded and
+    a number indicating the current value of the counter.
+\item the first time the \emph{seqAppend} operation is used on a non-existent
     key, the structure described above is created with the counter set
-    to 0 and the list structure is created with the single value
-    passed in the seqAppend operation.
-\item clients that call the seqAppend operation should check the
+    to 0 and the list structure is created with the single value that
+    was passed in the \emph{seqAppend} operation.
+\item clients that call the \emph{seqAppend} operation should check the
     status value in the result list. If the status is false, then the
-    client should retry the operation using the counter value as the
-    count in the operation.
+    client should retry the operation. Regardless of success of
+    failure, then client should store the current value of the counter
+    for the next \emph{seqAppend} call or retry.
 \end{enumerate}
 
 \section{Results}
@@ -813,9 +883,9 @@ that is implemented as follows:
 \subsubsection{Setup}
 
 The initial way that the application was tested was by loading the
-initial landing page to create a Raft over WebRTC cluster with
-a single leader. Here is a screenshot of the browser after the first
-node is created:
+basic application to create a Raft over WebRTC cluster with a single
+node acting as leader. Figure~\ref{fig:browser_1} shows a screenshot
+of the browser after the first node is created:
 
 \begin{center}
     \includegraphics[width=0.45\textwidth]{imgs/browser_1.png}
@@ -824,9 +894,9 @@ node is created:
 \end{center}
 
 Then four more Raft nodes were then added to the cluster by clicking
-on the embedded "create a node" link in the application. Here is
-a screenshot of the browser once four new nodes are added to the
-cluster (5 total):
+on the embedded "create more nodes" link in the application.
+Figure~\ref{fig:browser_5} shows a screenshot of the browser once four
+new nodes are added to the cluster (5 total):
 
 \begin{center}
     \includegraphics[width=0.45\textwidth]{imgs/browser_5.png}
@@ -836,11 +906,11 @@ cluster (5 total):
 
 In addition, the full chat application was also tested manually by
 loading the initial chat application landing page to create a Raft
-over WebRTC cluster with a single leader. Then one or more lines of
-text were entered into the text line each followed by clicking the
-Send button.  Here is a screenshot of the browser after the first
-node/tab of the chat application is created and a line of text was
-sent:
+over WebRTC cluster with a single leader acting as leader. Then lines
+of text were entered into the text area each followed by clicking the
+Send button. Figure~\ref{fig:browser_chat_1} shows a screenshot of the
+browser after the first node/tab of the chat application is created
+and a line of text was sent:
 
 \begin{center}
     \includegraphics[width=0.45\textwidth]{imgs/chat_1a.png}
@@ -851,9 +921,9 @@ sent:
 Then four more Raft nodes were then added to the cluster by clicking
 on the embedded "create more clients" link in the application.
 Finally, on a non-leader node more text lines were entered and sent by
-clicking the Send button. Here is a screenshot of the browser once
-four new nodes/tabs are added to the cluster (5 total) and another
-text line was sent:
+clicking the Send button. Figure~\ref{fig:browser_chat_5} shows
+a screenshot of the browser once four new nodes/tabs are added to the
+cluster (5 total) and another text line was sent from the fifth node:
 
 \begin{center}
     \includegraphics[width=0.45\textwidth]{imgs/chat_5a.png}
@@ -867,26 +937,24 @@ to ensure that the following steady state properties were observed:
 \item only a single leader
 \item all nodes have the same term and transaction log count
 \item all non-leader nodes are receiving `appendEntries` RPCs from the leader
-\item all nodes have the same perception of the cluster size
+\item all nodes have the same cluster membership state
 \item the transaction log entries are identical on all nodes
 \item the state machine is identical on all nodes
 \end{enumerate}
 
 The current leader was then terminated. The other nodes were checked
-for the steady state properties. This was repeated until only two
+again the steady state properties. This was repeated until only two
 nodes remained in the cluster.
 
-After the five node cluster was brought up, state machine commands
-were manually sent to leader to add to the transaction log. This was
-done using the JavaScript console as there is not yet a way to do this
-via the interface. Again the nodes were checked for the steady state
-properties.
+Next the five node cluster was brought up again and state machine
+commands were sent to leader to add to the transaction log. Again the
+nodes were checked for the above steady state properties.
 
 Then the application was tested was by loading the initial cluster
-creation landing page in a browser tab. Then nodes were randomly added
-to the cluster (by clicking on the link embedded in the page) or
-removed from the cluster (by closing a tab). After each change the
-steady state properties were checked.
+creation landing page in a browser tab. Nodes were randomly added to
+the cluster (by clicking on the link embedded in the page) or removed
+from the cluster (by closing a tab). After each change the steady
+state properties were checked.
 
 Similar testing to the above was done with browser instances on two
 separate computers. In addition, cross-browser functionality was
@@ -902,24 +970,26 @@ machine was replicated correctly to all nodes, and the safety
 properties were maintained. During testing the membership of the
 cluster was changed numerous times (both node additions and removals)
 and the Raft properties were maintained throughout. In addition,
-client interaction was tested although the application does not
-provide a friendly interface for doing so.
+client interaction was tested to make sure commands were still
+properly added to the state machine and transaction log.
 
-One limitation of the system is that the if the cluster membership
-drops from two nodes to one node then the cluster will become
-unavailable without manual intervention. This is because when there
-are two nodes in the cluster, both nodes are required for for
+One limitation of the Raft protocol is that the if the cluster
+membership drops from two nodes to one node then the cluster will
+become unavailable without manual intervention. This is because when
+there are two nodes in the cluster, both nodes are required for for
 a majority vote and when one member is forcible shutdown then the
-remaining cluster node will be unable to commit transaction entries
-and the cluster will become unavailable. There are several options to
-get around this problem:
+remaining cluster node will be unable to win elections or even commit
+transaction entries and the cluster will become unavailable. There are
+several options to get around this problem:
+
+% NOTE: optional section
 
 \begin{enumerate}
 \item The node can ask the leader to be removed and then wait for the
   transaction to become effective before it disconnects.  This may not
   always be an option especially in a browser context where the user
   may immediately kill the window/tab without giving the application
-  a change to remove itself from the cluster.
+  a chance to remove itself from the cluster.
 \item The signaling server can serve as a tie-breaker. This would allow
   the remaining leader successfully commit the removal of the other
   node. In the case of a partition, the signaling server must only
@@ -927,26 +997,27 @@ get around this problem:
 \item The node with the lower ID could have an implicit tie-breaker vote.
   This would allow one node of the partition to continue in the case
   of a network partition. If a node dies or is killed, this would only
-  allow the cluster to continue to operate if the node that dies
-  happens to have the higher ID.
+  allow the cluster to continue to operate if the node that survives
+  happens to have the lower ID.
 \item The system could allow manual user intervention. However, this is
   only likely to work correctly in the case where the user of the last
-  remaining node can be certain that the other node will never return
-  otherwise they is the risk of data-corruption.
+  remaining node can be certain that other nodes will never return
+  otherwise there is a risk of data-corruption.
 \end{enumerate}
 
-Running a Raft cluster in a browser context leads to some level of
+Running a Raft cluster in a browser context can lead to some level of
 timer instability. The JavaScript execution context is a fully event
 driven environment with a single thread of execution for a given
 JavaScript context. JavaScript code is run when browser (or Node.js)
 events trigger JavaScript code that is registered to that event. In
-order to implement logic that runs periodically, JavaScript code
-is register as a callback timer using the setTimer, setInterval or
+order to implement logic that runs periodically, JavaScript code is
+registered as a callback timer using the setTimer, setInterval or
 requestAnimationFrame APIs. However, none of these mechanisms is
 a precise timer. When a timer fires, the callback code they refer to
-is added to the JavaScript event queue and events on the queue are
+is added to the JavaScript execution queue and events on the queue are
 processed in the order they arrive. This means callbacks may be
-delayed by other code that is already running or queued first.
+delayed by other code that is already running or queued first
+\cite{resig2013secrets}.
 
 However, there is another browser mechanism that is less well known
 but that causes even larger delays in timer code execution. Modern
@@ -956,23 +1027,27 @@ responsiveness and improve battery life, most modern browsers will
 throttle the JavaScript callback timers for all windows and tabs that
 are hidden or have not been directly interacted with for some period
 of time. This throttling can cause timers to slow down by an order of
-magnitude or more.
+magnitude or more. %TODO/CITE
 
 In the context of Raft over WebRTC, the slowdown of background page
 timers means that whenever the leader node is residing on a page that
 is in the background, the propagation of transaction log entries slows
 down substantially. This also means that other nodes which are in the
 foreground are more likely to have an election timeout timer fire and
-they are more likely to become a leader because they are more likely
-to be able to send and receive votes quickly than nodes that are in
-the background. In this sense the problem is self-correcting because
-over the long term because higher performing nodes more are likely to
-start and win elections. This also indicates dynamic adjustment of
-timeout values may be a fruitful area of further study.
+they are more likely to become a leader because they will be able to
+send and receive votes more quickly than nodes that are in the
+background.  In this sense the problem is self-correcting because over
+the long term because higher performing nodes more are likely to start
+and win elections. This also indicates dynamic adjustment of timeout
+values may be a fruitful area of further study.
 
 In the context of the full chat application the slowdown of background
 pages is even more pronounced because each addition to the chat
-history can take several messages to fully propagate the new date.
+history can take several messages to fully propagate the new date. An
+interesting area of further study would be to extend the Raft protocol
+to more proactively adapt to network and node performance conditions
+(delayed timers) and more intentionally transition leadership to more
+capable nodes.
 
 
 \subsection{Automated Testing}
@@ -990,12 +1065,11 @@ To simplify the execution of the tests and to make the testing
 infrastructure more portable, a docker container environment was used
 to encapsulate and execute the SlimerJS environment. The container is
 built using \emph{test/Dockerfile} which is in turn derived from
-the "fentas/slimerjs" docker image
-(https://github.com/fentas/docker/blob/master/slimerjs/Dockerfile).
+the "fentas/slimerjs" docker image \cite{fentas:slimerjs}.
 This custom Dockerfile was created because the upstream version of the
 Dockerfile used an older version of XULRunner that did not support
-more than 7 WebRTC clients communicating together simultaneously.
-% (TODO/CITE)
+more than 7 WebRTC clients communicating together simultaneously. This
+issue was discovered during testing.
 
 Writing tests using SlimerJS involves creating JavaScript programs
 that are run within the SlimerJS environment. These scripts can create
@@ -1003,8 +1077,8 @@ browser instances (basically headless browser tabs), query the status
 of those pages and execute JavaScript within the context of the pages
 themselves.
 
-Three different tests were created to test the Raft over WebRTC
-functionality and the chat application. Each of the tests takes
+Three different tests were created to test the basic Raft over WebRTC
+application and the chat application. Each of the tests takes
 a parameter indicating the number of nodes/pages to launch and test
 again. The tests scripts files are:
 
@@ -1404,59 +1478,54 @@ Here are some interesting areas for further exploration:
 
 \begin{enumerate}
 \item Explore the use of alternate WebRTC transport modes for relaxing
-  ordering constraints and delivery guarantees. Since the Raft
-  protocol is tolerant of out-of-order and dropped messages, it is
-  possible that Raft over WebRTC could be more efficient with these
-  one or both of these constraints relaxed.
-\item Test the survivability of the cluster when the signaling server is
-  becomes completely unresponsive or just very slow.
+    ordering constraints and delivery guarantees. Since the Raft
+    protocol is tolerant of out-of-order and dropped messages, it is
+    possible that Raft over WebRTC could be more efficient with one or
+    both of these constraints relaxed.
+\item Test the survivability of the cluster when the signaling server
+    becomes completely unresponsive or very slow.
 \item Explore models for dynamically adjusting Raft timeout values to
-  account for changing network and browser conditions.
-\item Test the ability of the system to catch up stale nodes by
-  disconnecting one or more nodes, run the cluster for some period
-  time with transactions created periodically, and then reconnect the stale
-  clients.
-\item Implement a user interface for sending commands to the transaction
-  log and for viewing the current state of the Raft state machine.
-\item Explore models for dealing with the case where the cluster goes from
-  two nodes down to one node. Can usefulness and availability be
-  improved without sacrificing Raft safety constraints.
-\item Test the system in more various network environments. Determine the
-  reliability of establishing direct browser-to-browser communication.
-  Determine if corporate firewalls make this as difficult as is
-  implied in some of the documentation and standards texts.
-\item Implement and test forwarding client requests rather than default
-  redirecting the client to the leader. In other words, allow client
-  requests to originate from any node of the cluster and be redirected
-  automatically to the leader (rather than the current manual
-  process).
-\item Perform quantitative and real-world testing to better characterize
-  the performance, availability and scalability characteristics of the
-  system.
+    account for changing network and browser conditions.
+\item Explore models for dealing with the case where the cluster goes
+    from two nodes down to one node. Can usefulness and availability
+    be improved without sacrificing Raft safety constraints.
+\item Test the system in more diverse network environments. Determine
+    the reliability of establishing direct browser-to-browser
+    communication.  Determine if corporate firewalls make this as
+    difficult as is implied in some of the documentation and standards
+    texts. %TODO/CITE
+\item Perform quantitative and real-world testing to better
+    characterize the performance, availability and scalability
+    characteristics of the system.
 \item Explore models for timing out and automatically removing nodes
-  when they become unresponsive without needing to be notified by the
-  signaling server that the nodes have disconnected.
-\item Test larger scale deployments across multiple systems. Determine the
-  factors that affect scalability and characterize scaling limits.
-\item Perform wider cross-browser testing including Internet Explorer and
-  Opera.
-\item Implement Raft log compaction.
-\item Explore models that allow for a combination of strict shared state
-  and high performance bulk data such as media or object blobs. For
-  example, the data with full consensus might contain hashes that to
-  the refer to bulk data.
-\item Implement a Node.js based Raft over WebRTC application. This would
-  allow non-browser contexts to participate in the Raft cluster
-  together with the browser clients. PeerJS issue
-  [103](https://github.com/peers/peerjs/issues/103) must be resolved
-  for this to be feasible.
-\item Explore a design where some nodes of the cluster are non-voting and
-  are not counted as part of transaction commit quorum. However, these
-  nodes would still be included in the log replication algorithm. One
-  model this would enable would be a configuration where a small group
-  of voting nodes serve as the hub for a larger group of non-voting
-  nodes. This may enable higher scaling of the system. It also enables
-  interesting applications such as a logging or backup nodes.
+    when they become unresponsive without needing to be notified by
+    the signaling server that the nodes have disconnected.
+\item Consider extensions to the Raft protocol that enable slow
+    leaders to be proactively detected so that a more capable node
+    (network, CPU, etc) can be elected. This would help address that
+    background page/tag throttling of modern browsers.
+\item Test larger scale deployments spanning larger and more diverse
+    network domains. Determine the factors that affect scalability and
+    characterize scaling limits.
+\item Perform wider cross-browser testing including Internet Explorer
+    and Opera.
+\item Implement Raft log compaction and full client linearizability.
+\item Explore models that allow for a combination of strict shared
+    state and high performance bulk data such as media or object
+    blobs. For example, the data with full consensus might contain
+    hashes that to the refer to bulk data.
+\item Implement a Node.js based Raft over WebRTC application. This
+    would allow non-browser contexts to participate in the Raft
+    cluster together with the browser clients. PeerJS issue \#103 must
+    be resolved for this to be feasible \cite{peerjs:103}.
+\item Explore a design where some nodes of the cluster are non-voting
+    and are not counted as part of transaction commit quorum. However,
+    these nodes would still be included in the log replication
+    algorithm. One model this would enable would be a configuration
+    where a small group of voting nodes serve as the hub for a larger
+    group of non-voting nodes. This may enable higher scaling of the
+    system. It also enables interesting applications such as a logging
+    or backup nodes.
 \end{enumerate}
 
 

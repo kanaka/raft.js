@@ -1,28 +1,32 @@
-Browser A->rtc_server.js: GET /
-note right of rtc_server.js: create channel 1
-rtc_server.js->Browser A: redirect /rtc.html?channel=1#firstserver
+participant Browser A as A
+participant Browser B as B
+participant rtc_server.js as S
 
-Browser A->rtc_server.js: GET /rtc.html?channel=1#firstServer
-rtc_server.js->Browser A: \"<html>...\"
+A->S: [1] GET /
+note right of S: [2] create channel 1
+S->A: [3] redirect /rtc.html?channel=1#firstserver
 
-Browser A<-->rtc_server.js: Signaling WebSocket
+A->S: [4] GET /rtc.html?channel=1#firstServer
+S->A: [5] \"<html>...\"
 
-Browser A->rtc_server.js: GET /peers/1
-rtc_server.js->Browser A: [ PEER1 ]
+A<<-->>S: [6] Signaling WebSocket
+
+A->S: [7] GET /peers/1
+S->A: [8] [ PEER1 ]
 
 
-Browser B->rtc_server.js: GET /rtc.html?channel=1
-rtc_server.js->Browser B: \"<html>...\"
+B->S: [9] GET /rtc.html?channel=1
+S->B: [10] \"<html>...\"
 
-Browser B<-->rtc_server.js: Signaling WebSocket
+B<<-->>S: [11] Signaling WebSocket
 
-Browser B->rtc_server.js: GET /peers/1
-rtc_server.js->Browser B: [ PEER1, PEER2 ]
+B->S: [12] GET /peers/1
+S->B: [13] [ PEER1, PEER2 ]
 
-Browser A->rtc_server.js: GET /peers/1
-rtc_server.js->Browser A: [ PEER1, PEER2 ]
+A->S: [14] GET /peers/1
+S->A: [15] [ PEER1, PEER2 ]
 
-Browser A<-->Browser B: RTCPeerConnection
+A<<-->>B: [16] RTCPeerConnection
 
-Browser A->Browser B: Raft RPC
-Browser B->Browser A: Raft RPC Response
+A->B: [17] Raft RPC
+B->A: [18] Raft RPC Response
