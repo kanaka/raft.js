@@ -206,7 +206,7 @@ nodes \cite[Section~3.4]{raft_thesis:ongaro14}.
 
 Each Raft node maintains a transaction log. The entries in the
 transaction log each contain a term value in addition to the action to
-apply to the state machine. Each node also keep track of the most
+apply to the state machine. Each node also keeps track of the most
 recent log entry which is known to be committed (exists in the log of
 more than half the nodes in the cluster).
 
