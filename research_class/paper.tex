@@ -189,7 +189,7 @@ as the new leader of the cluster \cite[p.~12]{raft_thesis:ongaro14}.
 
 Each node of the Raft cluster maintains an ordinally increasing
 current term value. When a Raft follower node does not receive
-a heartbeat from a leader within a random election timeout period, it
+a heartbeat from a leader within a locally randomized election timeout period, it
 transitions to candidate state, votes for itself, increases its
 current term value by one and sends a requestVote RPC (with the
 new term) to all the other nodes in the cluster. When a node receives
