@@ -215,10 +215,10 @@ to other nodes in the Raft cluster. These RPC messages contain
 information about the state of its transaction log: index and term of
 the latest entry, and the most recently committed entry. If the node
 does not have an entry matching the most recent entry on the leader,
-then it replies with false to indicate that its log and not up to
+then it replies with false to indicate that its log is not up to
 date. The next appendEntries RPC that the leader sends to that
 node will contain the next oldest index and term. This will continue
-until the leader discovers the latest log entry which is agreement
+until the leader discovers the latest log entry which is in agreement
 (the node may not have any entries if it is new). Then the leader will
 begin to propagate entries to the node in subsequent appendEntries
 RPCs until the node is caught up. The leader continues sending
