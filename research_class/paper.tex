@@ -237,7 +237,7 @@ logs. A Raft node will only vote for a candidate if the candidate has
 a log that is more up-to-date than the voter. A log entry with a later
 term is always more up-to-date. If the log entries have the same term,
 then the entry with a higher index is more up-to-date. In addition,
-Raft leaders may not consider entries from a previous term to be
+a Raft leader may not consider entries from a previous term to be
 committed until it has committed at least one entry from its own
 term
 \cite[Section~3.6]{raft_thesis:ongaro14}.
