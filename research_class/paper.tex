@@ -177,7 +177,7 @@ same log entries, then their state machine on each node will have
 exactly the same state. Each node of a Raft cluster can be in one of
 three states: follower, candidate, or leader. The responsibility of
 the leader is to accept new transaction log entries and then
-replicated these entries in the same order to all other members of the
+replicate these entries in the same order to all other members of the
 cluster. The leader is the only member of the cluster that may make
 changes to the transaction log. In order to maintain leadership, the
 leader sends heartbeat RPCs to all the followers in the cluster.
