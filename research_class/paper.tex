@@ -231,8 +231,8 @@ receives a new entry in its transaction log from a client
 In order to ensure that each state machine on every node executes
 exactly the same commands in exactly the same order, the Raft system
 provides safety guarantees. In particular, there are some restrictions
-on which Raft nodes are actually eligible to become a leader based on
-the state of their transaction log compared to other node transaction
+on whether a Raft node is actually eligible to become a leader, based on
+the state of its transaction log compared to other node transaction
 logs. A Raft node will only vote for a candidate if the candidate has
 a log that is more up-to-date than the voter. A log entry with a later
 term is always more up-to-date. If the log entries have the same term,
