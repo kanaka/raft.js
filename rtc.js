@@ -205,73 +205,72 @@ function addRemoveServersAsync() {
 function start(opts) {
     opts = opts || {};
 
-var peer = new Peer({host: location.hostname,
-                     port: location.port,
-                     path: '/api/' + channel});
-peer.on('open', function(id) {
-    log('my RTC ID:', id);
-    nodeId = id;
-    // Put ourself into the map
-    nodeMap[nodeId] = null;
+    var peer = new Peer({host: location.hostname,
+                         port: location.port,
+                         path: '/api/' + channel});
+    peer.on('open', function(id) {
+        log('my RTC ID:', id);
+        nodeId = id;
+        // Put ourself into the map
+        nodeMap[nodeId] = null;
 
-    // Load the peer list and connect
-    jQuery.getJSON('/peers/' + channel, function (peers) {
-        log("RTC peer list:", peers);
-        $.each(peers, function (idx, peer_id) {
-            // If it is us, or we are already connected, ignore
-            if (peer_id in nodeMap) return true;
-            if (peer_id === nodeId) {
-                // Ignore
-                return true;
-            }
+        // Load the peer list and connect
+        jQuery.getJSON('/peers/' + channel, function (peers) {
+            log("RTC peer list:", peers);
+            $.each(peers, function (idx, peer_id) {
+                // If it is us, or we are already connected, ignore
+                if (peer_id in nodeMap) return true;
+                if (peer_id === nodeId) {
+                    // Ignore
+                    return true;
+                }
 
-            log("Connecting to RTC peer:", peer_id);
-            var conn = peer.connect(peer_id);
-            nodeMap[peer_id] = conn;
-            conn.on('data', function(data) {
-                //log("received from " + conn.peer + ": " + data);
-                rtcReceive(data);
-            });
-            conn.on('close', function(data) {
-                //log("RTC connection closed:" + conn.peer);
-                delete nodeMap[peer_id];
+                log("Connecting to RTC peer:", peer_id);
+                var conn = peer.connect(peer_id);
+                nodeMap[peer_id] = conn;
+                conn.on('data', function(data) {
+                    //log("received from " + conn.peer + ": " + data);
+                    rtcReceive(data);
+                });
+                conn.on('close', function(data) {
+                    //log("RTC connection closed:" + conn.peer);
+                    delete nodeMap[peer_id];
+                });
             });
         });
+
+        // Create the local raft.js node
+        log("Starting Raft node");
+        var node_opts = {verbose: verbose,
+                         debug: debug,
+                         log: log,
+                         serverData: nodeMap,
+                         firstServer: firstServer,
+                         sendRPC: rtcSend,
+                         electionTimeout: electionTimeout,
+                         clientRequestResponse: clientRequestResponse};
+        for (var k in opts) { node_opts[k] = opts[k] };
+
+        node = new local.RaftServerLocal(nodeId, node_opts);
+
+        // Start scanning for new servers
+        addRemoveServersAsync();
+        updateStats();
     });
 
-    // Create the local raft.js node
-    log("Starting Raft node");
-    var node_opts = {verbose: verbose,
-                     debug: debug,
-                     log: log,
-                     serverData: nodeMap,
-                     firstServer: firstServer,
-                     sendRPC: rtcSend,
-                     electionTimeout: electionTimeout,
-                     clientRequestResponse: clientRequestResponse};
-    for (var k in opts) { node_opts[k] = opts[k] };
-
-    node = new local.RaftServerLocal(nodeId, node_opts);
-
-    // Start scanning for new servers
-    addRemoveServersAsync();
-    updateStats();
-});
-
-peer.on('error', function(e) {
-    log('peer error:', e);
-});
-peer.on('connection', function(conn) {
-    log("Got RTC connection from:", conn.peer);
-    nodeMap[conn.peer] = conn;
-    conn.on('data', function(data) {
-        //log("received from " + conn.peer + ": " + data);
-        rtcReceive(data);
+    peer.on('error', function(e) {
+        log('peer error:', e);
     });
-    conn.on('close', function(data) {
-        //log("RTC connection closed:" + conn.peer);
-        delete nodeMap[conn.peer];
+    peer.on('connection', function(conn) {
+        log("Got RTC connection from:", conn.peer);
+        nodeMap[conn.peer] = conn;
+        conn.on('data', function(data) {
+            //log("received from " + conn.peer + ": " + data);
+            rtcReceive(data);
+        });
+        conn.on('close', function(data) {
+            //log("RTC connection closed:" + conn.peer);
+            delete nodeMap[conn.peer];
+        });
     });
-});
-
 }
