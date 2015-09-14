@@ -7,8 +7,6 @@
 Headless test page content
 <script src="/node_modules/twst/twst_client.js"></script>
 <script>
-var twst_ws = start_twst();
-twst_ws.onclose = function() { window.callPhantom('QUIT'); }
 console.log("headless test page started");
 </script>
 </body>

@@ -37,16 +37,21 @@ var messages = document.getElementById('messages'),
         appendEntries: 0,
         appendEntriesResponse: 0};
 
-function getParameterByName(name) {
-    name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
-    var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
-        results = regex.exec(location.search);
-    return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
+// Parse query parameters
+if (!location.queryParams) {
+    location.queryParams = {};
+    location.search.substr(1).split("&").forEach(function (param) {
+        if (param === "") return;
+        var key_value = param.split("=");
+        location.queryParams[key_value[0]] = key_value[1] &&
+            decodeURIComponent(key_value[1].replace(/\+/g, " "));
+    });
 }
 
-// Get the channel
-var channel = getParameterByName('channel');
-var console_logging = getParameterByName('console_logging');
+
+// Get the channel and logging parameters
+var channel = location.queryParams.channel;
+var console_logging = location.queryParams.console_logging;
 
 // Setup the new node link
 node_link.href = location.origin + location.pathname + location.search;

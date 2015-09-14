@@ -64,7 +64,16 @@
     <script type="text/javascript" src="rtc.js"></script>
     <script type="text/javascript">
         window.onload = function () {
-            start({});
+            if (!location.queryParams.paused) {
+                start({});
+            }
+        }
+    </script>
+
+    <script>
+        if (location.queryParams.twst_address) {
+            console.log("rtc.html: loading twst_client.js");
+            document.write('<script src="/node_modules/twst/twst_client.js"><\/script>');
         }
     </script>
 </body>

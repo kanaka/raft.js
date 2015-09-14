@@ -22,6 +22,7 @@
   "dependencies": {
     "express": "~4.11.2",
     "peer": "~0.2.8",
-    "minimist": "1.1.0"
+    "minimist": "1.1.0",
+    "twst": "0.0.5"
   }
 }

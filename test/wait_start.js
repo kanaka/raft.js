@@ -1,64 +1,55 @@
 #!/usr/bin/env node
 
-var spawn = require('child_process').spawn,
-    Twst = require('twst').Twst,
-    twst = new Twst(),
-    clientCount = process.argv.length >= 3 ? parseInt(process.argv[2]) : 1,
-    timeout = (clientCount*10)*1000;
+// To use this, first start an rtc_server.js signalling server (i.e.
+// running at 10.0.0.1:8001). Then start this test:
+//     node test/wait_start.js 10.0.01:8001 3
 
-var url = 'http://192.168.2.3:9000/test/index.html';
+var RtcTwst = require('./rtctwst').RtcTwst,
+    rtwst = new RtcTwst(),
+    rtc_address = process.argv[2],
+    clientCount = process.argv.length >= 4 ? parseInt(process.argv[3]) : 1,
+    timeout = (clientCount*20)*1000;
 
-function loadPage(url, opts) {
-    opts = opts || {};
-    var prefix = opts.prefix || "";
-    var docker_args = ['run', '-it', '--rm',
-        '-v', process.cwd() + '/test:/test',
-        'slimerjs-wily',
-        'slimerjs', '/test/launch.js',
-        url,
-        timeout];
-
-    console.log(prefix + 'launching ' + url);
-    //console.log('docker', docker_args.join(" "));
-    var page = spawn('docker', docker_args);
-
-    page.stdout.on('data', function(chunk) {
-        console.log(prefix + chunk.toString().replace(/\n$/,''));
-    });
-
-    page.on('close', function (code) {
-        console.log(prefix + 'docker container exited with code ' + code);
-        process.exit(code);
-    });
-    return page;
-}
+//var url = 'http://192.168.2.3:9000/test/index.html';
+var channel = Math.round(Math.random()*100000);
+var url = 'http://' + rtc_address +
+          '/rtc.html?channel=' + channel +
+          '&twst_address=' + rtwst.getAddress() + '&paused=1';
 
 var pages = [];
+
 for (var i=0; i<clientCount; i++) {
-    pages.push(loadPage(url, {prefix: 'p' + i + ': '}));
+    pages.push(rtwst.dockerPage(url, {prefix: 'p' + i + ': ',
+                                      timeout: timeout}));
 }
 
-setInterval(function() {
-    if (Object.keys(twst.clients).length >= clientCount) {
-        process.exit(0);
+function poll() {
+    if (Object.keys(rtwst.clients).length >= clientCount) {
+        console.log('Delaying for 5 seconds before starting cluster');
+        setTimeout(function() {
+            console.log('Starting cluster at:', Date.now());
+            rtwst.broadcast('start();');
+            rtwst.wait_cluster_up(timeout, function(status, nodes, elapsed) {
+                if (status) {
+                    console.log('Cluster is up after ' + elapsed + 'ms');
+                    console.log('Cluster up at:', Date.now());
+                    rtwst.cleanup_exit(0);
+                } else {
+                    console.log('Cluster failed to come up after ' +
+                                elapsed + 'ms');
+                    rtwst.cleanup_exit(1);
+                }
+            });
+        }, 5000);
+    } else {
+        setTimeout(poll, 100);
     }
-}, 100);
+}
+poll();
+
 
 setTimeout(function() {
     console.log("timeout waiting for clients");
-    process.exit(1);
+    rtwst.broadcast('window.callPhantom("QUIT")');
+    rtwst.cleanup_exit(1);
 }, timeout);
-
-/*
-function test_func() {
-    return location.search + Math.random();
-}
-
-setInterval(function() {
-    var opts = {timeout: 10000,
-                restype: 'return'};
-    twst.collect(test_func, opts, function(result, data) {
-        console.log('collect result:', result, data);
-    });
-}, 6000);
-*/

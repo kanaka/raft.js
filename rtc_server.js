@@ -36,8 +36,9 @@ function newPeerServerChannel(channel) {
 }
 
 var channelCnt = 0;
+var channels = {};
 
-app.get('/', function(req, res, next) {
+app.get('/' + opts.home, function(req, res, next) {
     var channel = null;
     // Pass along query parameters
     var query = "";
@@ -47,19 +48,31 @@ app.get('/', function(req, res, next) {
             channel = req.query[k];
         }
     }
-    if (channel === null) {
-        channel = channelCnt++;
+    if (channel === null || (!(channel in channels))) {
+        // Redirect to make sure URL has channel parameter and is also
+        // marked as the firstServer
+        if (channel === null) {
+            // Assign an unused channel number
+            do {
+                channel = channelCnt++;
+            } while (channel in channels);
+            var url = '/' + opts.home + '?channel=' + channel + query + '#firstServer';
+        } else {
+            var url = '/' + opts.home + '?' + query + '#firstServer';
+        }
+        // Create a new channel
+        channels[channel] = newPeerServerChannel(channel);
+        // Do the redirect
+        res.send('<html><head><meta http-equiv="refresh" content="0; url=' + url + '"/></head></html>');
+    } else {
+        // The channel already exists, continue
+        next();
     }
-    newPeerServerChannel(channel);
-
-    // Full redirect URL
-    var url = opts.home + '?channel=' + channel + query + '#firstServer';
-    res.send('<html><head><meta http-equiv="refresh" content="0; url=' + url + '"/></head></html>');
 });
 
 
 // Static file serving
-app.use( express.static('./'));
+app.use(express.static('./'));
 
 // Start Express server
 var server = app.listen(opts.port);
