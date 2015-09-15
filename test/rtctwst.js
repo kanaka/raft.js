@@ -46,7 +46,6 @@ RtcTwst.prototype.dockerPage = function(url, opts) {
 // RTC specific
 
 RtcTwst.prototype.get_node_info = function(timeout, callback) {
-    var nodes = [];
     this.collect(function() {
         // Evaluates in page context so 'node' variable is implicit
         if (typeof node !== 'undefined' && node) {
@@ -103,3 +102,33 @@ RtcTwst.prototype.wait_cluster_up = function(timeout, callback) {
     checkfn();
 }
 
+RtcTwst.prototype.wait_cluster_predicate = function(timeout, predicate, callback) {
+    var self = this,
+        server_count = Object.keys(self.clients).length,
+        start_time = Date.now();
+    var checkfn = function () {
+        self.collect(predicate, {timeout: timeout}, function(status, data) {
+            var elapsed = Date.now() - start_time;
+            if (!status) {
+                callback(false, data, elapsed)
+            }
+            var trueCnt = 0;
+            for (var n in data) {
+                if (data[n].data) { trueCnt += 1; }
+            }
+
+            console.log('Predicate results: ' + JSON.stringify(data) +
+                        ', true count: ' + trueCnt);
+            // Exit if cluster is up or we timeout
+            if (trueCnt >= server_count) {
+                callback(true, data, elapsed);
+            } else if (elapsed > timeout) {
+                callback(false, data, elapsed);
+            } else {
+                setTimeout(checkfn, 25);
+                //setTimeout(checkfn, 2000);
+            }
+        });
+    }
+    checkfn();
+}

@@ -10,6 +10,9 @@ exports.new_page = function (page_idx, firstServer, opts, callback) {
     page.onConsoleMessage = function (msg, line, origin) {
         console.log('CONSOLE ' + page_idx + ': ' + msg);
     };
+    page.onError = function (msg) {
+        console.log('ERROR ' + page_idx + ': ' + msg);
+    };
     page.onCallback = function(msg) {
         console.log('CALLBACK ' + page_idx + ': ' + msg);
         if (msg === 'QUIT') {

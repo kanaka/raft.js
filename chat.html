@@ -75,7 +75,18 @@
     <script type="text/javascript" src="rtc.js"></script>
     <script type="text/javascript" src="chat.js"></script>
     <script type="text/javascript">
-        window.onload = startChat;
+        window.onload = function () {
+            if (!location.queryParams.paused) {
+                startChat({});
+            }
+        }
+    </script>
+
+    <script>
+        if (location.queryParams.twst_address) {
+            console.log("chat.html: loading twst_client.js");
+            document.write('<script src="/node_modules/twst/twst_client.js"><\/script>');
+        }
     </script>
 </body>
 </html>
