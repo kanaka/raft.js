@@ -1009,7 +1009,7 @@ events trigger JavaScript code that is registered to that event. In
 order to implement logic that runs periodically, JavaScript code is
 registered as a callback timer using the setTimer, setInterval or
 requestAnimationFrame APIs. However, none of these mechanisms is
-a precise timer. When a timer fires, the callback code they refer to
+a precise timer. When a timer fires, the callback code it refers to
 is added to the JavaScript execution queue and events on the queue are
 processed in the order they arrive. This means callbacks may be
 delayed by other code that is already running or queued first
