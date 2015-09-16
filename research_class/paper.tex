@@ -1121,8 +1121,9 @@ The tests were all run on a system with the following configuration:
 
 Three tests were run at 10 different cluster sizes (odd cluster sizes
 from 3 to 21 nodes): \emph{test/test\_up.js} and
-\emph{test/test\_kill\_nodes.js} in kill one (leader) node and kill
-half nodes. Each of these tests was run with three different Raft election
+\emph{test/test\_kill\_nodes.js} in both modes (kill only leader and kill just
+under half the nodes).
+Each of these tests was run with three different Raft election
 timeout values: 100ms, 500ms, 1000ms. The
 \emph{test/test\_chat\_propagate.js} test was run at
 11 different cluster sizes (odd cluster sizes from 1 to 21 nodes).
