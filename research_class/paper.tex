@@ -334,7 +334,7 @@ described in \cite[Consensus:~Diego]{raft_thesis:ongaro14}.
 
 The implementation of the Raft algorithm is in the
 \texttt{RaftServerBase} class (in \texttt{base.js}). The base class
-omits the implementation of functions with side-effect such as RPC
+omits the implementation of functions with side-effects such as RPC
 communication, durable storage, scheduling/timeouts, or state machine
 command/management. In order to create a working implementation these
 functions must be provided either as configuration parameters when the
