@@ -1185,7 +1185,7 @@ Some specific notes about the figures:
         their election timeout fires. More analysis is needed, but one
         possible explanation is that the single SlimerJS XULRunner
         process that is handling all the cluster nodes is not able to
-        give enough CPU time to the leader node to reliable send
+        give enough CPU time to the leader node to reliably send
         appendEntries RPCs to all the other nodes within the election
         timeout value. Increasing the election timeout to 500ms or
         greater eliminates the failures without significantly changing
