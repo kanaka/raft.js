@@ -371,7 +371,7 @@ in order to limit memory growth and allow new nodes to catch up their
 logs more efficiently. However log compaction is not required for
 verifying overall system correctness and does not significantly impact
 short-running test configurations. Full client linearizability is
-important feature for simplifying certain types of distributed
+an important feature for simplifying certain types of distributed
 applications, however the implementation of linearizability requires
 some significant additions to the Raft implementation (e.g. assigning
 client IDs and sequence IDs and tracking timed-out clients). For the
