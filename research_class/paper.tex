@@ -970,7 +970,7 @@ and the Raft properties were maintained throughout. In addition,
 client interaction was tested to make sure commands were still
 properly added to the state machine and transaction log.
 
-One limitation of the Raft protocol is that the if the cluster
+One limitation of the Raft protocol is that if the cluster
 membership drops from two nodes to one node then the cluster will
 become unavailable without manual intervention. This is because when
 there are two nodes in the cluster, both nodes are required for for
