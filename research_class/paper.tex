@@ -405,9 +405,9 @@ described in \cite[Consensus:~Diego]{raft_thesis:ongaro14}:
     a synchronous request/response model. %TODO/CITE
     WebRTC DataChannel connections are message based rather than
     request/response stream based. %TODO/CITE
-    The original Raft definition of RPC request and response messages
+    In the original Raft definition of RPC, request and response messages
     almost contain enough information to function correctly in an
-    environment without builtin request/response correlation such as
+    environment without builtin request/response correlation, such as
     UDP or SCTP when used with reliable transport disabled. %TODO/CITE
     Raft.js includes a small modification to the response RPCs for
     requestVote and appendEntries to add a `sourceId' field that
