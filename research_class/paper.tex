@@ -775,7 +775,7 @@ statistics are shown in the application:
 % TODO: rename clientRequest* function to not clash with RPC names
 % (maybe raftRequest*?)
 
-In the Raft over WebRqTC implementation each local browser is a client
+In the Raft over WebRTC implementation each local browser is a client
 of the Raft cluster. However in Raft, the leader node is the only node
 that adds entries to the log so clients on follower nodes must have
 a way to communicate with the leader. This is implemented as a pair of
