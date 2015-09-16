@@ -787,21 +787,21 @@ a callback function to be called once the request is completed. The
 as follows:
 
 \begin{enumerate}
-\item the \texttt{clientRequestResponse} is registered with the local
+\item The \texttt{clientRequestResponse} is registered with the local
     Raft.js implementation as the callback function anytime
     a \texttt{clientRequestResponse} RPC is received.
-\item the \texttt{clientRequest} function keeps track of the current
+\item The \texttt{clientRequest} function keeps track of the current
     leader ID.  If the current leader ID is not set or this node is
     the leader then the client request RPC is sent directly to the
     local Raft node bypassing the network transport layer.  If the
     current leader ID is set then the request is sent to that node as
     a normal RPC request over the WebRTC channel.
-\item when the \texttt{clientRequestResponse} function is called and
+\item When the \texttt{clientRequestResponse} function is called and
     the status is ``NOT\_LEADER" then the current leader ID being
     tracked by the \texttt{clientRequest} function is set to the
     leader ID specified in the response. Then the original request is
     re-issued over the normal WebRTC channel to the leader.
-\item when the \texttt{clientRequestResponse} function is called with
+\item When the \texttt{clientRequestResponse} function is called with
     a successful status, the original callback argument of the
     \texttt{clientRequest} function is called with the results from
     the RPC response.
