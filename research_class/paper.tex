@@ -348,7 +348,7 @@ execution context. For example, the online Raft visualization at
 \href{http://kanaka.github.io/raft.js/}{http://kanaka.github.io/raft.js/}
 \cite{raft.js:visualization} uses the \texttt{RaftServerLocal} class
 and instantiates it using a scheduling function that executes one
-scheduled event each time the user clicks on the "Step" button rather
+scheduled event each time the user clicks on the ``Step" button rather
 than due to the passage of time.
 
 The \texttt{RaftServerHttp} class (\texttt{http.js}) embeds a simple
@@ -691,8 +691,8 @@ endpoints interact.
 The Raft over WebRTC testing application is designed as a single web
 page (\texttt{rtc.html} or \texttt{chat.html}). The application has
 different starting behavior depending on the value of the URL query
-string (the URL component following the "?" and up to the "\#") and
-the fragment identifier (the URL component after the "\#").
+string (the URL component following the ``?" and up to the ``\#") and
+the fragment identifier (the URL component after the ``\#").
 
 When a new Raft cluster is created, the user agent (browser) connects
 to the server's new channel endpoint
@@ -715,14 +715,14 @@ implementation (\texttt{rtc.js}), a layout stylesheet
 being loaded (\texttt{chat.js})
 (Figure~\ref{fig:raft_rtc_sequence}~[5]).
 
-If the URL fragment identifier is set to "firstServer", then this Raft
+If the URL fragment identifier is set to ``firstServer", then this Raft
 node is initialized as the leader of a single node cluster and all
 normal timers are started. The fragment identifier is then unset. The
 query parameter contains the ID of this cluster (the PeerJS channel).
 
 Subsequent nodes are added to the same Raft cluster by starting a new
 browser context (separate browser, browser window, or browser tab) and
-loading the same URL without the "firstServer" fragment identifier
+loading the same URL without the ``firstServer" fragment identifier
 (Figure~\ref{fig:raft_rtc_sequence}~[9]). There is a convenience link
 provided in the application page that opens a new browser window with
 a new cluster node (see \ref{fig:browser_1}).
@@ -750,7 +750,7 @@ in order to maximize availability
 \cite[Section~4.4]{raft_thesis:ongaro14}.
 
 When an instance of the web application starts that is not
-a "firstServer", the normal Raft timers are not enabled until the
+a ``firstServer", the normal Raft timers are not enabled until the
 server receives its first RPC. The prevents the server from
 trying to becoming a leader before it is incorporated into the cluster
 by an appendEntries RPC from the true cluster leader.
@@ -800,7 +800,7 @@ as follows:
     current leader ID is set then the request is sent to that node as
     a normal RPC request over the WebRTC channel.
 \item when the \texttt{clientRequestResponse} function is called and
-    the status is "NOT\_LEADER" then the current leader ID being
+    the status is ``NOT\_LEADER" then the current leader ID being
     tracked by the \texttt{clientRequest} function is set to the
     leader ID specified in the response. Then the original request is
     re-issued over the normal WebRTC channel to the leader.
@@ -894,7 +894,7 @@ of the browser after the first node is created:
 \end{center}
 
 Then four more Raft nodes were then added to the cluster by clicking
-on the embedded "create more nodes" link in the application.
+on the embedded ``create more nodes" link in the application.
 Figure~\ref{fig:browser_5} shows a screenshot of the browser once four
 new nodes are added to the cluster (5 total):
 
@@ -919,7 +919,7 @@ and a line of text was sent:
 \end{center}
 
 Then four more Raft nodes were then added to the cluster by clicking
-on the embedded "create more clients" link in the application.
+on the embedded ``create more clients" link in the application.
 Finally, on a non-leader node more text lines were entered and sent by
 clicking the Send button. Figure~\ref{fig:browser_chat_5} shows
 a screenshot of the browser once four new nodes/tabs are added to the
@@ -1065,7 +1065,7 @@ To simplify the execution of the tests and to make the testing
 infrastructure more portable, a docker container environment was used
 to encapsulate and execute the SlimerJS environment. The container is
 built using \emph{test/Dockerfile} which is in turn derived from
-the "fentas/slimerjs" docker image \cite{fentas:slimerjs}.
+the ``fentas/slimerjs" docker image \cite{fentas:slimerjs}.
 This custom Dockerfile was created because the upstream version of the
 Dockerfile used an older version of XULRunner that did not support
 more than 7 WebRTC clients communicating together simultaneously. This
@@ -1141,7 +1141,7 @@ Figure 7 shows the results of running the
 that a stable cluster takes to propagate, commit and apply a single
 state machine command to the state machines on every cluster node.
 
-Figure 7 is a scatterplot with each test run as a blue "x" and a black
+Figure 7 is a scatterplot with each test run as a blue ``x" and a black
 line representing the average at each cluster size.
 
 \begin{center}
@@ -1182,7 +1182,7 @@ Some specific notes about the figures:
 \begin{enumerate}
     \item \emph{Figure 8 (a)}: The results show that once the cluster
         size reaches 17, the cluster sometimes does not activate
-        before the test times out (the red "x" marks). Once the
+        before the test times out (the red ``x" marks). Once the
         cluster reaches 21 nodes, all 7 test runs time out. The reason
         for this is because at 17 nodes, the leader is not always able
         to send out appendEntries RPCs to all the other nodes before
@@ -1212,7 +1212,7 @@ Some specific notes about the figures:
 \end{enumerate}
 
 
-Each figure is a scatterplot with each test run as a blue "x" and
+Each figure is a scatterplot with each test run as a blue ``x" and
 a black line representing the average at each cluster size.
 
 %\end{multicols}
