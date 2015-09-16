@@ -410,7 +410,7 @@ described in \cite[Consensus:~Diego]{raft_thesis:ongaro14}:
     environment without builtin request/response correlation such as
     UDP or SCTP when used with reliable transport disabled. %TODO/CITE
     Raft.js includes a small modification to the response RPCs for
-    requestVote and appendEntries to add a 'sourceId' field that
+    requestVote and appendEntries to add a `sourceId' field that
     enables the protocol to function with message based transports.
 \item The Raft paper is clear that each membership change must be
     delayed until all the previous membership change is committed
@@ -419,7 +419,7 @@ described in \cite[Consensus:~Diego]{raft_thesis:ongaro14}:
     change requests and apply them one at a time.  However, in
     Raft.js, if a client requests a membership change while another
     change request is pending (uncommitted), the leader will reject
-    the change request with a status of 'PENDING\_CONFIG\_CHANGE'.
+    the change request with a status of `PENDING\_CONFIG\_CHANGE'.
     This keeps the core Raft implementation simpler with the trade-off
     being that the client implementation of membership change requests
     is slightly more complex due to retry logic.
@@ -658,9 +658,9 @@ PeerJS \cite{peerjs:103}.
 
 \subsection{Server}
 
-The file `rtc\_server.js` implements the signaling server for the Raft
+The file `rtc\_server.js' implements the signaling server for the Raft
 over WebRTC application. The server extends the PeerJS
-`ExpressPeerServer` object in order to provide WebRTC signaling. In
+`ExpressPeerServer' object in order to provide WebRTC signaling. In
 addition to the signaling function, the server also provides the
 following service endpoints:
 
@@ -769,7 +769,7 @@ statistics are shown in the application:
 \item \emph{Request Votes Sent/Received}: the number of `requestVote`
     RPCs that have been sent from and received by this node.
 \item \emph{Append Entries Sent/Received}: the number of
-    `appendEntries` RPCs that have been sent from and received by this
+    `appendEntries' RPCs that have been sent from and received by this
     node.
 \end{enumerate}
 
@@ -936,7 +936,7 @@ to ensure that the following steady state properties were observed:
 \begin{enumerate}
 \item only a single leader
 \item all nodes have the same term and transaction log count
-\item all non-leader nodes are receiving `appendEntries` RPCs from the leader
+\item all non-leader nodes are receiving `appendEntries' RPCs from the leader
 \item all nodes have the same cluster membership state
 \item the transaction log entries are identical on all nodes
 \item the state machine is identical on all nodes
