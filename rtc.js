@@ -3,7 +3,7 @@
 // Parmeters
 var verbose = 1,
     debug = true,
-    electionTimeout = 1000,
+    electionTimeout = 500,
     // addRemoveServersRetry: smaller values increase the number of
     // PENDING_CONFIG_CHANGE that will happen when there are multiple
     // changes pending (more than one server added or removed). Larger
@@ -14,7 +14,7 @@ var verbose = 1,
     // server map to identify nodes that need to be added or dropped.
     // Larger values means that it takes longer to detect when cluster
     // changes happen.
-    addRemoveServersPoll = 500;
+    addRemoveServersPoll = 100;
 
 // Global state
 var messages = document.getElementById('messages'),
