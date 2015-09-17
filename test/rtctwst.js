@@ -26,7 +26,7 @@ RtcTwst.prototype.dockerPage = function(url, opts) {
         url,
         timeout];
 
-    console.log(prefix + 'launching ' + url);
+    console.log(prefix + 'launching slimerjs in docker');
     var page = spawn('docker', docker_args);
 
     page.stdout.on('data', function(chunk) {
@@ -59,6 +59,24 @@ RtcTwst.prototype.get_node_info = function(timeout, callback) {
     }, {timeout: timeout}, callback);
 }
 
+RtcTwst.prototype.get_leader_idx = function(timeout, callback) {
+    var self = this;
+    self.get_node_info(timeout, function(status, nodes) {
+        if (status) {
+            for (var cid in nodes) {
+                var node = nodes[cid].data;
+                if (node.state === 'leader') {
+                    callback(true, cid);
+                    return;
+                }
+            }
+            callback(false, null);
+        } else {
+            callback(false, null);
+        }
+    });
+}
+
 RtcTwst.prototype.wait_cluster_up = function(timeout, callback) {
     var self = this,
         server_count = Object.keys(self.clients).length,
@@ -73,7 +91,7 @@ RtcTwst.prototype.wait_cluster_up = function(timeout, callback) {
             // Pull out some stats
             var states = {leader:[], candidate:[], follower:[]},
                 nodeCnts = [];
-            for (var i=0; i < server_count; i++) {
+            for (var i in nodes) {
                 var node = nodes[i].data;
                 if (node) {
                     //console.log("node:", node, "node.state:", node.state);

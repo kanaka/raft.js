@@ -6,12 +6,13 @@
 //
 // - Now run the test using the rtc_server listen address and the
 //   number of nodes:
-//     node test/wait_chat_propagate.js 10.0.01:8001 3
+//     node test/wait_kill_nodes.js 10.0.01:8001 3
 
 var RtcTwst = require('./rtctwst').RtcTwst,
     rtwst = new RtcTwst(),
     rtc_address = process.argv[2],
     clientCount = process.argv.length >= 4 ? parseInt(process.argv[3]) : 1,
+    killCount = (process.argv.length >= 5) ? parseInt(process.argv[4]) : parseInt((clientCount-1)/2, 10),
     timeout = (clientCount*20)*1000;
 
 var channel = Math.round(Math.random()*100000);
@@ -21,6 +22,11 @@ var url = 'http://' + rtc_address +
           '&twst_address=' + rtwst.getAddress() + '&paused=1';
 
 var pages = [];
+
+if (killCount > parseInt((clientCount-1)/2, 10)) {
+    console.log('Kill count must be less than half of client count');
+    process.exit(2);
+}
 
 for (var i=0; i<clientCount; i++) {
     pages.push(rtwst.dockerPage(url, {prefix: 'p' + i + ': ',
@@ -41,8 +47,8 @@ function do_start() {
     rtwst.wait_cluster_up(timeout, function(status, nodes, elapsed) {
         if (status) {
             console.log('Cluster is up after ' + elapsed + 'ms');
-            console.log('Delaying for 3 seconds before sending message');
-            setTimeout(do_chat, 3000);
+            console.log('Delaying for 3 seconds before killing node(s)');
+            setTimeout(do_kill, 3000);
         } else {
             console.log('Cluster failed to come up after ' +
                         elapsed + 'ms');
@@ -51,30 +57,35 @@ function do_start() {
     });
 }
 
-function do_chat() {
-    rtwst.send(function() {
-        $('#talk').val("test line");
-        //sendLine();
-        $('#send').click();
-    }, {index: pages.length-1});
-    rtwst.wait_cluster_predicate(timeout, function() {
-        var sm = node._self.stateMachine;
-        //console.log(nodeId + " stateMachine: " + JSON.stringify(sm));
-        if ('history' in sm && 'value' in sm.history) {
-            var lines = sm.history.value,
-                m = lines[lines.length-1].match(/.*: test line$/);
-            return m ? true : false;
-        } else {
-            return false;
-        }
-    }, function(status, results, elapsed) {
-        if (status) {
-            console.log('Cluster state propagated after ' + elapsed + 'ms');
-            rtwst.cleanup_exit(0);
-        } else {
-            console.log('Cluster state failed to propagate after ' + elapsed + 'ms')
+function do_kill() {
+    console.log('Removing ' + killCount + ' nodes/pages (including the leader)');
+
+    rtwst.get_leader_idx(2000, function(status, leader_idx) {
+        if (!status) {
+            console.log('Could not determine cluster leader');
             rtwst.cleanup_exit(1);
+            return;
         }
+        console.log('Removing page index ' + leader_idx + ' (current leader)');
+        rtwst.remove(leader_idx);
+
+        for (var j=0; j<killCount-1; j++) {
+            var cids = Object.keys(rtwst.clients),
+                kill_id = cids[parseInt(Math.random()*cids.length, 10)];
+            console.log('Removing page index ' + kill_id);
+            rtwst.remove(kill_id);
+        }
+
+        console.log('Waiting for cluster to stabilize');
+        rtwst.wait_cluster_up(timeout, function(status, nodes, elapsed) {
+            if (status) {
+                console.log('Cluster recovered after ' + elapsed + 'ms');
+                rtwst.cleanup_exit(0);
+            } else {
+                console.log('Cluster failed to recover after ' + elapsed + 'ms');
+                rtwst.cleanup_exit(1);
+            }
+        });
     });
 }
 

@@ -44,7 +44,7 @@ common.wait_cluster_up(pages, server_count, up_timeout, function(status, nodes, 
             pages.splice(kill_idx, 1); // NOTE: mutates pages array in place
         }
 
-        console.log('Waiting for cluster to stabalize');
+        console.log('Waiting for cluster to stabilize');
         common.wait_cluster_up(pages, server_count-kill_count, up_timeout, function(status, nodes, elapsed) {
             if (status) {
                 console.log('Cluster recovered after ' + elapsed + 'ms');
