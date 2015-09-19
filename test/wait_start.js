@@ -17,6 +17,7 @@ var RtcTwst = require('./rtctwst').RtcTwst,
 var channel = Math.round(Math.random()*100000);
 var url = 'http://' + rtc_address +
           '/chat.html?channel=' + channel +
+          '&console_logging=true' +
           '&twst_address=' + rtwst.getAddress() + '&paused=1';
 
 var pages = [];
@@ -36,7 +37,7 @@ function poll() {
 }
 
 function do_start() {
-    rtwst.broadcast('start();');
+    rtwst.broadcast('startChat();');
     rtwst.wait_cluster_up(timeout, function(status, nodes, elapsed) {
         if (status) {
             console.log('Cluster is up after ' + elapsed + 'ms');

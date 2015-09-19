@@ -43,7 +43,7 @@ function poll() {
 }
 
 function do_start() {
-    rtwst.broadcast('startChat();');
+    rtwst.broadcast('startChat()');
     rtwst.wait_cluster_up(timeout, function(status, nodes, elapsed) {
         if (status) {
             console.log('Cluster is up after ' + elapsed + 'ms');
