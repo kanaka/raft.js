@@ -1,21 +1,32 @@
-\documentclass[9pt]{extarticle}
+\documentclass[conference,compsoc]{./IEEEtran/IEEEtran}
 
-\usepackage{multicol}
-\setlength{\columnsep}{0.8cm}
+% *** CITATION PACKAGES ***
+% IEEE Computer Society needs nocompress option
+% requires cite.sty v4.0 or later (November 2003)
+\usepackage[nocompress]{cite}
 
-\usepackage{geometry}
-\geometry{margin=2.0cm}
+% *** ALIGNMENT PACKAGES ***
+\usepackage{array}
 
-%\usepackage[utf8]{inputenc}
-\usepackage[backend=bibtex]{biblatex}
+% *** SUBFIGURE PACKAGES ***
+\usepackage[caption=false,font=footnotesize,labelfont=sf,textfont=sf]{subfig}
+% The latest version and documentation of subfig.sty can be obtained at:
+% http://www.ctan.org/pkg/subfig
 
+
+
+%%\usepackage{geometry}
+%%\geometry{margin=2.0cm}
+%%
+%%\usepackage[backend=bibtex]{biblatex}
+%%
 \usepackage{hyperref}
-\usepackage{caption}
-\usepackage{subcaption}
-
-\usepackage{authblk}
-
-\usepackage{microtype}
+%%\usepackage{caption}
+%%\usepackage{subcaption}
+%%
+%%\usepackage{authblk}
+%%
+%%\usepackage{microtype}
 
 \usepackage{graphicx}
 \DeclareGraphicsExtensions{.png,.jpg,.pdf,.eps}
@@ -24,23 +35,38 @@
 \pgfplotsset{compat=1.9}
 
 
-\title{Raft Distributed Consensus Algorithm over WebRTC (Web Real-Time Communication)}
+%%\title{Raft Distributed Consensus Algorithm over WebRTC (Web Real-Time Communication)}
+%%
+%%\author{Joel D. Martin}
+%%\author{David Levine}
+%%\affil{University of Texas at Arlington}
+%%
+%%\addbibresource{references/raft.bib}
+%%\addbibresource{references/w3c.bib}
+%%\addbibresource{references/ietf.bib}
+%%\addbibresource{references/other.bib}
 
-\author{Joel D. Martin}
-\author{David Levine}
-\affil{University of Texas at Arlington}
+% correct bad hyphenation here
+\hyphenation{op-tical net-works semi-conduc-tor}
 
-\addbibresource{references/raft.bib}
-\addbibresource{references/w3c.bib}
-\addbibresource{references/ietf.bib}
-\addbibresource{references/other.bib}
 
 \begin{document}
 
+\title{Raft Distributed Consensus Algorithm over\\ WebRTC (Web Real-Time Communication)}
+
+\author{\IEEEauthorblockN{Joel Martin}
+\IEEEauthorblockA{Department of Computer Science and Engineering\\
+University of Texas at Arlington\\
+Arlington, TX 76010\\
+Email: joel@martintribe.org}
+\and
+\IEEEauthorblockN{David Levine}
+\IEEEauthorblockA{Department of Computer Science and Engineering\\
+University of Texas at Arlington\\
+Arlington, TX 76010\\
+Email: levine@cse.uta.edu}}
 
 \maketitle
-
-\begin{multicols}{2}
 
 \begin{abstract}
 We describe the creation of a browser-based distributed peer-to-peer
@@ -312,15 +338,11 @@ reads of stale data (the leader of the larger partition may have
 already committed new entries).
 \cite[Section~6.4]{raft_thesis:ongaro14}.
 
-\end{multicols}
-
-\begin{figure*}[h]
+\begin{figure*}[!t]
 \centerline{\includegraphics[width=0.8\textwidth]{imgs/raft_rtc_architecture}}
 \caption{Raft over RTC Architecture}
   \label{fig:raft_rtc_architecture}
 \end{figure*}
-
-\begin{multicols}{2}
 
 \subsection{Raft.js}
 
@@ -525,7 +547,7 @@ five general functionality groups:
     \item connection management
     \item data formats
     \item presentation and control
-    \item and local system support functions
+    \item local system support functions
 \end{enumerate}
 
 The last three functionality groups focus on interactive audio and video
@@ -582,15 +604,13 @@ compatible signaling server, however application developers can also
 run their own signaling service using PeerJS PeerServer.
 
 
-\end{multicols}
-
-\begin{figure*}[h]
-\centerline{\includegraphics[width=0.8\textwidth]{imgs/raft_rtc_sequence}}
+%\begin{figure*}[!t]
+\begin{figure}[!t]
+%\centerline{\includegraphics[width=0.8\textwidth]{imgs/raft_rtc_sequence}}
+\centerline{\includegraphics[width=0.45\textwidth]{imgs/raft_rtc_sequence}}
 \caption{Raft over RTC Sequence Diagram}
   \label{fig:raft_rtc_sequence}
-\end{figure*}
-
-\begin{multicols}{2}
+\end{figure}
 
 \section {Design and Implementation}
 
@@ -884,22 +904,26 @@ basic application to create a Raft over WebRTC cluster with a single
 node acting as leader. Figure~\ref{fig:browser_1} shows a screenshot
 of the browser after the first node is created:
 
-\begin{center}
+\begin{figure}[!t]
+    \centering
     \includegraphics[width=0.45\textwidth]{imgs/browser_1.png}
-    \captionof{figure}{Basic app with one Node/Tab}
+    %\captionof{figure}{Basic app with one Node/Tab}
+    \caption{Basic app with one Node/Tab}
     \label{fig:browser_1}
-\end{center}
+\end{figure}
 
 Then four more Raft nodes were then added to the cluster by clicking
 on the embedded ``create more nodes" link in the application.
 Figure~\ref{fig:browser_5} shows a screenshot of the browser once four
 new nodes are added to the cluster (5 total):
 
-\begin{center}
+\begin{figure}[!t]
+    \centering
     \includegraphics[width=0.45\textwidth]{imgs/browser_5.png}
-    \captionof{figure}{Basic app with Five Nodes/Tabs}
+    %\captionof{figure}{Basic app with Five Nodes/Tabs}
+    \caption{Basic app with Five Nodes/Tabs}
     \label{fig:browser_5}
-\end{center}
+\end{figure}
 
 In addition, the full chat application was also tested manually by
 loading the initial chat application landing page to create a Raft
@@ -909,11 +933,13 @@ Send button. Figure~\ref{fig:browser_chat_1} shows a screenshot of the
 browser after the first node/tab of the chat application is created
 and a line of text was sent:
 
-\begin{center}
+\begin{figure}[!t]
+    \centering
     \includegraphics[width=0.45\textwidth]{imgs/chat_1a.png}
-    \captionof{figure}{Chat app with one Node/Tab}
+    %\captionof{figure}{Chat app with one Node/Tab}
+    \caption{Chat app with one Node/Tab}
     \label{fig:browser_chat_1}
-\end{center}
+\end{figure}
 
 Then four more Raft nodes were then added to the cluster by clicking
 on the embedded ``create more clients" link in the application.
@@ -922,11 +948,13 @@ clicking the Send button. Figure~\ref{fig:browser_chat_5} shows
 a screenshot of the browser once four new nodes/tabs are added to the
 cluster (5 total) and another text line was sent from the fifth node:
 
-\begin{center}
+\begin{figure}[!t]
+    \centering
     \includegraphics[width=0.45\textwidth]{imgs/chat_5a.png}
-    \captionof{figure}{Chat app with Five Nodes/Tabs}
+    %\captionof{figure}{Chat app with Five Nodes/Tabs}
+    \caption{Chat app with Five Nodes/Tabs}
     \label{fig:browser_chat_5}
-\end{center}
+\end{figure}
 
 After every change was made to the cluster all the nodes were checked
 to ensure that the following steady state properties were observed:
@@ -1141,7 +1169,7 @@ state machine command to the state machines on every cluster node.
 Figure 7 is a scatterplot with each test run as a blue ``x" and a black
 line representing the average at each cluster size.
 
-\begin{center}
+\begin{figure}[!t]
     \begin{tikzpicture}
     \begin{axis}[%
         xlabel={Nodes}, ylabel={Time (seconds)},
@@ -1158,9 +1186,9 @@ line representing the average at each cluster size.
     table[meta=label] {data/data_propagate_averages.dat};
     \end{axis}
     \end{tikzpicture}
-\captionof{figure}{Propagate$,$ Commit$,$ and Apply Command}
-\label{fig:propagate}
-\end{center}
+\caption{Propagate$,$ Commit$,$ and Apply Command}
+  \label{fig:propagate}
+\end{figure}
 
 Figures 8, 9 and 10 show the results of running the
 \emph{test/test\_up.js} and \emph{test/test\_kill\_nodes.js} in both
@@ -1212,15 +1240,16 @@ Some specific notes about the figures:
 Each figure is a scatterplot with each test run as a blue ``x" and
 a black line representing the average at each cluster size.
 
-%\end{multicols}
-
+%\begin{figure*}[!t]
 \begin{figure*}[h]
-    \begin{subfigure}[b]{0.30\textwidth}
+    \centering
+    %\begin{subfigure}[b]{0.30\textwidth}
+    \subfloat[100ms election timer]{
         \centering
-        \resizebox{\linewidth}{!}{
+        \resizebox{0.3\linewidth}{!}{
             \begin{tikzpicture}
             \begin{axis}[%
-                height=1.5\textwidth, width=1.4\textwidth,
+                %height=1.5\textwidth, width=1.4\textwidth,
                 xlabel={Nodes}, ylabel={Time (seconds)},
                 xtick=data,
                 ymin=0, ymax=65,
@@ -1238,15 +1267,15 @@ a black line representing the average at each cluster size.
             \end{axis}
             \end{tikzpicture}
         }
-        \caption{100ms election timer}
         \label{fig:A}
-    \end{subfigure}
-    \begin{subfigure}[b]{0.30\textwidth}
+    }
+    %\begin{subfigure}[b]{0.30\textwidth}
+    \subfloat[500ms election timer]{
         \centering
-        \resizebox{\linewidth}{!}{
+        \resizebox{0.3\linewidth}{!}{
             \begin{tikzpicture}
             \begin{axis}[%
-                height=1.5\textwidth, width=1.4\textwidth,
+                %height=1.5\textwidth, width=1.4\textwidth,
                 xlabel={Nodes}, ylabel={Time (seconds)},
                 xtick=data,
                 ymin=0, ymax=65,
@@ -1263,15 +1292,15 @@ a black line representing the average at each cluster size.
             \end{axis}
             \end{tikzpicture}
         }
-        \caption{500ms election timer}
         \label{fig:B}
-    \end{subfigure}
-    \begin{subfigure}[b]{0.30\textwidth}
+    }
+    %\begin{subfigure}[b]{0.30\textwidth}
+    \subfloat[1000ms election timer]{
         \centering
-        \resizebox{\linewidth}{!}{
+        \resizebox{0.3\linewidth}{!}{
             \begin{tikzpicture}
             \begin{axis}[%
-                height=1.5\textwidth, width=1.4\textwidth,
+                %height=1.5\textwidth, width=1.4\textwidth,
                 xlabel={Nodes}, ylabel={Time (seconds)},
                 xtick=data,
                 ymin=0, ymax=65,
@@ -1288,9 +1317,8 @@ a black line representing the average at each cluster size.
             \end{axis}
             \end{tikzpicture}
         }
-        \caption{1000ms election timer}
         \label{fig:C}
-    \end{subfigure}
+    }
     \caption{Initial Cluster Activation}
     \label{fig:cluster_up}
 
@@ -1298,12 +1326,13 @@ a black line representing the average at each cluster size.
 \rule{\textwidth}{0.3pt}
 \smallskip
 
-    \begin{subfigure}[b]{0.30\textwidth}
+    %\begin{subfigure}[b]{0.30\textwidth}
+    \subfloat[100ms election timer]{
         \centering
-        \resizebox{\linewidth}{!}{
+        \resizebox{0.3\linewidth}{!}{
             \begin{tikzpicture}
             \begin{axis}[%
-                height=1.5\textwidth, width=1.4\textwidth,
+                %height=1.5\textwidth, width=1.4\textwidth,
                 xlabel={Nodes}, ylabel={Time (seconds)},
                 xtick=data,
                 ymin=0, ymax=3.5, xmax=23,
@@ -1321,15 +1350,15 @@ a black line representing the average at each cluster size.
             \end{axis}
             \end{tikzpicture}
         }
-        \caption{100ms election timer}
         \label{fig:D}
-    \end{subfigure}
-    \begin{subfigure}[b]{0.30\textwidth}
+    }
+    %\begin{subfigure}[b]{0.30\textwidth}
+    \subfloat[500ms election timer]{
         \centering
-        \resizebox{\linewidth}{!}{
+        \resizebox{0.3\linewidth}{!}{
             \begin{tikzpicture}
             \begin{axis}[%
-                height=1.5\textwidth, width=1.4\textwidth,
+                %height=1.5\textwidth, width=1.4\textwidth,
                 xlabel={Nodes}, ylabel={Time (seconds)},
                 xtick=data,
                 ymin=0, ymax=3.5,
@@ -1346,15 +1375,15 @@ a black line representing the average at each cluster size.
             \end{axis}
             \end{tikzpicture}
         }
-        \caption{500ms election timer}
         \label{fig:E}
-    \end{subfigure}
-    \begin{subfigure}[b]{0.30\textwidth}
+    }
+    %\begin{subfigure}[b]{0.30\textwidth}
+    \subfloat[1000ms election timer]{
         \centering
-        \resizebox{\linewidth}{!}{
+        \resizebox{0.3\linewidth}{!}{
             \begin{tikzpicture}
             \begin{axis}[%
-                height=1.5\textwidth, width=1.4\textwidth,
+                %height=1.5\textwidth, width=1.4\textwidth,
                 xlabel={Nodes}, ylabel={Time (seconds)},
                 xtick=data,
                 ymin=0, ymax=3.5,
@@ -1371,9 +1400,8 @@ a black line representing the average at each cluster size.
             \end{axis}
             \end{tikzpicture}
         }
-        \caption{1000ms election timer}
         \label{fig:F}
-    \end{subfigure}
+    }
     \caption{Recovery from Leader Failure}
     \label{fig:recovery-leader-failure}
 
@@ -1381,12 +1409,13 @@ a black line representing the average at each cluster size.
 \rule{\textwidth}{0.3pt}
 \smallskip
 
-    \begin{subfigure}[b]{0.30\textwidth}
+    %\begin{subfigure}[b]{0.30\textwidth}
+    \subfloat[100ms election timer]{
         \centering
-        \resizebox{\linewidth}{!}{
+        \resizebox{0.3\linewidth}{!}{
             \begin{tikzpicture}
             \begin{axis}[%
-                height=1.5\textwidth, width=1.4\textwidth,
+                %height=1.5\textwidth, width=1.4\textwidth,
                 xlabel={Nodes}, ylabel={Time (seconds)},
                 xtick=data,
                 ymin=0, ymax=3.5, xmax=23,
@@ -1403,15 +1432,15 @@ a black line representing the average at each cluster size.
             \end{axis}
             \end{tikzpicture}
         }
-        \caption{100ms election timer}
         \label{fig:G}
-    \end{subfigure}
-    \begin{subfigure}[b]{0.30\textwidth}
+    }
+    %\begin{subfigure}[b]{0.30\textwidth}
+    \subfloat[500ms election timer]{
         \centering
-        \resizebox{\linewidth}{!}{
+        \resizebox{0.3\linewidth}{!}{
             \begin{tikzpicture}
             \begin{axis}[%
-                height=1.5\textwidth, width=1.4\textwidth,
+                %height=1.5\textwidth, width=1.4\textwidth,
                 xlabel={Nodes}, ylabel={Time (seconds)},
                 xtick=data,
                 ymin=0, ymax=3.5,
@@ -1428,15 +1457,15 @@ a black line representing the average at each cluster size.
             \end{axis}
             \end{tikzpicture}
         }
-        \caption{500ms election timer}
         \label{fig:H}
-    \end{subfigure}
-    \begin{subfigure}[b]{0.30\textwidth}
+    }
+    %\begin{subfigure}[b]{0.30\textwidth}
+    \subfloat[1000ms election timer]{
         \centering
-        \resizebox{\linewidth}{!}{
+        \resizebox{0.3\linewidth}{!}{
             \begin{tikzpicture}
             \begin{axis}[%
-                height=1.5\textwidth, width=1.4\textwidth,
+                %height=1.5\textwidth, width=1.4\textwidth,
                 xlabel={Nodes}, ylabel={Time (seconds)},
                 xtick=data,
                 ymin=0, ymax=3.5,
@@ -1453,15 +1482,12 @@ a black line representing the average at each cluster size.
             \end{axis}
             \end{tikzpicture}
         }
-        \caption{1000ms election timer}
         \label{fig:I}
-    \end{subfigure}
+    }
     \caption{Recovery from Half Cluster Failure}
     \label{fig:recovery-half-failure}
 \end{figure*}
 
-
-%\begin{multicols}{2}
 
 
 
@@ -1528,79 +1554,87 @@ Here are some interesting areas for further exploration:
 \section*{Acknowledgments}
 I would like to thank my academic supervisor, David Levine, for his
 excellent input and oversight of this project. I would also like to
-thank Diego Ongaro for his amazing work on the Raft protocol and paper
-\cite[p.~215]{lamport78} which made implementing
-a Raft implementation a pleasure \cite{lamport78}.
-There are too many people involved in the creation and standardization
-of WebRTC but I would like to thank them for their tireless work to
-make browser-to-browser communication possible. Last but not least,
-I would like to thank my family for putting up with the long nights
-and weekends I spent on this project. Thanks!
+thank Diego Ongaro for his amazing work on the Raft protocol and paper which
+made implementing a Raft implementation a pleasure.  There are too many people
+involved in the creation and standardization of WebRTC but I would like to
+thank them for their tireless work to make browser-to-browser communication
+possible. Last but not least, I would like to thank my family for putting up
+with the long nights and weekends I spent on this project. Thanks!
 
-\end{multicols}
+\bibliographystyle{./IEEEtranBST2/IEEEtran}
+\bibliography{./references/ietf,./references/w3c,./references/raft,./references/other}
 
-\printbibliography[title={General references},notkeyword=rtc-general,notkeyword=rtc-transport,notkeyword=rtc-framing]
+%% % Bibliography with multiplie sectiosn and references not actually
+%% % cited in the paper either
 
-\nocite{draft-rtcweb-overview}
-\nocite{draft-rtcweb-security-arch}
-\nocite{draft-rtcweb-security}
-\printbibliography[title={WebRTC general references},keyword=rtc-general]
+%% \addbibresource{references/raft.bib}
+%% \addbibresource{references/w3c.bib}
+%% \addbibresource{references/ietf.bib}
+%% \addbibresource{references/other.bib}
+%%
+%% \printbibliography[title={General references},notkeyword=rtc-general,notkeyword=rtc-transport,notkeyword=rtc-framing]
+%% 
+%% \nocite{draft-rtcweb-overview}
+%% \nocite{draft-rtcweb-security-arch}
+%% \nocite{draft-rtcweb-security}
+%% \printbibliography[title={WebRTC general references},keyword=rtc-general]
+%% 
+%% \nocite{draft-rtcweb-transports}
+%% \nocite{draft-rtcweb-qos}
+%% \nocite{RFC4960:sctp}
+%% \nocite{RFC3758:sctp-reliability}
+%% \nocite{draft-sctp-dtls-encaps}
+%% \nocite{draft-mmusic-sctp-sdp}
+%% \nocite{draft-sctp-ndata}
+%% \nocite{draft-rtcweb-rtp-usage}
+%% \nocite{draft-rtcweb-data-channel}
+%% \nocite{draft-rtcweb-data-protocol}
+%% \nocite{draft-rtcweb-alpn}
+%% \nocite{RFC5245:ice}
+%% \nocite{RFC5128:p2p-nat}
+%% \nocite{RFC5389:stun}
+%% \nocite{RFC3489:stun-udp}
+%% \nocite{RFC5766:turn}
+%% \nocite{RFC6156:turn-ipv6}
+%% \nocite{RFC6544:tcp-ice}
+%% \nocite{RFC4571:rtp-rtcp}
+%% \nocite{RFC5764:dtls-srtp}
+%% \printbibliography[title={WebRTC data transport},keyword=rtc-transport]
+%% 
+%% \nocite{RFC3550:rtp}
+%% \nocite{RFC3711:srtp}
+%% %\nocite{draft-rtcweb-rtp-usage}
+%% %\nocite{draft-rtcweb-data-channel}
+%% %\nocite{draft-rtcweb-data-protocol}
+%% \printbibliography[title={WebRTC framing and security},keyword=rtc-framing]
+%% 
+%% \nocite{RFC2327:sdp}
+%% \nocite{RFC3264:sdp-offer-answer}
+%% \nocite{draft-rtcweb-jsep}
+%% %\nocite{RFC5245:ice}
+%% \nocite{draft-mmusic-trickle-ice}
+%% \nocite{RFC5763:srtp-using-dtls}
+%% \printbibliography[title={WebRTC connection management},keyword=rtc-connection]
 
-\nocite{draft-rtcweb-transports}
-\nocite{draft-rtcweb-qos}
-\nocite{RFC4960:sctp}
-\nocite{RFC3758:sctp-reliability}
-\nocite{draft-sctp-dtls-encaps}
-\nocite{draft-mmusic-sctp-sdp}
-\nocite{draft-sctp-ndata}
-\nocite{draft-rtcweb-rtp-usage}
-\nocite{draft-rtcweb-data-channel}
-\nocite{draft-rtcweb-data-protocol}
-\nocite{draft-rtcweb-alpn}
-\nocite{RFC5245:ice}
-\nocite{RFC5128:p2p-nat}
-\nocite{RFC5389:stun}
-\nocite{RFC3489:stun-udp}
-\nocite{RFC5766:turn}
-\nocite{RFC6156:turn-ipv6}
-\nocite{RFC6544:tcp-ice}
-\nocite{RFC4571:rtp-rtcp}
-\nocite{RFC5764:dtls-srtp}
-\printbibliography[title={WebRTC data transport},keyword=rtc-transport]
 
-\nocite{RFC3550:rtp}
-\nocite{RFC3711:srtp}
-%\nocite{draft-rtcweb-rtp-usage}
-%\nocite{draft-rtcweb-data-channel}
-%\nocite{draft-rtcweb-data-protocol}
-\printbibliography[title={WebRTC framing and security},keyword=rtc-framing]
+%% % WebRTC standards that aren't relevant
 
-\nocite{RFC2327:sdp}
-\nocite{RFC3264:sdp-offer-answer}
-\nocite{draft-rtcweb-jsep}
-%\nocite{RFC5245:ice}
-\nocite{draft-mmusic-trickle-ice}
-\nocite{RFC5763:srtp-using-dtls}
-\printbibliography[title={WebRTC connection management},keyword=rtc-connection]
-
-%%%
-
-%\begin{enumerate}
-%\item Data formats (audio)
-%    \begin{enumerate}
-%    \item \href{https://tools.ietf.org/html/draft-cbran-rtcweb-codec-02}{WebRTC: WebRTC Codec and Media Processing Requirements}
-%    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-audio-07}{WebRTC: Audio Codec and Processing Requirements}
-%    \item \href{https://tools.ietf.org/html/rfc6716}{RFC6716: Opus Audio Codec}
-%    \item \href{https://tools.ietf.org/html/draft-ietf-payload-rtp-opus-11}{RTP Payload Format for Opus Speech and Audio Codec}
-%    \item \href{https://tools.ietf.org/html/rfc3551}{RFC3551: RTP Profile for Audio and Video Conference}
-%    \item \href{https://tools.ietf.org/html/rfc4733}{RFC4733: RTP Payload for DTMF Digits, Telephony Tones, and Telephony Signals}
-%    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-audio-codecs-for-interop-01}{WebRTC: Additional WebRTC audio codecs for interoperability with legacy networks}
-%    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-video-05}{WebRTC: Video Processing and Codec Requirements}
-%    \item \href{https://tools.ietf.org/html/rfc6386}{RFC6386: VP8 Data Format and Decoding Guide}
-%    \item \href{http://www.itu.int/rec/T-REC-H.264}{ITU H.264: Advanced video coding for generic audiovisual services}
-%    \item \href{https://tools.ietf.org/html/draft-ietf-payload-vp8-15}{RTP Payload Format for VP8 Video}
-%    \item \href{https://tools.ietf.org/html/rfc6236}{RFC6236: Negotiation of Generic Image Attributes in the Session Description Protocol (SDP)}
-%    \end{enumerate}
-%\end{enumerate}
+%% %\begin{enumerate}
+%% %\item Data formats (audio)
+%% %    \begin{enumerate}
+%% %    \item \href{https://tools.ietf.org/html/draft-cbran-rtcweb-codec-02}{WebRTC: WebRTC Codec and Media Processing Requirements}
+%% %    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-audio-07}{WebRTC: Audio Codec and Processing Requirements}
+%% %    \item \href{https://tools.ietf.org/html/rfc6716}{RFC6716: Opus Audio Codec}
+%% %    \item \href{https://tools.ietf.org/html/draft-ietf-payload-rtp-opus-11}{RTP Payload Format for Opus Speech and Audio Codec}
+%% %    \item \href{https://tools.ietf.org/html/rfc3551}{RFC3551: RTP Profile for Audio and Video Conference}
+%% %    \item \href{https://tools.ietf.org/html/rfc4733}{RFC4733: RTP Payload for DTMF Digits, Telephony Tones, and Telephony Signals}
+%% %    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-audio-codecs-for-interop-01}{WebRTC: Additional WebRTC audio codecs for interoperability with legacy networks}
+%% %    \item \href{https://tools.ietf.org/html/draft-ietf-rtcweb-video-05}{WebRTC: Video Processing and Codec Requirements}
+%% %    \item \href{https://tools.ietf.org/html/rfc6386}{RFC6386: VP8 Data Format and Decoding Guide}
+%% %    \item \href{http://www.itu.int/rec/T-REC-H.264}{ITU H.264: Advanced video coding for generic audiovisual services}
+%% %    \item \href{https://tools.ietf.org/html/draft-ietf-payload-vp8-15}{RTP Payload Format for VP8 Video}
+%% %    \item \href{https://tools.ietf.org/html/rfc6236}{RFC6236: Negotiation of Generic Image Attributes in the Session Description Protocol (SDP)}
+%% %    \end{enumerate}
+%% %\end{enumerate}
 
 \end{document}
