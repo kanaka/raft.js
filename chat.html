@@ -76,8 +76,10 @@
     <script type="text/javascript" src="chat.js"></script>
     <script type="text/javascript">
         window.onload = function () {
-            if (!location.queryParams.paused) {
-                startChat({});
+            if (location.queryParams.paused) {
+                startRtc({});
+            } else {
+                startRtc({}, startChat);
             }
         }
     </script>

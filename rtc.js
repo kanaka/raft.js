@@ -3,7 +3,7 @@
 // Parmeters
 var verbose = 1,
     debug = true,
-    electionTimeout = 500,
+    electionTimeout = 1000,
     // addRemoveServersRetry: smaller values increase the number of
     // PENDING_CONFIG_CHANGE that will happen when there are multiple
     // changes pending (more than one server added or removed). Larger
@@ -207,7 +207,7 @@ function addRemoveServersAsync() {
     }
 }
 
-function start(opts) {
+function startRtc(opts, nextCallback) {
     opts = opts || {};
 
     var peer = new Peer({host: location.hostname,
@@ -244,23 +244,9 @@ function start(opts) {
             });
         });
 
-        // Create the local raft.js node
-        log("Starting Raft node");
-        var node_opts = {verbose: verbose,
-                         debug: debug,
-                         log: log,
-                         serverData: nodeMap,
-                         firstServer: firstServer,
-                         sendRPC: rtcSend,
-                         electionTimeout: electionTimeout,
-                         clientRequestResponse: clientRequestResponse};
-        for (var k in opts) { node_opts[k] = opts[k] };
-
-        node = new local.RaftServerLocal(nodeId, node_opts);
-
-        // Start scanning for new servers
-        addRemoveServersAsync();
-        updateStats();
+        if (nextCallback) {
+            nextCallback(opts);
+        }
     });
 
     peer.on('error', function(e) {
@@ -278,4 +264,24 @@ function start(opts) {
             delete nodeMap[conn.peer];
         });
     });
+}
+
+function startRaft(opts) {
+    // Create the local raft.js node
+    log("Starting Raft node");
+    var node_opts = {verbose: verbose,
+                     debug: debug,
+                     log: log,
+                     serverData: nodeMap,
+                     firstServer: firstServer,
+                     sendRPC: rtcSend,
+                     electionTimeout: electionTimeout,
+                     clientRequestResponse: clientRequestResponse};
+    for (var k in opts) { node_opts[k] = opts[k] };
+
+    node = new local.RaftServerLocal(nodeId, node_opts);
+
+    // Start scanning for new servers
+    addRemoveServersAsync();
+    updateStats();
 }

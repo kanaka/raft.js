@@ -84,7 +84,7 @@ function startChat() {
             sendLine();
         }
     };
-    start({applyCmd: applyCmd});
+    startRaft({applyCmd: applyCmd});
     flushSends();
 
 }

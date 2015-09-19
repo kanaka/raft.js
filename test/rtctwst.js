@@ -3,7 +3,26 @@ var spawn = require('child_process').spawn,
     RtcTwst = null;
 
 // Subclass Twst
-exports.RtcTwst = RtcTwst = function(opts) { Twst.call(this, opts); };
+exports.RtcTwst = RtcTwst = function(opts) {
+    Twst.call(this, opts);
+    //rtwst.on('return',        function(idx, msg) { console.log('RETURN:', idx, msg); });
+    //rtwst.on('callback',      function(idx, msg) { console.log('CALLBACK:', idx, msg); });
+    this.on('error', function(idx, msg) {
+        console.error(idx + ' ERROR:', msg.data);
+    });
+    this.on('console.log', function(idx, msg) {
+        console.log(idx + ' CONSOLE.LOG:', msg.data.join(' '));
+    });
+    this.on('console.warn', function(idx, msg) {
+        console.warn(idx + ' CONSOLE.WARN:', msg.data.join(' '));
+    });
+    this.on('console.error', function(idx, msg) {
+        console.error(idx + ' CONSOLE.ERROR:', msg.data.join(' '));
+    });
+    this.on('close', function(idx, msg) {
+        console.log(idx + ' CLOSE:', msg.data);
+    });
+};
 RtcTwst.prototype = Object.create(Twst.prototype);
 RtcTwst.prototype.constructor = RtcTwst;
 
@@ -30,9 +49,11 @@ RtcTwst.prototype.dockerPage = function(url, opts) {
     var page = spawn('docker', docker_args);
 
     page.stdout.on('data', function(chunk) {
-        var line = chunk.toString('utf8').replace(/\r\n$/,'');
-        if (line === '') { return; }
-        console.log(prefix + line);
+        if (opts.verbose) {
+            var line = chunk.toString('utf8').replace(/\r\n$/,'');
+            if (line === '') { return; }
+            console.log(prefix + line);
+        }
     });
 
     page.on('close', function (code) {
@@ -83,9 +104,10 @@ RtcTwst.prototype.wait_cluster_up = function(timeout, callback) {
         start_time = Date.now();
     var checkfn = function () {
         // Gather data from the nodes
-        self.get_node_info(2000, function(status, nodes) {
+        self.get_node_info(2000+timeout/10, function(status, nodes) {
             var elapsed = Date.now() - start_time;
             if (!status) {
+                console.log("get_node_info timed out");
                 callback(false, nodes, elapsed)
             }
             // Pull out some stats

@@ -37,7 +37,7 @@ function poll() {
 }
 
 function do_start() {
-    rtwst.broadcast('startChat();');
+    rtwst.broadcast('startChat()');
     rtwst.wait_cluster_up(timeout, function(status, nodes, elapsed) {
         if (status) {
             console.log('Cluster is up after ' + elapsed + 'ms');
@@ -56,7 +56,7 @@ function do_chat() {
         $('#talk').val("test line");
         //sendLine();
         $('#send').click();
-    }, {index: pages.length-1});
+    }, {index: rtwst.clients.length-1});
     rtwst.wait_cluster_predicate(timeout, function() {
         var sm = node._self.stateMachine;
         //console.log(nodeId + " stateMachine: " + JSON.stringify(sm));
