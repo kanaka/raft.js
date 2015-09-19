@@ -7,15 +7,29 @@ DATA = $(wildcard data/*)
 
 REFERENCES = $(wildcard references/*)
 
+all: paper.pdf paper-min.pdf
+
 paper.pdf: $(DATA) $(REFERENCES)
+paper-min.pdf: $(DATA) $(REFERENCES)
 
-%.pdf: %.tex
-	pdflatex -halt-on-error $<
-	bibtex $*.aux
-	pdflatex -halt-on-error $<
-	pdflatex -halt-on-error $<
+paper.pdf: paper.tex
+	pdflatex -halt-on-error "\def\OPTIONAL{}\input{$<}"
+	bibtex paper.aux
+	pdflatex -halt-on-error "\def\OPTIONAL{}\input{$<}"
+	pdflatex -halt-on-error "\def\OPTIONAL{}\input{$<}"
 
-all: paper.pdf
+paper-min.pdf: paper.tex
+	cp paper.tex paper-min.tex
+	pdflatex -halt-on-error "\input{paper-min.tex}"
+	bibtex paper-min.aux
+	pdflatex -halt-on-error "\input{paper-min.tex}"
+	pdflatex -halt-on-error "\input{paper-min.tex}"
+
+#%.pdf: %.tex
+#	pdflatex -halt-on-error "$(if $(OPTIONAL),\def\OPTIONAL{},)\input{$<}"
+#	bibtex $*.aux
+#	pdflatex -halt-on-error "$(if $(OPTIONAL),\def\OPTIONAL{},)\input{$<}"
+#	pdflatex -halt-on-error "$(if $(OPTIONAL),\def\OPTIONAL{},)\input{$<}"
 
 clean:
-	rm -f *.pdf *.bak *.log *.out *.aux *.run.xml paper-blx.bib paper.bbl paper.bcf paper.blg
+	rm -f *.pdf *.bak *.log *.out *.aux *.run.xml paper-blx.bib paper.bbl paper.bcf paper.blg paper-min.pdf

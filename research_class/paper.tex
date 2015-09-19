@@ -1,5 +1,9 @@
 \documentclass[conference,compsoc]{./IEEEtran/IEEEtran}
 
+%% Configure which sections are included:
+%\newcommand*{\OPTIONAL}{}
+
+
 % *** CITATION PACKAGES ***
 % IEEE Computer Society needs nocompress option
 % requires cite.sty v4.0 or later (November 2003)
@@ -534,27 +538,67 @@ There are three primary WebRTC interfaces:
 There is a large suite of protocols that are required for a working
 WebRTC system. The Internet Engineering Task Force (IETF) organization
 is responsible for specifying and/or standardizing (where necessary)
-the protocols that are part of WebRTC. In many cases an existing
-protocol is applicable and is referenced or extended as part of the
-WebRTC suite. %TODO/CITE
+the protocols that are part of WebRTC \cite{draft-rtcweb-overview}
+\cite{draft-rtcweb-security-arch} \cite{draft-rtcweb-security}. In many
+cases an existing protocol is applicable and is referenced or
+extended as part of the WebRTC suite. %TODO/CITE
 
 The protocols that make up the WebRTC suite are categorized into
 five general functionality groups:
 
 \begin{enumerate}
     \item data transport
+        \ifdefined\OPTIONAL
+        \\
+        \cite{draft-rtcweb-transports}
+        \cite{draft-rtcweb-qos}
+        \cite{RFC4960:sctp}
+        \cite{RFC3758:sctp-reliability}
+        \cite{draft-sctp-dtls-encaps}
+        \cite{draft-mmusic-sctp-sdp}
+        \cite{draft-sctp-ndata}
+        \cite{draft-rtcweb-rtp-usage}
+        \cite{draft-rtcweb-data-channel}
+        \cite{draft-rtcweb-data-protocol}
+        \cite{draft-rtcweb-alpn}
+        \cite{RFC5245:ice}
+        \cite{RFC5128:p2p-nat}
+        \cite{RFC5389:stun}
+        \cite{RFC3489:stun-udp}
+        \cite{RFC5766:turn}
+        \cite{RFC6156:turn-ipv6}
+        \cite{RFC6544:tcp-ice}
+        \cite{RFC4571:rtp-rtcp}
+        \cite{RFC5764:dtls-srtp}
+        \fi
     \item data framing and security
+        \ifdefined\OPTIONAL
+        \\
+        \cite{RFC3550:rtp}
+        \cite{RFC3711:srtp}
+        \cite{draft-rtcweb-rtp-usage}
+        \cite{draft-rtcweb-data-channel}
+        \cite{draft-rtcweb-data-protocol}
+        \fi
     \item connection management
+        \ifdefined\OPTIONAL
+        \\
+        \cite{RFC2327:sdp}
+        \cite{RFC3264:sdp-offer-answer}
+        \cite{draft-rtcweb-jsep}
+        \cite{RFC5245:ice}
+        \cite{draft-mmusic-trickle-ice}
+        \cite{RFC5763:srtp-using-dtls}
+        \fi
     \item data formats
     \item presentation and control
     \item local system support functions
 \end{enumerate}
 
 The last three functionality groups focus on interactive audio and video
-applications and are less relevant to Raft over WebRTC. The WebRTC
-section of the bibliography %TODO: reference link
-has a (partial) list of WebRTC specific protocol drafts and other
-related protocol standards for the first three functionality groups.
+applications and are less relevant to Raft over WebRTC. \ifdefined\OPTIONAL
+Some of the important standards for the first three functionality
+groups are cited above. \fi
 
 The signaling transport itself is not defined as part of WebRTC.
 This is up to the application designer. The JavaScript interface used
@@ -565,6 +609,9 @@ modular JavaScript API for WebRTC signaling \cite{ortc2014}. However,
 at the time of this paper, the ORTC interface is not yet widely
 supported and is still in a state of flux. The use of PeerJS provides an
 abstraction that is likely to transparently support ORTC in the future.
+
+
+\ifdefined\OPTIONAL
 
 \subsection{PeerJS}
 
@@ -603,6 +650,7 @@ The PeerJS organization provides a cloud-hosted version of a PeerJS
 compatible signaling server, however application developers can also
 run their own signaling service using PeerJS PeerServer.
 
+\fi  % \ifdefined\OPTIONAL
 
 %\begin{figure*}[!t]
 \begin{figure}[!t]
@@ -613,6 +661,9 @@ run their own signaling service using PeerJS PeerServer.
 \end{figure}
 
 \section {Design and Implementation}
+
+
+\ifdefined\OPTIONAL
 
 \subsection{Incremental Steps}
 
@@ -672,6 +723,8 @@ During the planning phase, the project was broken down into ten incremental step
 Steps 1-9 were successfully implemented for this paper. Step 10 was an
 aspirational goal because this functionality is not yet supported in
 PeerJS \cite{peerjs:103}.
+
+\fi  % \ifdefined\OPTIONAL
 
 \subsection{Server}
 
@@ -895,6 +948,9 @@ operation that is implemented as follows:
 
 \section{Results}
 
+
+\ifdefined\OPTIONAL
+
 \subsection{Manual Testing}
 
 \subsubsection{Setup}
@@ -1072,6 +1128,8 @@ interesting area of further study would be to extend the Raft protocol
 to more proactively adapt to network and node performance conditions
 (delayed timers) and more intentionally transition leadership to more
 capable nodes.
+
+\fi  % \ifdefined\OPTIONAL
 
 
 \subsection{Automated Testing}
