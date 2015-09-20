@@ -152,12 +152,20 @@ RtcTwst.prototype.wait_cluster_predicate = function(timeout, predicate, callback
             if (!status) {
                 callback(false, data, elapsed)
             }
-            var trueCnt = 0;
+            var falseStates = [],
+                trueStates = [],
+                trueCnt = 0;
             for (var n in data) {
-                if (data[n].data) { trueCnt += 1; }
+                if (data[n].data) {
+                    trueCnt += 1;
+                    trueStates.push(n);
+                } else {
+                    falseStates.push(n);
+                }
             }
 
-            console.log('Predicate results: ' + JSON.stringify(data) +
+            console.log('Predicate false: ' + JSON.stringify(falseStates) +
+                        ', true: ' + JSON.stringify(trueStates) +
                         ', true count: ' + trueCnt);
             // Exit if cluster is up or we timeout
             if (trueCnt >= server_count) {
@@ -165,7 +173,7 @@ RtcTwst.prototype.wait_cluster_predicate = function(timeout, predicate, callback
             } else if (elapsed > timeout) {
                 callback(false, data, elapsed);
             } else {
-                setTimeout(checkfn, 25);
+                setTimeout(checkfn, 50);
                 //setTimeout(checkfn, 2000);
             }
         });

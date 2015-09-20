@@ -12,6 +12,7 @@ var RtcTwst = require('./rtctwst').RtcTwst,
     rtwst = new RtcTwst(),
     rtc_address = process.argv[2],
     clientCount = process.argv.length >= 4 ? parseInt(process.argv[3]) : 1,
+    msgCount = (process.argv.length >= 5) ? parseInt(process.argv[4]) : 1,
     timeout = (clientCount*20)*1000;
 
 var channel = Math.round(Math.random()*100000);
@@ -52,18 +53,32 @@ function do_start() {
 }
 
 function do_chat() {
-    rtwst.send(function() {
-        $('#talk').val("test line");
-        //sendLine();
-        $('#send').click();
-    }, {index: rtwst.clients.length-1});
+    rtwst.broadcast("window._test_msgCount = " + msgCount + ";")
+    for (var idx=0; idx < clientCount; idx++) {
+        var cnt = Math.floor((msgCount + clientCount - idx - 1) / clientCount),
+            msg = 'test msg #' + idx,
+            x = '';
+
+        if (cnt === 0) { continue }
+
+        x += 'for(var j=0; j<' + cnt + '; j++) {pendingSends.push('
+        x += '"msg #" + j + " from node ' + idx + '")}';
+        console.log('Sending to ' + idx + ': ' + x);
+        rtwst.send(x, {id: idx})
+    }
     rtwst.wait_cluster_predicate(timeout, function() {
         var sm = node._self.stateMachine;
         //console.log(nodeId + " stateMachine: " + JSON.stringify(sm));
         if ('history' in sm && 'value' in sm.history) {
-            var lines = sm.history.value,
-                m = lines[lines.length-1].match(/.*: test line$/);
-            return m ? true : false;
+            var lines = sm.history.value;
+            //console.log("lines:", lines);
+            if (lines.length === window._test_msgCount) {
+                var m = lines[lines.length-1].match(/msg .* from node .*$/);
+                //console.log("m:", m);
+                return m ? true : false;
+            } else {
+                return false
+            }
         } else {
             return false;
         }

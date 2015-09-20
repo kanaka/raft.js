@@ -11,7 +11,7 @@ function updateHistory() {
 }
 
 function applyCmd(stateMachine, cmd) {
-    log("cmd:", JSON.stringify(cmd));
+    //log("cmd:", JSON.stringify(cmd));
     switch (cmd.op) {
         case 'get':
             stateMachine[cmd.key];
