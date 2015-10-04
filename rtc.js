@@ -103,48 +103,58 @@ function rtcSend(targetId, rpcName, args, callback) {
     }
 }
 function rtcReceive(json) {
-    var resp = JSON.parse(json),
-        rpcName = resp[0],
-        otherNodeId = resp[1],
-        args = resp[2];
-    rpcCounts[rpcName]++;
-    
-    // Call the rpc indicated
-    node[rpcName](args);
+    if (node) {
+        var resp = JSON.parse(json),
+            rpcName = resp[0],
+            otherNodeId = resp[1],
+            args = resp[2];
+        rpcCounts[rpcName]++;
+
+        // Call the rpc indicated
+        node[rpcName](args);
+    } else {
+        console.warn("rtcReceive called before Raft cluster started");
+    }
 }
 
 // Wrap async clientRequest/clientRequestResponse messages into
 // a callback based clientRequest call
 var curLeaderId = null;
-var pendingClientRequest = null;
+var pendingClientRequests = [];
 function clientRequest(args, callback) {
-    //log("clientRequest:", args);
-    if (pendingClientRequest) {
-        // TODO: fix this
-        throw new Error("outstanding clientRequest");
-    }
+    //log("clientRequest:", JSON.stringify(args));
     args['responseId'] = nodeId;
-    pendingClientRequest = {args: args, callback: callback};
-    if (curLeaderId === null || curLeaderId === nodeId) {
-        node.clientRequest(args);
-    } else {
-        rtcSend(curLeaderId, 'clientRequest', args);
-    }
+    pendingClientRequests.push({args: args, callback: callback});
+    clientRequestSend();
 }
-function clientRequestResponse(result) {
-    //log("clientRequestResponse:", result);
-    if (result.status === 'NOT_LEADER') {
-        curLeaderId = result.leaderHint;
-        if (pendingClientRequest) {
-            var args = pendingClientRequest.args;
-            //log("curLeaderId:", curLeaderId, nodeMap[curLeaderId]);
+function clientRequestSend() {
+    if (pendingClientRequests.length > 0) {
+        var args = pendingClientRequests[0].args;
+        if (curLeaderId === null || curLeaderId === nodeId) {
+            //console.log("node.clientRequest:", JSON.stringify(args));
+            node.clientRequest(args);
+        } else {
             rtcSend(curLeaderId, 'clientRequest', args);
         }
-    } else {
-        var callback = pendingClientRequest.callback,
-            args = pendingClientRequest.args;
-        pendingClientRequest = null;
+    }
+}
+// TODO: if request response doesn't make it through then pending won't
+// be sent until next actual request and there will be a permanently
+// delayed request.
+function clientRequestResponse(result) {
+    //log("clientRequestResponse:", JSON.stringify(result));
+    if (result.status === 'NOT_LEADER') {
+        curLeaderId = result.leaderHint;
+        setTimeout(clientRequestSend, 1);
+    } else if (result.status === 'success') {
+        var callback = pendingClientRequests[0].callback,
+            args = pendingClientRequests[0].args;
+        pendingClientRequests.shift();
         callback(result);
+        //setTimeout(clientRequestSend, 1);
+    } else {
+        console.log('Retrying failed clientRequest: ' + result.result);
+        setTimeout(clientRequestSend, 1);
     }
 }
 
@@ -156,7 +166,7 @@ function addRemoveServersAsync() {
     var changes = 0;
 
     if (node && node._self.state === 'leader') {
-        //log("addRemoveServersAsync, nodeMap IDs: " + Object.keys(nodeMap) + 
+        //log("addRemoveServersAsync, nodeMap IDs: " + Object.keys(nodeMap) +
         //    ", serverMap IDs: " + Object.keys(node._self.serverMap));
 
         // If an ID is in map1 but not in map2 then call rpc with

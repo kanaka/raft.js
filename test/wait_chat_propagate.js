@@ -6,35 +6,35 @@
 //
 // - Now run the test using the rtc_server listen address and the
 //   number of nodes:
-//     node test/wait_chat_propagate.js 10.0.01:8001 3
+//     node test/wait_chat_propagate.js 10.0.01:8001 3 1
 
-var RtcTwst = require('./rtctwst').RtcTwst,
-    rtwst = new RtcTwst(),
+var getIP = require('twst').getIP,
+    RtcTwst = require('./rtctwst').RtcTwst,
+    port = 9000,
+    //spread_msgs = true,
+    spread_msgs = false,
     rtc_address = process.argv[2],
     clientCount = process.argv.length >= 4 ? parseInt(process.argv[3]) : 1,
     msgCount = (process.argv.length >= 5) ? parseInt(process.argv[4]) : 1,
-    timeout = (clientCount*20)*1000;
-
-var channel = Math.round(Math.random()*100000);
-var url = 'http://' + rtc_address +
+    timeout = (clientCount*20)*1000,
+    channel = Math.round(Math.random()*100000),
+    url = 'http://' + rtc_address +
           '/chat.html?channel=' + channel +
           '&console_logging=true' +
-          '&twst_address=' + rtwst.getAddress() + '&paused=1';
+          '&twst_address=' + getIP() + ':' + port + '&paused=1',
+    rtwst = null;
 
-var pages = [];
+rtwst = new RtcTwst({port: port,
+                     startPages: true,
+                     url: url,
+                     prefix: 'p',
+                     timeout: timeout,
+                     clientCount: clientCount,
+                     pagesCallback: delay_do_start});
 
-for (var i=0; i<clientCount; i++) {
-    pages.push(rtwst.dockerPage(url, {prefix: 'p' + i + ': ',
-                                      timeout: timeout}));
-}
-
-function poll() {
-    if (Object.keys(rtwst.clients).length >= clientCount) {
-        console.log('Delaying for 5 seconds before starting cluster');
-        setTimeout(do_start, 5000);
-    } else {
-        setTimeout(poll, 100);
-    }
+function delay_do_start() {
+    console.log('All clients started, delaying for 5 seconds before starting cluster');
+    setTimeout(do_start, 5000);
 }
 
 function do_start() {
@@ -54,26 +54,39 @@ function do_start() {
 
 function do_chat() {
     rtwst.broadcast("window._test_msgCount = " + msgCount + ";")
-    for (var idx=0; idx < clientCount; idx++) {
-        var cnt = Math.floor((msgCount + clientCount - idx - 1) / clientCount),
-            msg = 'test msg #' + idx,
-            x = '';
+    if (spread_msgs) {
+        for (var idx=0; idx < clientCount; idx++) {
+            var cnt = Math.floor((msgCount + clientCount - idx - 1) / clientCount),
+                msg = 'test msg #' + idx,
+                x = '';
 
-        if (cnt === 0) { continue }
+            if (cnt === 0) { continue }
 
-        x += 'for(var j=0; j<' + cnt + '; j++) {pendingSends.push('
-        x += '"msg #" + j + " from node ' + idx + '")}';
-        console.log('Sending to ' + idx + ': ' + x);
-        rtwst.send(x, {id: idx})
+            x += 'for(var j=0; j<' + cnt + '; j++) {pendingSends.push('
+            x += '"msg #" + j + " from node ' + idx + '")}';
+            console.log('Sending to ' + idx + ': ' + x);
+            rtwst.send(x, {id: idx})
+        }
+    } else {
+        rtwst.get_leader_idx(2000, function(status, leader_idx) {
+            var x = '';
+            x += 'for(var j=0; j<' + msgCount + '; j++) {pendingSends.push('
+            x += '"msg #" + j + " from leader node ' + leader_idx + '")}';
+            console.log('Sending to leader node ' + leader_idx + ': ' + x);
+            rtwst.send(x, {id: leader_idx})
+        });
     }
     rtwst.wait_cluster_predicate(timeout, function() {
+    //rtwst.wait_cluster_predicate(10000, function() {
         var sm = node._self.stateMachine;
         //console.log(nodeId + " stateMachine: " + JSON.stringify(sm));
         if ('history' in sm && 'value' in sm.history) {
             var lines = sm.history.value;
-            //console.log("lines:", lines);
-            if (lines.length === window._test_msgCount) {
-                var m = lines[lines.length-1].match(/msg .* from node .*$/);
+            //console.log("lines.length:", lines.length);
+            if (lines.length > window._test_msgCount) {
+                console.error('Too many lines (' + lines.length + ') in history!')
+            } else if (lines.length === window._test_msgCount) {
+                var m = lines[lines.length-1].match(/msg .* from .*node .*$/);
                 //console.log("m:", m);
                 return m ? true : false;
             } else {
@@ -90,11 +103,23 @@ function do_chat() {
             console.log('Cluster state failed to propagate after ' + elapsed + 'ms')
             rtwst.cleanup_exit(1);
         }
+
+        /*
+        // TODO: remove debug
+        var retcode = status ? 0 : 1;
+        rtwst.collect(function() { return JSON.stringify({log: node._self.log,
+                                    history: node._self.stateMachine.history.value});
+        }, {timeout: timeout}, function(status, data) {
+            if (status) {
+                console.log("DEBUG collect data:", JSON.stringify(data));
+            } else {
+                console.log("DEBUG collect failed");
+            }
+            rtwst.cleanup_exit(retcode);
+        });
+        */
     });
 }
-
-poll();
-
 
 setTimeout(function() {
     console.log("timeout waiting for clients");

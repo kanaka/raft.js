@@ -6,40 +6,38 @@
 //
 // - Now run the test using the rtc_server listen address and the
 //   number of nodes:
-//     node test/wait_kill_nodes.js 10.0.01:8001 3
+//     node test/wait_kill_nodes.js 10.0.01:8001 3 1
 
-var RtcTwst = require('./rtctwst').RtcTwst,
-    rtwst = new RtcTwst(),
+var getIP = require('twst').getIP,
+    RtcTwst = require('./rtctwst').RtcTwst,
+    port = 9000,
     rtc_address = process.argv[2],
     clientCount = process.argv.length >= 4 ? parseInt(process.argv[3]) : 1,
     killCount = (process.argv.length >= 5) ? parseInt(process.argv[4]) : parseInt((clientCount-1)/2, 10),
-    timeout = (clientCount*20)*1000;
-
-var channel = Math.round(Math.random()*100000);
-var url = 'http://' + rtc_address +
+    timeout = (clientCount*20)*1000,
+    channel = Math.round(Math.random()*100000),
+    url = 'http://' + rtc_address +
           '/chat.html?channel=' + channel +
           '&console_logging=true' +
-          '&twst_address=' + rtwst.getAddress() + '&paused=1';
-
-var pages = [];
+          '&twst_address=' + getIP() + ':' + port + '&paused=1',
+    rtwst = null;
 
 if (killCount > parseInt((clientCount-1)/2, 10)) {
     console.log('Kill count must be less than half of client count');
     process.exit(2);
 }
 
-for (var i=0; i<clientCount; i++) {
-    pages.push(rtwst.dockerPage(url, {prefix: 'p' + i + ': ',
-                                      timeout: timeout}));
-}
+rtwst = new RtcTwst({port: port,
+                     startPages: true,
+                     url: url,
+                     prefix: 'p',
+                     timeout: timeout,
+                     clientCount: clientCount,
+                     pagesCallback: delay_do_start});
 
-function poll() {
-    if (Object.keys(rtwst.clients).length >= clientCount) {
-        console.log('Delaying for 5 seconds before starting cluster');
-        setTimeout(do_start, 5000);
-    } else {
-        setTimeout(poll, 100);
-    }
+function delay_do_start() {
+    console.log('All clients started, delaying for 5 seconds before starting cluster');
+    setTimeout(do_start, 5000);
 }
 
 function do_start() {
@@ -88,9 +86,6 @@ function do_kill() {
         });
     });
 }
-
-poll();
-
 
 setTimeout(function() {
     console.log("timeout waiting for clients");

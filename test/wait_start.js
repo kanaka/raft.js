@@ -8,40 +8,37 @@
 //   number of nodes:
 //     node test/wait_start.js 10.0.01:8001 3
 
-var RtcTwst = require('./rtctwst').RtcTwst,
-    rtwst = new RtcTwst(),
+var getIP = require('twst').getIP,
+    RtcTwst = require('./rtctwst').RtcTwst,
+    port = 9000,
     rtc_address = process.argv[2],
     clientCount = process.argv.length >= 4 ? parseInt(process.argv[3]) : 1,
-    timeout = (clientCount*20)*1000;
-
-var channel = Math.round(Math.random()*100000);
-var url = 'http://' + rtc_address +
+    timeout = (clientCount*20)*1000,
+    channel = Math.round(Math.random()*100000),
+    url = 'http://' + rtc_address +
           '/chat.html?channel=' + channel +
           '&console_logging=true' +
-          '&twst_address=' + rtwst.getAddress() + '&paused=1';
+          '&twst_address=' + getIP() + ':' + port + '&paused=1',
+    rtwst = null;
 
-var pages = [];
+rtwst = new RtcTwst({port: port,
+                     startPages: true,
+                     url: url,
+                     prefix: 'p',
+                     timeout: timeout,
+                     clientCount: clientCount,
+                     pagesCallback: delay_do_start});
 
-for (var i=0; i<clientCount; i++) {
-    pages.push(rtwst.dockerPage(url, {prefix: 'p' + i + ': ',
-                                      timeout: timeout}));
-}
-
-function poll() {
-    if (Object.keys(rtwst.clients).length >= clientCount) {
-        console.log('Delaying for 5 seconds before starting cluster');
-        setTimeout(do_start, 5000);
-    } else {
-        setTimeout(poll, 100);
-    }
+function delay_do_start() {
+    console.log('All clients started, delaying for 5 seconds before starting cluster');
+    setTimeout(do_start, 5000);
 }
 
 function do_start() {
-    rtwst.broadcast('startChat();');
+    rtwst.broadcast('startChat()');
     rtwst.wait_cluster_up(timeout, function(status, nodes, elapsed) {
         if (status) {
             console.log('Cluster is up after ' + elapsed + 'ms');
-            console.log('Delaying for 3 seconds before sending message');
             rtwst.cleanup_exit(0);
         } else {
             console.log('Cluster failed to come up after ' +
@@ -50,8 +47,6 @@ function do_start() {
         }
     });
 }
-
-poll();
 
 
 setTimeout(function() {
