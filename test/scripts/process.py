@@ -3,12 +3,15 @@
 from __future__ import print_function
 
 import os, sys
-match = sys.argv[1]
-tag = sys.argv[2]
-files = sys.argv[3:]
+fprefix = sys.argv[1]
+match = sys.argv[2]
+tag = sys.argv[3]
+files = sys.argv[4:]
+
+out = open(fprefix+".dat", "w")
+out.write("nodes time label\n")
 
 grouped = {}
-
 for file in files:
     lines = open(file).readlines()
     matches = filter(lambda x:match in x, lines)
@@ -23,14 +26,17 @@ for file in files:
 
     #print(file, type, subtype, size, attempt, secs, ":", line, file=sys.stderr)
 
-    print("%s %s %s" % (size, secs, tag))
+    out.write("%s %s %s\n" % (size, secs, tag))
 
     if not grouped.has_key(size):
         grouped[size] = []
 
     grouped[size].append(secs)
 
+out_avg = open(fprefix+"_average.dat", "w")
+out_avg.write("nodes time label\n")
+
 for size in sorted(grouped.keys()):
     times = grouped[size]
     avg = sum(times) / len(times)
-    print("%s %s %s" % (size, avg, tag+"_average"))
+    out_avg.write("%s %s %s\n" % (size, avg, tag+"_average"))

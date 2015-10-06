@@ -1197,37 +1197,70 @@ test runs (3*10*7*3 + 11*7)
 
 \subsubsection{Outcome}
 
-% TODO: programmatic figure numbers
-Figure 7 shows the results of running the
-\emph{test/test\_chat\_propagate.js} test to show the amount of time
+Figure~\ref{fig:propagate1} shows the results of running the
+\emph{test/wait\_chat\_propagate.js} test to show the amount of time
 that a stable cluster takes to propagate, commit and apply a single
-state machine command to the state machines on every cluster node.
-
-Figure 7 is a scatterplot with each test run as a blue ``x" and a black
-line representing the average at each cluster size.
+chat message to the state machine on every cluster node using the
+atomic \emph{seqAppend} command.  Figure~\ref{fig:propagate1} is
+a scatterplot with each test run as a blue ``x" and a black line
+representing the average at each cluster size.
 
 \begin{figure}[!t]
     \begin{tikzpicture}
     \begin{axis}[%
         xlabel={Nodes}, ylabel={Time (seconds)},
-        xtick=data,
+        %xtick=data,
+        xmin=0, ymin=0,
         grid=major,
         scatter/classes={%
-            propagate={mark=x,draw=blue},
-            propagate_average={mark=,draw=red}}]
+            propagate_1_et1000={mark=x,draw=blue},
+            propagate_1_et1000_average={mark=}}]
     \addplot[scatter,only marks,%
         scatter src=explicit symbolic]%
-    table[meta=label] {data/data_propagate.dat};
+    table[meta=label] {data/propagate_1.dat};
     \addplot[scatter,%
         scatter src=explicit symbolic]%
-    table[meta=label] {data/data_propagate_averages.dat};
+    table[meta=label] {data/propagate_1_average.dat};
     \end{axis}
     \end{tikzpicture}
 \caption{Propagate$,$ Commit$,$ and Apply Command}
-  \label{fig:propagate}
+  \label{fig:propagate1}
 \end{figure}
 
-Figures 8, 9 and 10 show the results of running the
+Figure~\ref{fig:propagate100} is similar to
+Figure~\ref{fig:propagate1} but shows the results of adding 100 chat
+messages instead of just 1. The commands are serialized which means
+that the previous command must be committed before the current command
+can be committed. The test is complete once the last chat message
+command has been both committed and applied to every node of the
+cluster. Figure~\ref{fig:propagate1} is a scatterplot with each test
+run as a red ``x" and a black line representing the average at each
+cluster size.
+
+\begin{figure}[!t]
+    \begin{tikzpicture}
+    \begin{axis}[%
+        xlabel={Nodes}, ylabel={Time (seconds)},
+        %xtick=data,
+        xmin=0, ymin=0,
+        grid=major,
+        scatter/classes={%
+            propagate_100_et1000={mark=x,draw=red},
+            propagate_100_et1000_average={mark=}}]
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/propagate_100.dat};
+    \addplot[scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/propagate_100_average.dat};
+    \end{axis}
+    \end{tikzpicture}
+\caption{Propagate$,$ Commit$,$ and Apply Command}
+  \label{fig:propagate100}
+\end{figure}
+
+Figures \ref{fig:cluster_up}, \ref{fig:recovery-leader-failure} and
+\ref{fig:recovery-half-failure} show the results of running the
 \emph{test/test\_up.js} and \emph{test/test\_kill\_nodes.js} in both
 modes (kill only leader and kill just under half the nodes). Three
 different scatterplots are shown for each test mode to test different
@@ -1242,32 +1275,34 @@ Some specific notes about the figures:
 % TODO: link figure numbers
 
 \begin{enumerate}
-    \item \emph{Figure 8 (a)}: The results show that once the cluster
-        size reaches 17, the cluster sometimes does not activate
-        before the test times out (the red ``x" marks). Once the
-        cluster reaches 21 nodes, all 7 test runs time out. The reason
-        for this is because at 17 nodes, the leader is not always able
-        to send out appendEntries RPCs to all the other nodes before
-        their election timeout fires. More analysis is needed, but one
-        possible explanation is that the single SlimerJS XULRunner
-        process that is handling all the cluster nodes is not able to
-        give enough CPU time to the leader node to reliably send
-        appendEntries RPCs to all the other nodes within the election
-        timeout value. Increasing the election timeout to 500ms or
-        greater eliminates the failures without significantly changing
-        the average cluster activation time curve.
-    \item \emph{Figure 9 (a)}: The results show that when the cluster
-        size reaches 15, then average amount of time for cluster
-        recovery (after the leader is killed) increases dramatically
-        (not all data points are shown on the plot for size 15). At
-        cluster size 17 the cluster is no longer able to recover
-        within the test timeout period. Increasing the election
-        timeout to 500ms or greater eliminates the failures at the
-        cost of slightly increased recovery time for smaller cluster
-        sizes.
-    \item \emph{Figure 10 (a)}: During this test the cluster was unable to
-        activate at cluster size 21 when the election timeout value is
-        set to 100ms (see Figure 8 (a)). This means there was no
+    \item \emph{Figure~\ref{fig:cluster_up}~(a)}: The results show that
+        once the cluster size reaches 17, the cluster sometimes does
+        not activate before the test times out (the red ``x" marks).
+        Once the cluster reaches 21 nodes, all 7 test runs time out.
+        The reason for this is because at 17 nodes, the leader is not
+        always able to send out appendEntries RPCs to all the other
+        nodes before their election timeout fires. More analysis is
+        needed, but one possible explanation is that the single
+        SlimerJS XULRunner process that is handling all the cluster
+        nodes is not able to give enough CPU time to the leader node
+        to reliably send appendEntries RPCs to all the other nodes
+        within the election timeout value. Increasing the election
+        timeout to 500ms or greater eliminates the failures without
+        significantly changing the average cluster activation time
+        curve.
+    \item \emph{Figure~\ref{fig:recovery-leader-failure}~(a)}: The
+        results show that when the cluster size reaches 15, then
+        average amount of time for cluster recovery (after the leader
+        is killed) increases dramatically (not all data points are
+        shown on the plot for size 15). At cluster size 17 the cluster
+        is no longer able to recover within the test timeout period.
+        Increasing the election timeout to 500ms or greater eliminates
+        the failures at the cost of slightly increased recovery time
+        for smaller cluster sizes.
+    \item \emph{Figure~\ref{fig:recovery-half-failure}~(a)}: During
+        this test the cluster was unable to activate at cluster size
+        21 when the election timeout value is set to 100ms (see
+        Figure~\ref{fig:cluster_up}~(a)). This means there was no
         opportunity for cluster recovery at cluster size 21 so there
         is no data for that column.
 
@@ -1339,18 +1374,20 @@ a black line representing the average at each cluster size.
             \begin{axis}[%
                 %height=1.5\textwidth, width=1.4\textwidth,
                 xlabel={Nodes}, ylabel={Time (seconds)},
-                xtick=data,
-                ymin=0, ymax=65,
+                %xtick={1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33},
+                %xticklabels={1,,5,,9,,13,,17,,21,,25,,29,,33},
+                xmin=0, xmax=34,
+                ymin=0, ymax=11,
                 grid=major,
                 scatter/classes={%
-                    et1000={mark=x,draw=blue},
-                    et1000_average={mark=,draw=red}}]
+                    start_et1000={mark=x,draw=blue},
+                    start_et1000_average={mark=,draw=red}}]
             \addplot[scatter,only marks,%
                 scatter src=explicit symbolic]%
-            table[meta=label] {data/data_cluster_up_1000.dat};
+            table[meta=label] {data/start_et1000.dat};
             \addplot[scatter,%
                 scatter src=explicit symbolic]%
-            table[meta=label] {data/data_cluster_up_1000_averages.dat};
+            table[meta=label] {data/start_et1000_average.dat};
             \end{axis}
             \end{tikzpicture}
         }
@@ -1422,18 +1459,19 @@ a black line representing the average at each cluster size.
             \begin{axis}[%
                 %height=1.5\textwidth, width=1.4\textwidth,
                 xlabel={Nodes}, ylabel={Time (seconds)},
-                xtick=data,
+                %xtick=data,
+                xmin=0,
                 ymin=0, ymax=3.5,
                 grid=major,
                 scatter/classes={%
-                    kl={mark=x,draw=blue},
-                    kl_average={mark=,draw=red}}]
+                    kill_1_et1000={mark=x,draw=blue},
+                    kill_1_et1000_average={mark=,draw=red}}]
             \addplot[scatter,only marks,%
                 scatter src=explicit symbolic]%
-            table[meta=label] {data/data_kill_leader_1000.dat};
+            table[meta=label] {data/kill_1_et1000.dat};
             \addplot[scatter,%
                 scatter src=explicit symbolic]%
-            table[meta=label] {data/data_kill_leader_1000_averages.dat};
+            table[meta=label] {data/kill_1_et1000_average.dat};
             \end{axis}
             \end{tikzpicture}
         }
@@ -1504,18 +1542,18 @@ a black line representing the average at each cluster size.
             \begin{axis}[%
                 %height=1.5\textwidth, width=1.4\textwidth,
                 xlabel={Nodes}, ylabel={Time (seconds)},
-                xtick=data,
+                xmin=0,
                 ymin=0, ymax=3.5,
                 grid=major,
                 scatter/classes={%
-                    kh={mark=x,draw=blue},
-                    kh_average={mark=,draw=red}}]
+                    kill_half_et1000={mark=x,draw=blue},
+                    kill_half_et1000_average={mark=,draw=red}}]
             \addplot[scatter,only marks,%
                 scatter src=explicit symbolic]%
-            table[meta=label] {data/data_kill_half_1000.dat};
+            table[meta=label] {data/kill_half_et1000.dat};
             \addplot[scatter,%
                 scatter src=explicit symbolic]%
-            table[meta=label] {data/data_kill_half_1000_averages.dat};
+            table[meta=label] {data/kill_half_et1000_average.dat};
             \end{axis}
             \end{tikzpicture}
         }
