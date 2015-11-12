@@ -14,7 +14,11 @@
   },
   "main": "index.js",
   "files": [
-    "LICENSE.txt"
+    "LICENSE.txt",
+    "index.js",
+    "local.js",
+    "base.js",
+    "http.js"
   ],
   "engines": {
     "node": ">=0.8.9"
