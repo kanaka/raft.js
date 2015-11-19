@@ -4,6 +4,8 @@
 var verbose = 1,
     debug = true,
     electionTimeout = 1000,
+    //electionTimeout = 500,
+    //electionTimeout = 250,
     // addRemoveServersRetry: smaller values increase the number of
     // PENDING_CONFIG_CHANGE that will happen when there are multiple
     // changes pending (more than one server added or removed). Larger

@@ -198,9 +198,9 @@ as the new leader of the cluster \cite[p.~12]{raft_thesis:ongaro14}.
 
 Each node of the Raft cluster maintains an ordinally increasing
 current term value. When a Raft follower node does not receive
-a heartbeat from a leader within a locally randomized election timeout period, it
-transitions to candidate state, votes for itself, increases its
-current term value by one and sends a requestVote RPC (with the
+a heartbeat from a leader within a locally randomized election timeout
+period, it transitions to candidate state, votes for itself, increases
+its current term value by one and sends a requestVote RPC (with the
 new term) to all the other nodes in the cluster. When a node receives
 a requestVote RPC with a term that is greater than its own it will
 become a follower (if not already), update its term to the new term,
@@ -406,7 +406,7 @@ described in \cite[Consensus:~Diego]{raft_thesis:ongaro14}:
     automatically correlated together by a lower level of the software
     stack. For example with HTTP 1.0 \cite{http:rfc1945} client
     requests are followed by a server response on any given TCP
-    stream. Most remote procedure call mechanims also use
+    stream. Most remote procedure call mechanisms also use
     a synchronous request/response model. %TODO/CITE
     WebRTC DataChannel connections are message based rather than
     request/response stream based. %TODO/CITE
@@ -1113,7 +1113,28 @@ capable nodes.
 
 \subsection{Automated Testing}
 
-\subsubsection{Setup}
+\subsubsection{Twst Test Framework}
+
+In order to facilitate coordinated testing across a large number of
+browser instances, a new test framework was created called
+\cite{twst}. This \emph{Twst} framework provides a client and server
+library written in JavaScript:
+
+\begin{enumerate}
+    \item \emph{server library}: this library is used to write tests
+        that need to coordinate testing across many browser instances.
+        It provides services such as client tracking/enumeration,
+        broadcast and targeted RPC, state rendezvous, log collection,
+        etc.
+    \item \emph{client library}: this library is included with the web
+        application that is being tested. When the page loads, the
+        library will automatically connect to the \emph{Twst} server
+        instance and begin sending console logs and accepting
+        RPCs/commands from the server.
+\end{enumerate}
+
+
+\subsubsection{Test Setup}
 
 Automated testing of the Raft over WebRTC system was performed by
 leveraging the SlimerJS scriptable browser environment. SlimerJS
@@ -1130,18 +1151,22 @@ the ``fentas/slimerjs" docker image \cite{fentas:slimerjs}.
 This custom Dockerfile was created because the upstream version of the
 Dockerfile used an older version of XULRunner that did not support
 more than 7 WebRTC clients communicating together simultaneously. This
-issue was discovered during testing.
+issue was discovered during initial testing.
 
-Writing tests using SlimerJS involves creating JavaScript programs
-that are run within the SlimerJS environment. These scripts can create
-browser instances (essentially headless browser tabs), query the status
-of those pages and execute JavaScript within the context of the pages
-themselves.
+Writing tests using SlimerJS involves creating JavaScript test programs
+which start a \emph{Twst} server instance and then launch a SlimerJS
+docker container for each node of the cluster. Each container starts
+a XULRunner browser instance of the Raft over WebRTC chat application.
+Also included with the application is the \emph{Twst} client library
+which connects back to the \emph{Twst} service in the test program.
+Once all the chat application nodes have connected to the test
+server/program, then the actual test is started across all the
+application nodes.
 
-Three different tests were created to test the basic Raft over WebRTC
-application and the chat application. Each of the tests takes
-a parameter indicating the number of nodes/pages to launch and test
-again. The test script files are:
+Three different tests programs/servers were created to test the basic
+Raft over WebRTC application. Each of the tests takes a parameter
+indicating the number of nodes/pages to launch. The test
+source files are:
 
 \begin{enumerate}
     \item \emph{test/common.js}: a module of common functions used by
@@ -1159,7 +1184,9 @@ again. The test script files are:
         just under half the nodes of the cluster. The test then waits
         for a new leader to be elected and remove the dead nodes from
         the cluster. The test reports both the number of milliseconds
-        for the cluster to come up and the recover from the failure.
+        for the cluster to come up and the number of milliseconds for
+        the cluster to fully recover from the failure and evict the
+        failed nodes.
     \item \emph{test/test\_chat\_propagate.js}: similar to
         \emph{test/test\_up.js} but once the cluster is up, the test
         connects to one of the non-leader nodes and and sends a chat
@@ -1184,26 +1211,13 @@ The tests were all run on a system with the following configuration:
     \end{enumerate}
 \end{enumerate}
 
-Three tests were run at 10 different cluster sizes (odd cluster sizes
-from 3 to 21 nodes): \emph{test/test\_up.js} and
-\emph{test/test\_kill\_nodes.js} in both modes (kill only leader and kill just
-under half the nodes).
-Each of these tests was run with three different Raft election
-timeout values: 100ms, 500ms, 1000ms. The
-\emph{test/test\_chat\_propagate.js} test was run at
-11 different cluster sizes (odd cluster sizes from 1 to 21 nodes).
-Each test mode and cluster size was run 7 times for a total of 707
-test runs (3*10*7*3 + 11*7)
+Five different tests (using different options for the three test
+programs) were run at 17 different cluster sizes (odd cluster sizes
+from 3 to 35 nodes). Each of these tests was run with three different
+Raft election timeout values: 250ms, 500ms, 1000ms. Each of the five
+tests and cluster size combinations was run 7 times.
 
 \subsubsection{Outcome}
-
-Figure~\ref{fig:propagate1} shows the results of running the
-\emph{test/wait\_chat\_propagate.js} test to show the amount of time
-that a stable cluster takes to propagate, commit and apply a single
-chat message to the state machine on every cluster node using the
-atomic \emph{seqAppend} command.  Figure~\ref{fig:propagate1} is
-a scatterplot with each test run as a blue ``x" and a black line
-representing the average at each cluster size.
 
 \begin{figure}[!t]
     \begin{tikzpicture}
@@ -1223,21 +1237,11 @@ representing the average at each cluster size.
     table[meta=label] {data/propagate_1_average.dat};
     \end{axis}
     \end{tikzpicture}
-\caption{Propagate$,$ Commit$,$ and Apply Command}
-  \label{fig:propagate1}
-\end{figure}
-
-Figure~\ref{fig:propagate100} is similar to
-Figure~\ref{fig:propagate1} but shows the results of adding 100 chat
-messages instead of just 1. The commands are serialized which means
-that the previous command must be committed before the current command
-can be committed. The test is complete once the last chat message
-command has been both committed and applied to every node of the
-cluster. Figure~\ref{fig:propagate1} is a scatterplot with each test
-run as a red ``x" and a black line representing the average at each
-cluster size.
-
-\begin{figure}[!t]
+    \caption{Propagate$,$ Commit$,$ and Apply 1 Command}
+    \label{fig:propagate1}
+%
+    \vspace{1cm}
+%
     \begin{tikzpicture}
     \begin{axis}[%
         xlabel={Nodes}, ylabel={Time (seconds)},
@@ -1245,7 +1249,7 @@ cluster size.
         xmin=0, ymin=0,
         grid=major,
         scatter/classes={%
-            propagate_100_et1000={mark=x,draw=red},
+            propagate_100_et1000={mark=x,draw=blue},
             propagate_100_et1000_average={mark=}}]
     \addplot[scatter,only marks,%
         scatter src=explicit symbolic]%
@@ -1255,315 +1259,247 @@ cluster size.
     table[meta=label] {data/propagate_100_average.dat};
     \end{axis}
     \end{tikzpicture}
-\caption{Propagate$,$ Commit$,$ and Apply Command}
-  \label{fig:propagate100}
+    \caption{Propagate$,$ Commit$,$ and Apply 100 Commands}
+    \label{fig:propagate100}
 \end{figure}
 
-Figures \ref{fig:cluster_up}, \ref{fig:recovery-leader-failure} and
-\ref{fig:recovery-half-failure} show the results of running the
-\emph{test/test\_up.js} and \emph{test/test\_kill\_nodes.js} in both
-modes (kill only leader and kill just under half the nodes). Three
-different scatterplots are shown for each test mode to test different
-values of the Raft election timeout value: 100ms, 500ms, and 1000ms.
-The election timeout value makes very little difference to the average
-time curve line. The reason for this is that the first leader tends to
-stay the leader as new nodes are added so for the most part the
-election timer does not have an impact.
+\begin{figure}[!t]
+    \begin{tikzpicture}
+    \begin{axis}[%
+        %height=1.5\textwidth, width=1.4\textwidth,
+        %width=0.45\textwidth,
+        xlabel={Nodes}, ylabel={Time (seconds)},
+        xmin=0, xmax=43,
+        ymin=0, ymax=15,
+        grid=major,
+        %legend pos=outer north east,
+        legend pos=north west,
+        scatter/classes={%
+            start_et250={mark=x,draw=magenta},
+            start_et250_average={mark=,draw=red},
+            %start_et250_fail={mark=x,/raw=red},
+            start_et500={mark=x,draw=cyan},
+            start_et500_average={mark=,draw=red},
+            %start_et500_fail={mark=x,draw=red},
+            start_et1000={mark=x,draw=blue},
+            start_et1000_average={mark=,draw=red}}]
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/start_et250.dat};
+    \addplot[magenta,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/start_et250_average.dat};
 
-Some specific notes about the figures:
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/start_et500.dat};
+    \addplot[cyan,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/start_et500_average.dat};
+    %\addplot[scatter,%
+    %    scatter src=explicit symbolic]%
+    %table[meta=label] {data/start_et500_fail.dat};
 
-% TODO: link figure numbers
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/start_et1000.dat};
+    \addplot[blue,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/start_et1000_average.dat};
 
-\begin{enumerate}
-    \item \emph{Figure~\ref{fig:cluster_up}~(a)}: The results show that
-        once the cluster size reaches 17, the cluster sometimes does
-        not activate before the test times out (the red ``x" marks).
-        Once the cluster reaches 21 nodes, all 7 test runs time out.
-        The reason for this is because at 17 nodes, the leader is not
-        always able to send out appendEntries RPCs to all the other
-        nodes before their election timeout fires. More analysis is
-        needed, but one possible explanation is that the single
-        SlimerJS XULRunner process that is handling all the cluster
-        nodes is not able to give enough CPU time to the leader node
-        to reliably send appendEntries RPCs to all the other nodes
-        within the election timeout value. Increasing the election
-        timeout to 500ms or greater eliminates the failures without
-        significantly changing the average cluster activation time
-        curve.
-    \item \emph{Figure~\ref{fig:recovery-leader-failure}~(a)}: The
-        results show that when the cluster size reaches 15, then
-        average amount of time for cluster recovery (after the leader
-        is killed) increases dramatically (not all data points are
-        shown on the plot for size 15). At cluster size 17 the cluster
-        is no longer able to recover within the test timeout period.
-        Increasing the election timeout to 500ms or greater eliminates
-        the failures at the cost of slightly increased recovery time
-        for smaller cluster sizes.
-    \item \emph{Figure~\ref{fig:recovery-half-failure}~(a)}: During
-        this test the cluster was unable to activate at cluster size
-        21 when the election timeout value is set to 100ms (see
-        Figure~\ref{fig:cluster_up}~(a)). This means there was no
-        opportunity for cluster recovery at cluster size 21 so there
-        is no data for that column.
-
-\end{enumerate}
-
-
-Each figure is a scatterplot with each test run as a blue ``x" and
-a black line representing the average at each cluster size.
-
-%\begin{figure*}[!t]
-\begin{figure*}[h]
-    \centering
-    %\begin{subfigure}[b]{0.30\textwidth}
-    \subfloat[100ms election timer]{
-        \centering
-        \resizebox{0.3\linewidth}{!}{
-            \begin{tikzpicture}
-            \begin{axis}[%
-                %height=1.5\textwidth, width=1.4\textwidth,
-                xlabel={Nodes}, ylabel={Time (seconds)},
-                xtick=data,
-                ymin=0, ymax=65,
-                grid=major,
-                scatter/classes={%
-                    et100={mark=x,draw=blue},
-                    et100_fail={mark=x,draw=red},
-                    et100_average={mark=,draw=red}}]
-            \addplot[scatter,only marks,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/data_cluster_up_100.dat};
-            \addplot[scatter,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/data_cluster_up_100_averages.dat};
-            \end{axis}
-            \end{tikzpicture}
-        }
-        \label{fig:A}
-    }
-    %\begin{subfigure}[b]{0.30\textwidth}
-    \subfloat[500ms election timer]{
-        \centering
-        \resizebox{0.3\linewidth}{!}{
-            \begin{tikzpicture}
-            \begin{axis}[%
-                %height=1.5\textwidth, width=1.4\textwidth,
-                xlabel={Nodes}, ylabel={Time (seconds)},
-                xtick=data,
-                ymin=0, ymax=65,
-                grid=major,
-                scatter/classes={%
-                    et500={mark=x,draw=blue},
-                    et500_average={mark=,draw=red}}]
-            \addplot[scatter,only marks,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/data_cluster_up_500.dat};
-            \addplot[scatter,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/data_cluster_up_500_averages.dat};
-            \end{axis}
-            \end{tikzpicture}
-        }
-        \label{fig:B}
-    }
-    %\begin{subfigure}[b]{0.30\textwidth}
-    \subfloat[1000ms election timer]{
-        \centering
-        \resizebox{0.3\linewidth}{!}{
-            \begin{tikzpicture}
-            \begin{axis}[%
-                %height=1.5\textwidth, width=1.4\textwidth,
-                xlabel={Nodes}, ylabel={Time (seconds)},
-                %xtick={1,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33},
-                %xticklabels={1,,5,,9,,13,,17,,21,,25,,29,,33},
-                xmin=0, xmax=34,
-                ymin=0, ymax=11,
-                grid=major,
-                scatter/classes={%
-                    start_et1000={mark=x,draw=blue},
-                    start_et1000_average={mark=,draw=red}}]
-            \addplot[scatter,only marks,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/start_et1000.dat};
-            \addplot[scatter,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/start_et1000_average.dat};
-            \end{axis}
-            \end{tikzpicture}
-        }
-        \label{fig:C}
-    }
+    \legend{250ms,,500ms,,1000ms,}
+    \end{axis}
+    \end{tikzpicture}
     \caption{Initial Cluster Activation}
     \label{fig:cluster_up}
+\end{figure}
 
-%%% Next Row
-\rule{\textwidth}{0.3pt}
-\smallskip
+\begin{figure}[!t]
+    \begin{tikzpicture}
+    \begin{axis}[%
+        %height=1.5\textwidth, width=1.4\textwidth,
+        %width=0.45\textwidth,
+        xlabel={Nodes}, ylabel={Time (seconds)},
+        xmin=0, xmax=37,
+        ymin=0, ymax=4.5,
+        grid=major,
+        %legend pos=outer north east,
+        legend pos=north west,
+        scatter/classes={%
+            kill_1_et250={mark=x,draw=magenta},
+            kill_1_et250_average={mark=,draw=red},
+            %kill_1_et250_fail={mark=x,/raw=red},
+            kill_1_et500={mark=x,draw=cyan},
+            kill_1_et500_average={mark=,draw=red},
+            %kill_1_et500_fail={mark=x,draw=red},
+            kill_1_et1000={mark=x,draw=blue},
+            kill_1_et1000_average={mark=,draw=red}}]
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_1_et250.dat};
+    \addplot[magenta,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_1_et250_average.dat};
 
-    %\begin{subfigure}[b]{0.30\textwidth}
-    \subfloat[100ms election timer]{
-        \centering
-        \resizebox{0.3\linewidth}{!}{
-            \begin{tikzpicture}
-            \begin{axis}[%
-                %height=1.5\textwidth, width=1.4\textwidth,
-                xlabel={Nodes}, ylabel={Time (seconds)},
-                xtick=data,
-                ymin=0, ymax=3.5, xmax=23,
-                grid=major,
-                scatter/classes={%
-                    kl={mark=x,draw=blue},
-                    kl_fail={mark=x,draw=red},
-                    kl_average={mark=,draw=red}}]
-            \addplot[scatter,only marks,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/data_kill_leader_100.dat};
-            \addplot[scatter,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/data_kill_leader_100_averages.dat};
-            \end{axis}
-            \end{tikzpicture}
-        }
-        \label{fig:D}
-    }
-    %\begin{subfigure}[b]{0.30\textwidth}
-    \subfloat[500ms election timer]{
-        \centering
-        \resizebox{0.3\linewidth}{!}{
-            \begin{tikzpicture}
-            \begin{axis}[%
-                %height=1.5\textwidth, width=1.4\textwidth,
-                xlabel={Nodes}, ylabel={Time (seconds)},
-                xtick=data,
-                ymin=0, ymax=3.5,
-                grid=major,
-                scatter/classes={%
-                    kl={mark=x,draw=blue},
-                    kl_average={mark=,draw=red}}]
-            \addplot[scatter,only marks,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/data_kill_leader_500.dat};
-            \addplot[scatter,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/data_kill_leader_500_averages.dat};
-            \end{axis}
-            \end{tikzpicture}
-        }
-        \label{fig:E}
-    }
-    %\begin{subfigure}[b]{0.30\textwidth}
-    \subfloat[1000ms election timer]{
-        \centering
-        \resizebox{0.3\linewidth}{!}{
-            \begin{tikzpicture}
-            \begin{axis}[%
-                %height=1.5\textwidth, width=1.4\textwidth,
-                xlabel={Nodes}, ylabel={Time (seconds)},
-                %xtick=data,
-                xmin=0,
-                ymin=0, ymax=3.5,
-                grid=major,
-                scatter/classes={%
-                    kill_1_et1000={mark=x,draw=blue},
-                    kill_1_et1000_average={mark=,draw=red}}]
-            \addplot[scatter,only marks,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/kill_1_et1000.dat};
-            \addplot[scatter,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/kill_1_et1000_average.dat};
-            \end{axis}
-            \end{tikzpicture}
-        }
-        \label{fig:F}
-    }
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_1_et500.dat};
+    \addplot[cyan,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_1_et500_average.dat};
+    %\addplot[scatter,%
+    %    scatter src=explicit symbolic]%
+    %table[meta=label] {data/kill_1_et500_fail.dat};
+
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_1_et1000.dat};
+    \addplot[blue,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_1_et1000_average.dat};
+
+    \legend{250ms,,500ms,,1000ms,}
+
+    \end{axis}
+    \end{tikzpicture}
     \caption{Recovery from Leader Failure}
-    \label{fig:recovery-leader-failure}
+    \label{fig:recovery_leader_failure}
+%
+    \vspace{1cm}
+%
+    \begin{tikzpicture}
+    \begin{axis}[%
+        %height=1.5\textwidth, width=1.4\textwidth,
+        %width=0.45\textwidth,
+        xlabel={Nodes}, ylabel={Time (seconds)},
+        xmin=0, xmax=37,
+        ymin=0, ymax=4.5,
+        grid=major,
+        %legend pos=outer north east,
+        legend pos=north west,
+        scatter/classes={%
+            kill_half_et250={mark=x,draw=magenta},
+            kill_half_et250_average={mark=,draw=red},
+            %kill_half_et250_fail={mark=x,/raw=red},
+            kill_half_et500={mark=x,draw=cyan},
+            kill_half_et500_average={mark=,draw=red},
+            %kill_half_et500_fail={mark=x,draw=red},
+            kill_half_et1000={mark=x,draw=blue},
+            kill_half_et1000_average={mark=,draw=red}}]
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_half_et250.dat};
+    \addplot[magenta,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_half_et250_average.dat};
 
-%%% Next Row
-\rule{\textwidth}{0.3pt}
-\smallskip
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_half_et500.dat};
+    \addplot[cyan,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_half_et500_average.dat};
+    %\addplot[scatter,%
+    %    scatter src=explicit symbolic]%
+    %table[meta=label] {data/kill_half_et500_fail.dat};
 
-    %\begin{subfigure}[b]{0.30\textwidth}
-    \subfloat[100ms election timer]{
-        \centering
-        \resizebox{0.3\linewidth}{!}{
-            \begin{tikzpicture}
-            \begin{axis}[%
-                %height=1.5\textwidth, width=1.4\textwidth,
-                xlabel={Nodes}, ylabel={Time (seconds)},
-                xtick=data,
-                ymin=0, ymax=3.5, xmax=23,
-                grid=major,
-                scatter/classes={%
-                    kh={mark=x,draw=blue},
-                    kh_average={mark=,draw=red}}]
-            \addplot[scatter,only marks,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/data_kill_half_100.dat};
-            \addplot[scatter,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/data_kill_half_100_averages.dat};
-            \end{axis}
-            \end{tikzpicture}
-        }
-        \label{fig:G}
-    }
-    %\begin{subfigure}[b]{0.30\textwidth}
-    \subfloat[500ms election timer]{
-        \centering
-        \resizebox{0.3\linewidth}{!}{
-            \begin{tikzpicture}
-            \begin{axis}[%
-                %height=1.5\textwidth, width=1.4\textwidth,
-                xlabel={Nodes}, ylabel={Time (seconds)},
-                xtick=data,
-                ymin=0, ymax=3.5,
-                grid=major,
-                scatter/classes={%
-                    kh={mark=x,draw=blue},
-                    kh_average={mark=,draw=red}}]
-            \addplot[scatter,only marks,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/data_kill_half_500.dat};
-            \addplot[scatter,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/data_kill_half_500_averages.dat};
-            \end{axis}
-            \end{tikzpicture}
-        }
-        \label{fig:H}
-    }
-    %\begin{subfigure}[b]{0.30\textwidth}
-    \subfloat[1000ms election timer]{
-        \centering
-        \resizebox{0.3\linewidth}{!}{
-            \begin{tikzpicture}
-            \begin{axis}[%
-                %height=1.5\textwidth, width=1.4\textwidth,
-                xlabel={Nodes}, ylabel={Time (seconds)},
-                xmin=0,
-                ymin=0, ymax=3.5,
-                grid=major,
-                scatter/classes={%
-                    kill_half_et1000={mark=x,draw=blue},
-                    kill_half_et1000_average={mark=,draw=red}}]
-            \addplot[scatter,only marks,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/kill_half_et1000.dat};
-            \addplot[scatter,%
-                scatter src=explicit symbolic]%
-            table[meta=label] {data/kill_half_et1000_average.dat};
-            \end{axis}
-            \end{tikzpicture}
-        }
-        \label{fig:I}
-    }
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_half_et1000.dat};
+    \addplot[blue,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_half_et1000_average.dat};
+
+    \legend{250ms,,500ms,,1000ms,}
+
+    \end{axis}
+    \end{tikzpicture}
     \caption{Recovery from Half Cluster Failure}
-    \label{fig:recovery-half-failure}
-\end{figure*}
+    \label{fig:recovery_half_failure}
+\end{figure}
 
 
+
+Figure~\ref{fig:propagate1} and Figure~\ref{fig:propagate100} show the
+result of running the \emph{test/wait\_chat\_propagate.js} test to
+determine the amount of time that a stable cluster takes to propagate,
+commit and apply 1 and 100 chat message commands respectively to the state
+machine on every cluster node using the atomic \emph{seqAppend}
+command. The commands are serialized which means that the previous
+command must be committed before the current command can be committed.
+The test is complete once the last chat message command has been both
+committed and applied to every node of the cluster. Each test execution
+is shown as a blue ``x" and the black line represents the average for
+each cluster size.
+
+In Figure~\ref{fig:propagate1} the time to propagate a single message
+to a single node of the cluster is approximately 0.1 seconds. However,
+this really just represents the tests scanning/checking granularity.
+The time to finish propagating and committing a single message shows
+a slight linear slope upwards from about 0.3 seconds for a three node
+cluster to about 0.5 seconds for a 41 node cluster. The time to
+propagate 100 messages (Figure~\ref{fig:propagate100}) has a much
+higher slope and also appears to be non-linear. TODO: why?
+
+Figure~\ref{fig:cluster_up} shows the results of running the
+\emph{test/test\_up.js} test to determine the amount of time that
+a cluster takes to start. The cluster is fully started once a
+leader has been elected and the leader has successfully added all the
+other nodes to the running configuration. Each election timer value
+is represented as a different color and the line represents the
+average value for each cluster size. The cluster startup times show
+a fairly linear increase as the cluster size increases. The reason
+that the slope varies with election timer is due to the fact that the
+election timer also determines the leader heartbeat value (currently
+set to one fifth of the election timer value). The leader heartbeat
+determines the frequency with which \emph{appendEntries} messages are
+sent from the leader to followers and is also used to propagate log
+entries.  This means that the rate at which log entries (and thus
+cluster configuration updates) can be propagated is proportional to
+the election timer value.
+
+Figures \ref{fig:recovery_leader_failure} and
+\ref{fig:recovery_half_failure} show the results of running the
+\emph{test/test\_kill\_nodes.js} in both modes (kill only leader and
+kill just under half the nodes). Each election timer value is
+represented as a different color and the solid line represents the
+average recovery time for each cluster size. When only the leader is
+killed, the recovery times are constant flat regardless of cluster
+size. This is because after a new leader is elected, there is only
+a single configuration entry to propagate to the rest of the cluster
+(to remove the old failed leader). One interesting thing to note is
+that with a 1000ms timer, the 3 node cluster is actually the most
+inefficient size because the average time until a leader election
+starts is inversely proportional to cluster size so the delay until an
+election happens is a significant contributor to the three node
+cluster with 1000ms timer. With a larger cluster or shorter election
+timer, the contribution of election delay is not noticeable. The
+recovery from almost half the nodes failing is not flat because the
+amount of configuration information that needs to be propagated is
+proportional to the size of the cluster.
+
+At larger cluster sizes (35 and greater) the cluster begins to
+experience failures. For example, when testing with a 250ms election
+timer, once the cluster size reaches 35 nodes, the cluster is
+frequently (more than 50\% of the time) unable to recover from the
+half cluster shutdown test. At a cluster size or 41 and with a 1000ms
+election timer, the cluster begins to experience difficulty
+successfully starting up (about 50\% failure rate). The basic problem
+appears to be due to the average election timeout period being too low
+in relation to communication latency. During leader election, the
+first candidate is unable to gather enough votes to become leader
+before other candidates arise and steal votes which prevents a quorum.
+
+Some (or most) of the communication latency may be a result of CPU or
+memory contention due to all the browser instances running on a single
+host. The use of multiple hosts may show that the system can support
+much larger clusters for a given election timeout value. However, with
+a fixed election timer value, there is always a cluster size for which
+communication latency will begin to prevent the cluster from being
+able to perform leader elections. A dynamically adjusted election
+timer is something that should be explored especially for a browser
+context where the communication latency may be highly variable over
+time.
 
 
 \section{Next Steps}
