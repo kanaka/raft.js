@@ -33,7 +33,8 @@
 
 \begin{document}
 
-\title{Peer-to-peer Browser Middleware for Communication and Consensus in an Unreliable Infrastructure}
+\title{Peer-to-peer Browser Middleware\\
+       for Communication and Consensus in an Unreliable Infrastructure}
 
 \author{\IEEEauthorblockN{Joel Martin}
 \IEEEauthorblockA{Department of Computer Science and Engineering\\
@@ -370,14 +371,13 @@ Figures \ref{fig:recovery_leader_failure} and \ref{fig:recovery_half_failure} sh
 One of the useful outcomes of this project was that it brought to light many areas where further study of Raft, WebRTC, and Raft over WebRTC should be pursued. Here are some interesting areas for further exploration:
 
 \begin{enumerate}
-\item Explore the use of alternate WebRTC transport modes for relaxing ordering constraints and delivery guarantees. Since the Raft protocol is tolerant of out-of-order and dropped messages, it is possible that Raft over WebRTC could be more efficient with one or both of these constraints relaxed.
-\item Test the survivability of the cluster when the signaling server becomes completely unresponsive or very slow.
 \item Explore models for dynamically adjusting Raft timeout values to account for changing network and browser conditions.
-\item Test the system in more diverse network environments. Determine the reliability of establishing direct browser-to-browser communication.  Determine if corporate firewalls make this as difficult as some of the documentation and standards texts imply.
+\item Explore alternate WebRTC transport modes for relaxing ordering constraints and delivery guarantees. Since the Raft protocol is tolerant of out-of-order and dropped messages, it is possible that Raft over WebRTC could be more efficient with one or both of these constraints relaxed.
+\item Test the survivability of the cluster when the signaling server becomes completely unresponsive or very slow.
+\item Test larger scale deployments spanning larger and more diverse network domains. Characterize the factors that affect and limit scalability.
 \item Explore models for timing out and automatically removing nodes when they become unresponsive without needing to be notified by the signaling server that the nodes have disconnected.
 \item Consider extensions to the Raft protocol that enable slow leaders to be proactively detected so that a more capable node (network, CPU, etc) can be elected. This would help address that background page/tag throttling of modern browsers.
-\item Test larger scale deployments spanning larger and more diverse network domains. Determine the factors that affect scalability and characterize scaling limits.
-\item Explore models that allow for a combination of strict shared state and high performance bulk data such as media or object blobs. For example, the data with full consensus might contain hashes that refer to bulk data.
+\item Explore models that allow for a combination of strict shared state and high performance bulk data such as media or object blobs.
 \end{enumerate}
 
 
