@@ -6,4 +6,5 @@ research_class/*-blx.bib
 research_class/*.bbl
 research_class/*.blg
 research_class/*.run.xml
+research_class/*.bak
 node_modules
