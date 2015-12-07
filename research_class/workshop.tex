@@ -102,13 +102,13 @@ Raft.js is an implementation of the Raft algorithm in JavaScript that was create
 
 PeerJS is a project that provides a simplified abstraction for using WebRTC. The first component of PeerJS is a node.js server library that implements a WebRTC signaling server. The second component is a JavaScript library that interacts with that signaling server and also provides a simpler interface for using the WebRTC APIs.
 
-\subsection{Signalling Server}
+\subsection{Signaling Server}
 
 The file `rtc\_server.js' implements the signaling server for the Raft over WebRTC application. The server extends the PeerJS `ExpressPeerServer' object in order to provide WebRTC signaling. In addition to the WebRTC signaling function the server also serves static web resources (HTML, CSS, and JavaScript) and WebRTC channel management endpoints.
 
 \subsection{Client}
 
-The Raft over WebRTC chat application is a single web page (\texttt{chat.html}). When a new Raft cluster is created, the browser connects to the signalling server's new channel endpoint (Figure~\ref{fig:raft_rtc_sequence}~[1]). This endpoint causes the server to create a new channel for PeerJS signaling (Figure~\ref{fig:raft_rtc_sequence}~[2]). Once this is complete the server responds to the browser with a redirect message that contains the new channel identifier in the query parameter and ``firstServer” in the fragment identifier to indicate that this is the very first Raft cluster node (Figure~\ref{fig:raft_rtc_sequence}~[3]).
+The Raft over WebRTC chat application is a single web page (\texttt{chat.html}). When a new Raft cluster is created, the browser connects to the signaling server's new channel endpoint (Figure~\ref{fig:raft_rtc_sequence}~[1]). This endpoint causes the server to create a new channel for PeerJS signaling (Figure~\ref{fig:raft_rtc_sequence}~[2]). Once this is complete the server responds to the browser with a redirect message that contains the new channel identifier in the query parameter and ``firstServer” in the fragment identifier to indicate that this is the very first Raft cluster node (Figure~\ref{fig:raft_rtc_sequence}~[3]).
 
 Subsequent nodes are added to the same Raft cluster by starting a new browser context (separate browser, browser window, or browser tab) and loading the same URL without the ``firstServer" fragment identifier (Figure~\ref{fig:raft_rtc_sequence}~[9]). There is a convenience link provided in the application page that opens a new browser window with a new cluster node.
 
@@ -128,7 +128,7 @@ The chat application extends the basic Raft.js over WebRTC client. The chat appl
 
 \begin{enumerate}
 \item The \emph{seqAppend} operation operates on a specially structured key/value pair in the state machine map. The value of the pair is another associative map that contains a counter and list structure where the actual chat lines are accumulated. \emph{seqAppend} operations are sent with both a count and then new value to append.
-\item When a \emph{seqAppend} operation is applied to the state machine and the count value in the command matches the counter in the state machine's value, then the new line in the request is added to the value list and the counter is incremented. If the count value does not match the counter then the the operation is not applied. In either case, a list is returned in the \texttt{clientRequestResponse} that contains two values: a boolean indicating whether the \emph{seqAppend} operation succeeded and a number indicating the current value of the counter.
+\item When a \emph{seqAppend} operation is applied to the state machine and the count value in the command matches the counter in the state machine's value, then the new line in the request is added to the value list and the counter is incremented. If the count value does not match the counter then the the operation is not applied. In either case, a list is returned in the \texttt{clientRequestResponse} that contains two values: a Boolean indicating whether the \emph{seqAppend} operation succeeded and a number indicating the current value of the counter.
 \item The first time the \emph{seqAppend} operation is used on a non-existent key, the structure described above is created with the counter set to 0 and the list structure is created with the single value that was passed in the \emph{seqAppend} operation.\
 \item Clients that call the \emph{seqAppend} operation should check the status value in the result list. If the status is false, then the client should retry the operation. Regardless of success of failure, then client should store the current value of the counter for the next \emph{seqAppend} call or retry.
 \end{enumerate}
@@ -386,7 +386,7 @@ One of the useful outcomes of this project was that it brought to light many are
 The ability to create distributed applications that minimize dependence on centralized infrastructure is important for many use cases. The combination of the Raft distributed consensus algorithm with the WebRTC communication protocol enables a powerful middleware system for building powerful distributed browser-to-browser applications. The Raft over WebRTC middleware system is able to easily scale to at least 35 node clusters and that it can quickly recover from multiple node failures. Further study may show that a dynamically tuned election timer that accounts for communication latency would allow the cluster size to be scaled well beyond 35 nodes.
 
 
-\section*{Acknowledgements}
+\section*{Acknowledgments}
 
 I would like to thank my academic supervisor, David Levine, for his excellent input and oversight of this project. I would also like to thank Diego Ongaro for his amazing work on the Raft protocol and paper which made implementing a Raft implementation a pleasure.  There are too many people involved in the creation and standardization of WebRTC but I would like to thank them for their tireless work to make browser-to-browser communication possible. Last but not least, I would like to thank my family for putting up with the long nights and weekends I spent on this project. Thanks!
 
