@@ -25,6 +25,12 @@ paper-min.pdf: paper.tex
 	pdflatex -halt-on-error "\input{paper-min.tex}"
 	pdflatex -halt-on-error "\input{paper-min.tex}"
 
+workshop.pdf: workshop.tex
+	pdflatex -halt-on-error "\input{$<}"
+	bibtex workshop.aux
+	pdflatex -halt-on-error "\input{$<}"
+	pdflatex -halt-on-error "\input{$<}"
+
 #%.pdf: %.tex
 #	pdflatex -halt-on-error "$(if $(OPTIONAL),\def\OPTIONAL{},)\input{$<}"
 #	bibtex $*.aux
