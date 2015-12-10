@@ -22,7 +22,7 @@
 
 
 
-\usepackage{hyperref}
+%\usepackage{hyperref}
 
 \usepackage{graphicx}
 \DeclareGraphicsExtensions{.png,.jpg,.pdf,.eps}
@@ -59,7 +59,7 @@ Consider a scenario where emergency responders and volunteers are responding to 
 
 Responders and volunteers have access to a distributed disaster response datastore that is accessed and updated via a browser based application. Volunteers use their own mobile device and only require a browser with WebRTC capability to run the application. The application communicates over the cellular network (existing or provided by mobile emergency response cell stations) or mesh network (although this may also require additional installed software on mobile devices in order to support it). Once loaded and running, the application does not require any centralized servers or database system. The application uses the Raft distributed consensus protocol to maintain a distributed but consistent view of the datastore among all participating client nodes. Also, the distributed cluster is dynamic and allows nodes to join and leave over time without losing state or synchronization of the datastore.
 
-The above capabilities are demonstrated using a distributed chat application implemented with the Raft over WebRTC middleware. This chat application uses direct browser-to-browser communication over WebRTC and maintains a consistent view of the chat history (exact same messages and ordering is seen by all nodes) and is fault tolerant (almost half the cluster nodes can fail simultaneously and the application will remain available without dataloss for the remaining clients).
+These capabilities are demonstrated using a distributed chat application implemented with the Raft over WebRTC middleware. This chat application uses direct browser-to-browser communication over WebRTC and maintains a consistent view of the chat history (exact same messages and ordering is seen by all nodes) and is fault tolerant (almost half the cluster nodes can fail simultaneously and the application will remain available without dataloss for the remaining clients).
 
 \section{Background}
 
@@ -69,7 +69,7 @@ Raft is a new distributed consensus algorithm designed to be understandable and 
 
 The Raft algorithm breaks the problem of consensus into three core sub-problems: leader election, log replication, and safety \cite[Section~3]{raft_thesis:ongaro14}. A full Raft system must also address: cluster membership changes \cite[Section~4]{raft_thesis:ongaro14}, log compaction \cite[Section~5]{raft_thesis:ongaro14}, and client interaction \cite[Section~6]{raft_thesis:ongaro14}. The Raft protocol is based on the concept of a distributed transaction log. Entries in the log represent a sequence of commands that will be applied to an internal state machine. If all members of the Raft cluster have the same log entries, then their state machine on each node will have exactly the same state. Each node of a Raft cluster can be in one of three states: follower, candidate, or leader. The responsibility of the leader is to accept new transaction log entries and then replicate these entries in the same order to all other members of the cluster. The leader is the only member of the cluster that may make changes to the transaction log. In order to maintain leadership, the leader sends heartbeat RPCs to all the followers in the cluster.  Followers that do not receive a heartbeat RPC within a certain time period become candidates and attempt to be elected by the other nodes as the new leader of the cluster \cite[p.~12]{raft_thesis:ongaro14}.
 
-Raft leverages the replicated transaction log to accomplish live cluster membership changes. Membership changes are accomplished by adding or removing one Raft node at a time using special add/remove log entries. In order to keep the replicated transaction log from growing indefinitely, Raft nodes should periodically compact their logs. The simplest and most generic solution is often to provide some way of snapshotting the entire state machine (including the term and log index it represents) to disk at which point the all previously applied log entries can be discarded. Clients of the Raft cluster are able to interact with the distributed state machine by sending RPCs to the leader in order to add command entries to the transaction log. Clients first find the address of any node in the cluster and are then redirected to communicate directly with the leader. The Raft protocol also provides strict linearizable semantics for client commands/requests (reads and writes) for applications that require it.
+Raft leverages the replicated transaction log to accomplish live cluster membership changes. Membership changes are accomplished by adding or removing one Raft node at a time using special add/remove log entries. In order to keep the replicated transaction log from growing indefinitely, Raft nodes should periodically compact their logs. The simplest and most generic solution is often to provide some way of snapshotting the entire state machine (including the term and log index it represents) to disk at which point all previously applied log entries can be discarded. Clients of the Raft cluster are able to interact with the distributed state machine by sending RPCs to the leader in order to add command entries to the transaction log. Clients first find the address of any node in the cluster and are then redirected to communicate directly with the leader. The Raft protocol also provides strict linearizable semantics for client commands/requests (reads and writes) for applications that require it.
 
 \subsection{WebRTC}
 
@@ -97,7 +97,7 @@ There is a large suite of protocols that are required for a working WebRTC syste
 
 \subsection{Raft.js Core Library}
 
-Raft.js is an implementation of the Raft algorithm in JavaScript that was created by the author of this paper \cite{raft.js}.  Raft.js is designed to run in either a browser environment or within Node.js (server-side JavaScript). Raft.js implements the Raft algorithm as described in \cite[Consensus:~Diego]{raft_thesis:ongaro14}. The core Raft algorithm is defined in the \texttt{RaftServerBase} abstract class (in \texttt{base.js}) which omits the implementation of methods with side-effects such as RPC communication, durable storage, scheduling/timeouts, or state machine command/management. The full instantiation of the class (in \texttt{rtc.js} and \texttt{chat.js}) adds state machine commands and the ability to send RPCs over the WebRTC Data Channel.
+Raft.js is an implementation of the Raft algorithm in JavaScript that was created by the author of this paper \cite{raft.js}.  Raft.js is designed to run in either a browser environment or within Node.js (server-side JavaScript). Raft.js implements the Raft algorithm as described in Consensus:~Diego \cite{raft_thesis:ongaro14}. The core Raft algorithm is defined in the \texttt{RaftServerBase} abstract class (in \texttt{base.js}) which omits the implementation of methods with side-effects such as RPC communication, durable storage, scheduling/timeouts, or state machine command/management. The full instantiation of the class (in \texttt{rtc.js} and \texttt{chat.js}) adds state machine commands and the ability to send RPCs over the WebRTC Data Channel.
 
 \subsection{PeerJS}
 
@@ -128,9 +128,9 @@ When an instance of the web application starts that is not a ``firstServer", the
 The chat application extends the basic Raft.js over WebRTC client. The chat application provides a large text area containing the chat history and a text entry field below it. When the user clicks on the \emph{Send} button (or presses enter), the current node ID is prepended to the beginning of the text line and it is added to a pending send queue and the text entry field is blanked. The chat application also extends the default set of state machine operations to add a \emph{seqAppend} operation. This is an atomic operation that is implemented as follows:
 
 \begin{enumerate}
-\item The \emph{seqAppend} operation operates on a specially structured key/value pair in the state machine map. The value of the pair is another associative map that contains a counter and list structure where the actual chat lines are accumulated. \emph{seqAppend} operations are sent with both a count and then new value to append.
+\item The \emph{seqAppend} operation operates on a specially structured key/value pair in the state machine map. The value of the pair is another associative map that contains a counter and list structure where the actual chat lines are accumulated. \emph{seqAppend} operations are sent with both a count and the new value to append.
 \item When a \emph{seqAppend} operation is applied to the state machine and the count value in the command matches the counter in the state machine's value, then the new line in the request is added to the value list and the counter is incremented. If the count value does not match the counter then the the operation is not applied. In either case, a list is returned in the \texttt{clientRequestResponse} that contains two values: a Boolean indicating whether the \emph{seqAppend} operation succeeded and a number indicating the current value of the counter.
-\item The first time the \emph{seqAppend} operation is used on a non-existent key, the structure described above is created with the counter set to 0 and the list structure is created with the single value that was passed in the \emph{seqAppend} operation.\
+\item The first time the \emph{seqAppend} operation is used on a non-existent key, the structure previously described is created with the counter set to 0 and the list structure is created with the single value that was passed in the \emph{seqAppend} operation.\
 \item Clients that call the \emph{seqAppend} operation should check the status value in the result list. If the status is false, then the client should retry the operation. Regardless of success of failure, then client should store the current value of the counter for the next \emph{seqAppend} call or retry.
 \end{enumerate}
 
@@ -140,7 +140,7 @@ The chat application extends the basic Raft.js over WebRTC client. The chat appl
 
 Automated testing of the Raft over WebRTC system was performed by leveraging the SlimerJS scriptable browser environment. SlimerJS enables web applications to be scripted by loading pages in a special Mozilla rendering environment called XULRunner. The XULRunner instance is directed to an X virtual frame buffer (xvfb) which provides effectively headless testing.
 
-To simplify the execution of the tests and to make the testing infrastructure more portable, a docker container environment encapsulates and executes the SlimerJS environment. The container is built using \emph{test/Dockerfile} which is in turn derived from the ``fentas/slimerjs" docker image \cite{fentas:slimerjs}.  This custom Dockerfile was created because the upstream version of the Dockerfile used an older version of XULRunner that did not support more than 7 WebRTC clients communicating together simultaneously. This issue was discovered during initial testing.
+To simplify the execution of the tests and to make the testing infrastructure more portable, a docker container environment encapsulates and executes the SlimerJS environment. The container is built using \emph{test/Dockerfile} which is in turn derived from the ``fentas/slimerjs" docker image \cite{fentas:slimerjs}.
 
 Writing tests using SlimerJS involves creating JavaScript test programs which start a server instance and then launch a SlimerJS docker container for each node of the cluster. Each container starts a XULRunner browser instance of the Raft over WebRTC chat application. Once all the chat application nodes have connected to the test server/program, then the actual test is started across all the application nodes.
 
@@ -213,31 +213,14 @@ The tests were all run on a system with 8 Intel Core i7 processors running at 3.
         %legend pos=outer north east,
         legend pos=north west,
         scatter/classes={%
-            start_et250={mark=x,draw=magenta},
-            start_et250_average={mark=,draw=red},
-            %start_et250_fail={mark=x,/raw=red},
-            start_et500={mark=x,draw=cyan},
-            start_et500_average={mark=,draw=red},
-            %start_et500_fail={mark=x,draw=red},
             start_et1000={mark=x,draw=blue},
-            start_et1000_average={mark=,draw=red}}]
-    \addplot[scatter,only marks,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/start_et250.dat};
-    \addplot[magenta,scatter,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/start_et250_average.dat};
-
-    \addplot[scatter,only marks,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/start_et500.dat};
-    \addplot[cyan,scatter,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/start_et500_average.dat};
-    %\addplot[scatter,%
-    %    scatter src=explicit symbolic]%
-    %table[meta=label] {data/start_et500_fail.dat};
-
+            start_et1000_average={mark=,draw=red},
+            start_et500={mark=x,draw=cyan},
+            %start_et500_fail={mark=x,draw=red},
+            start_et500_average={mark=,draw=red},
+            start_et250={mark=x,draw=magenta},
+            %start_et250_fail={mark=x,/raw=red}
+            start_et250_average={mark=,draw=red}}]
     \addplot[scatter,only marks,%
         scatter src=explicit symbolic]%
     table[meta=label] {data/start_et1000.dat};
@@ -245,7 +228,24 @@ The tests were all run on a system with 8 Intel Core i7 processors running at 3.
         scatter src=explicit symbolic]%
     table[meta=label] {data/start_et1000_average.dat};
 
-    \legend{250ms,,500ms,,1000ms,}
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/start_et500.dat};
+    %\addplot[scatter,%
+    %    scatter src=explicit symbolic]%
+    %table[meta=label] {data/start_et500_fail.dat};
+    \addplot[cyan,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/start_et500_average.dat};
+
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/start_et250.dat};
+    \addplot[magenta,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/start_et250_average.dat};
+
+    \legend{1000ms,,500ms,,250ms,}
     \end{axis}
     \end{tikzpicture}
     \caption{Initial Cluster Activation}
@@ -264,31 +264,14 @@ The tests were all run on a system with 8 Intel Core i7 processors running at 3.
         %legend pos=outer north east,
         legend pos=north west,
         scatter/classes={%
-            kill_1_et250={mark=x,draw=magenta},
-            kill_1_et250_average={mark=,draw=red},
-            %kill_1_et250_fail={mark=x,/raw=red},
-            kill_1_et500={mark=x,draw=cyan},
-            kill_1_et500_average={mark=,draw=red},
-            %kill_1_et500_fail={mark=x,draw=red},
             kill_1_et1000={mark=x,draw=blue},
-            kill_1_et1000_average={mark=,draw=red}}]
-    \addplot[scatter,only marks,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_1_et250.dat};
-    \addplot[magenta,scatter,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_1_et250_average.dat};
-
-    \addplot[scatter,only marks,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_1_et500.dat};
-    \addplot[cyan,scatter,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_1_et500_average.dat};
-    %\addplot[scatter,%
-    %    scatter src=explicit symbolic]%
-    %table[meta=label] {data/kill_1_et500_fail.dat};
-
+            kill_1_et1000_average={mark=,draw=red},
+            kill_1_et500={mark=x,draw=cyan},
+            %kill_1_et500_fail={mark=x,draw=red},
+            kill_1_et500_average={mark=,draw=red},
+            kill_1_et250={mark=x,draw=magenta},
+            %kill_1_et250_fail={mark=x,/raw=red},
+            kill_1_et250_average={mark=,draw=red}}]
     \addplot[scatter,only marks,%
         scatter src=explicit symbolic]%
     table[meta=label] {data/kill_1_et1000.dat};
@@ -296,7 +279,24 @@ The tests were all run on a system with 8 Intel Core i7 processors running at 3.
         scatter src=explicit symbolic]%
     table[meta=label] {data/kill_1_et1000_average.dat};
 
-    \legend{250ms,,500ms,,1000ms,}
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_1_et500.dat};
+    %\addplot[scatter,%
+    %    scatter src=explicit symbolic]%
+    %table[meta=label] {data/kill_1_et500_fail.dat};
+    \addplot[cyan,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_1_et500_average.dat};
+
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_1_et250.dat};
+    \addplot[magenta,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_1_et250_average.dat};
+
+    \legend{1000ms,,500ms,,250ms,}
 
     \end{axis}
     \end{tikzpicture}
@@ -326,29 +326,29 @@ The tests were all run on a system with 8 Intel Core i7 processors running at 3.
             kill_half_et1000_average={mark=,draw=red}}]
     \addplot[scatter,only marks,%
         scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_half_et250.dat};
-    \addplot[magenta,scatter,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_half_et250_average.dat};
-
-    \addplot[scatter,only marks,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_half_et500.dat};
-    \addplot[cyan,scatter,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_half_et500_average.dat};
-    %\addplot[scatter,%
-    %    scatter src=explicit symbolic]%
-    %table[meta=label] {data/kill_half_et500_fail.dat};
-
-    \addplot[scatter,only marks,%
-        scatter src=explicit symbolic]%
     table[meta=label] {data/kill_half_et1000.dat};
     \addplot[blue,scatter,%
         scatter src=explicit symbolic]%
     table[meta=label] {data/kill_half_et1000_average.dat};
 
-    \legend{250ms,,500ms,,1000ms,}
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_half_et500.dat};
+    %\addplot[scatter,%
+    %    scatter src=explicit symbolic]%
+    %table[meta=label] {data/kill_half_et500_fail.dat};
+    \addplot[cyan,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_half_et500_average.dat};
+
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_half_et250.dat};
+    \addplot[magenta,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_half_et250_average.dat};
+
+    \legend{1000ms,,500ms,,250ms,}
 
     \end{axis}
     \end{tikzpicture}
@@ -360,11 +360,12 @@ The tests were all run on a system with 8 Intel Core i7 processors running at 3.
 
 Figure~\ref{fig:propagate1} and Figure~\ref{fig:propagate100} show the result of running the \emph{test/wait\_chat\_propagate.js} test to determine the amount of time that a stable cluster takes to propagate, commit and apply 1 and 100 chat message commands respectively to the state machine on every cluster node using the atomic \emph{seqAppend} command. The commands are serialized which means that the previous command must be committed before the current command can be committed.  The test is complete once the last chat message command has been both committed and applied to every node of the cluster. Each test execution is shown as a blue ``x" and the black line represents the average for each cluster size.
 
-In Figure~\ref{fig:propagate1} the time to propagate a single message to a single node of the cluster is approximately 0.1 seconds. However, this really just represents the tests scanning/checking granularity.  The time to finish propagating and committing a single message shows a slight linear slope upwards from about 0.3 seconds for a three node cluster to about 0.5 seconds for a 41 node cluster. The time to propagate 100 messages (Figure~\ref{fig:propagate100}) has a much higher slope and also appears to be non-linear.
+In Figure~\ref{fig:propagate1} the time to propagate a single message to a single node of the cluster is approximately 0.1 seconds. This simply represents the tests scanning/checking granularity.  The time to finish propagating and committing a single message shows a slight linear slope upwards from about 0.3 seconds for a three node cluster to about 0.5 seconds for a 41 node cluster. The time to propagate 100 messages (Figure~\ref{fig:propagate100}) has a much higher slope and also appears to be non-linear.
 
 Figure~\ref{fig:cluster_up} shows the results of running the \emph{test/test\_up.js} test to determine the amount of time that a cluster takes to start. The cluster is fully started once a leader has been elected and the leader has successfully added all the other nodes to the running configuration. Each election timer value is represented as a different color and the line represents the average value for each cluster size. The cluster startup times show a fairly linear increase as the cluster size increases. The reason that the slope varies with election timer is due to the fact that the election timer also determines the leader heartbeat value (currently set to one fifth of the election timer value). The leader heartbeat determines the frequency with which \emph{appendEntries} messages are sent from the leader to followers and is also used to propagate log entries.  This means that the rate at which log entries (and thus cluster configuration updates) can be propagated is proportional to the election timer value.
 
-Figures \ref{fig:recovery_leader_failure} and \ref{fig:recovery_half_failure} show the results of running the \emph{test/test\_kill\_nodes.js} in both modes (kill only leader and kill just under half the nodes). Each election timer value is represented as a different color and the solid line represents the average recovery time for each cluster size. When only the leader is killed, the recovery times are constant flat regardless of cluster size. This is because after a new leader is elected, there is only a single configuration entry to propagate to the rest of the cluster (to remove the old failed leader). One interesting thing to note is that with a 1000ms timer, the 3 node cluster is actually the most inefficient size because the average time until a leader election starts is inversely proportional to cluster size so the delay until an election happens is a significant contributor to the three node cluster with 1000ms timer. With a larger cluster or shorter election timer, the contribution of election delay is not noticeable. The recovery from almost half the nodes failing is not flat because the amount of configuration information that needs to be propagated is proportional to the size of the cluster.
+Figures \ref{fig:recovery_leader_failure} and \ref{fig:recovery_half_failure} show the results of running the \emph{test/test\_kill\_nodes.js} in both modes (kill only leader and kill just under half the nodes). Each election timer value is represented as a different color and the solid line represents the average recovery time for each cluster size. When only the leader is killed, the recovery times are constant flat regardless of cluster size. This is because after a new leader is elected, there is only a single configuration entry to propagate to the rest of the cluster (to remove the old failed leader). The recovery from almost half the nodes failing is not flat because the amount of configuration information that needs to be propagated is proportional to the size of the cluster.
+
 
 \section{Future Work}
 
@@ -376,19 +377,22 @@ One of the useful outcomes of this project was that it brought to light many are
 \item Test the survivability of the cluster when the signaling server becomes completely unresponsive or very slow.
 \item Test larger scale deployments spanning larger and more diverse network domains. Characterize the factors that affect and limit scalability.
 \item Explore models for timing out and automatically removing nodes when they become unresponsive without needing to be notified by the signaling server that the nodes have disconnected.
-\item Consider extensions to the Raft protocol that enable slow leaders to be proactively detected so that a more capable node (network, CPU, etc) can be elected. This would help address that background page/tag throttling of modern browsers.
+\item Consider extensions to the Raft protocol that enable slow leaders to be proactively detected so that a more capable node (network, CPU, etc) can be elected. This would help address background page/tag throttling in modern browsers.
 \item Explore models that allow for a combination of strict shared state and high performance bulk data such as media or object blobs.
 \end{enumerate}
 
 
 \section{Conclusion}
 
-The ability to create distributed applications that minimize dependence on centralized infrastructure is important for many use cases. The combination of the Raft distributed consensus algorithm with the WebRTC communication protocol enables a powerful middleware system for building powerful distributed browser-to-browser applications. The Raft over WebRTC middleware system is able to easily scale to at least 35 node clusters and that it can quickly recover from multiple node failures. Further study may show that a dynamically tuned election timer that accounts for communication latency would allow the cluster size to be scaled well beyond 35 nodes.
+The wide reach of the browser platform (exceeding most if not all other computing platforms) and the recent advances in browser programming and communication interfaces make the browser a very interesting platform for a wide variety of applications. The combination of the Raft distributed consensus algorithm with the WebRTC communication protocol enables a middleware system for building powerful distributed browser-to-browser applications.
 
+An important use case for the Raft over WebRTC middleware system is the ability to create distributed applications that minimize dependence on centralized infrastructure and are able to tolerate unreliable communication and frequent changes in cluster membership (adds, removes, failures). The demonstration chat application was able to easily scale to clusters containing several dozen nodes and quickly recover from multiple node failures. The current limitation in cluster size is due to communication latency relative to the election timer setting. Further study is expected to show that a dynamically adjusted election timer that accounts for communication latency and cluster size would allow the cluster size to be scaled significantly larger (at the cost of slower recovery from a leader failure).
+
+There are other types of applications that can benefit from avoiding central communication and central data storage without sacrificing consistent shared state. These include applications where privacy or security requirements prevent messages from traversing central servers or where remote communication latency or bandwidth costs make communication with remote services unattractive or expensive. The Raft over WebRTC middleware system enables these types of applications to be developed for the browser environment.
 
 \section*{Acknowledgments}
 
-I would like to thank my academic supervisor, David Levine, for his excellent input and oversight of this project. I would also like to thank Diego Ongaro for his amazing work on the Raft protocol and paper which made implementing a Raft implementation a pleasure.  There are too many people involved in the creation and standardization of WebRTC but I would like to thank them for their tireless work to make browser-to-browser communication possible. Last but not least, I would like to thank my family for putting up with the long nights and weekends I spent on this project. Thanks!
+I would like to thank Diego Ongaro for his amazing work on the Raft protocol which made implementing a Raft implementation a pleasure. I would also like to thank the many people involved in the creation and standardization of WebRTC and for their tireless work to make browser-to-browser communication possible. Last but not least, I would like to thank my family for putting up with the long nights and weekends I spent on this project. Thanks!
 
 \bibliographystyle{./IEEEtranBST2/IEEEtran}
 \bibliography{./references/ietf,./references/w3c,./references/raft,./references/other}
