@@ -22,15 +22,13 @@
 
 
 
-\usepackage{hyperref}
+%\usepackage{hyperref}
 
 \usepackage{graphicx}
 \DeclareGraphicsExtensions{.png,.jpg,.pdf,.eps}
 
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.9}
-
-
 
 
 \begin{document}
@@ -177,22 +175,22 @@ sub-problems: leader election, log replication, and safety
 \cite[Section~3]{raft_thesis:ongaro14}. A full Raft system must also
 address: cluster membership changes
 \cite[Section~4]{raft_thesis:ongaro14}, log compaction
-\cite[Section~5]{raft_thesis:ongaro14}, and client
-interaction \cite[Section~6]{raft_thesis:ongaro14}. The Raft protocol
-is based on the concept of a distributed transaction log. Entries in
-the log represent a sequence of commands that will be applied to an
-internal state machine. If all members of the Raft cluster have the
-same log entries, then their state machine on each node will have
-exactly the same state. Each node of a Raft cluster can be in one of
-three states: follower, candidate, or leader. The responsibility of
-the leader is to accept new transaction log entries and then
-replicate these entries in the same order to all other members of the
-cluster. The leader is the only member of the cluster that may make
-changes to the transaction log. In order to maintain leadership, the
-leader sends heartbeat RPCs to all the followers in the cluster.
-Followers that do not receive a heartbeat RPC within a certain time
-period become candidates and attempt to be elected by the other nodes
-as the new leader of the cluster \cite[p.~12]{raft_thesis:ongaro14}.
+\cite[Section~5]{raft_thesis:ongaro14}, and client interaction
+\cite[Section~6]{raft_thesis:ongaro14}. The Raft protocol is based on
+the concept of a distributed transaction log. Entries in the log
+represent a sequence of commands that will be applied to an internal
+state machine. If all members of the Raft cluster have the same log
+entries, then their state machine on each node will have exactly the
+same state. Each node of a Raft cluster can be in one of three states:
+follower, candidate, or leader. The responsibility of the leader is to
+accept new transaction log entries and then replicate these entries in
+the same order to all other members of the cluster. The leader is the
+only member of the cluster that may make changes to the transaction
+log. In order to maintain leadership, the leader sends heartbeat RPCs
+to all the followers in the cluster.  Followers that do not receive
+a heartbeat RPC within a certain time period become candidates and
+attempt to be elected by the other nodes as the new leader of the
+cluster \cite[p.~12]{raft_thesis:ongaro14}.
 
 \subsubsection{Leader Election}
 
@@ -279,14 +277,14 @@ are many different ways to accomplish log compaction and the best way
 will depend on application requirements and on the specific nature of
 the distributed state machine. For example, if the state machine is
 simply a single shared counter, then any log entries before the most
-recently committed entry may be safely discarded. The simplest and
-most generic solution is often to provide some way of snapshotting the
-entire state machine (including the term and log index it represents)
-to disk at which point the all previously applied log entries can be
-discarded. Snapshotting the state machine also means that the
-implementation must provide a way for the leader to serialize and send
-the current state machine to other nodes if their transaction log is
-too old (e.g. when a new node is added)
+recently committed entry may be safely discarded.
+The simplest and most generic solution is often to provide some way of
+snapshotting the entire state machine (including the term and log
+index it represents) to disk at which point all previously applied log
+entries can be discarded. Snapshotting the state machine also means
+that the implementation must provide a way for the leader to serialize
+and send the current state machine to other nodes if their transaction
+log is too old (e.g. when a new node is added)
 \cite[Section~5]{raft_thesis:ongaro14}.
 
 \subsubsection{Client Interaction}
@@ -302,12 +300,13 @@ requests with a response indicating the address of the leader where
 client requests should be redirected
 \cite[Section~6.2]{raft_thesis:ongaro14}.
 
-The Raft protocol can also provide strict linearizable semantics for
+The Raft protocol also provides strict linearizable semantics for
 client commands/requests (reads and writes) for applications that
-require it. In order to accomplish this, each client is given a unique
-ID, and the client assigns a unique serial number to each command.
-This prevents a single client command from being applied twice (leader
-crash, network duplication) or lost (packet loss)
+require it.
+In order to accomplish this, each client is given a unique ID, and the
+client assigns a unique serial number to each command.  This prevents
+a single client command from being applied twice (leader crash,
+network duplication) or lost (packet loss)
 \cite[Section~6.3]{raft_thesis:ongaro14}.
 
 Linearizability is important not just for writes/updates to the state
@@ -321,122 +320,13 @@ reads of stale data (the leader of the larger partition may have
 already committed new entries).
 \cite[Section~6.4]{raft_thesis:ongaro14}.
 
-\begin{figure*}[!t]
-\centerline{\includegraphics[width=0.8\textwidth]{imgs/raft_rtc_architecture}}
-\caption{Raft over RTC Architecture}
-  \label{fig:raft_rtc_architecture}
-\end{figure*}
-
-\subsection{Raft.js}
-
-Raft.js is an implementation of the Raft algorithm in JavaScript that
-was created by the author of this paper \cite{raft.js}.  Raft.js is
-designed to run in either a browser environment or within Node.js
-(server-side JavaScript). Raft.js implements the Raft algorithm as
-described in \cite[Consensus:~Diego]{raft_thesis:ongaro14}.
-
-\subsubsection{Modular Design}
-
-The implementation of the Raft algorithm is in the
-\texttt{RaftServerBase} class (in \texttt{base.js}). The base class
-omits the implementation of functions with side-effects such as RPC
-communication, durable storage, scheduling/timeouts, or state machine
-command/management. In order to create a working implementation these
-functions must be provided either as configuration parameters when the
-class is instantiated or by sub-classing the class.
-
-The modular design of the Raft.js implementation allows it to be
-easily used in different contexts. For example, the \texttt{RaftServerLocal}
-class (\texttt{local.js}) implements RPC calls using plain JavaScript function
-calls between different instances of the class (nodes) in the same
-execution context. For example, the online Raft visualization at
-\href{http://kanaka.github.io/raft.js/}{http://kanaka.github.io/raft.js/}
-\cite{raft.js:visualization} uses the \texttt{RaftServerLocal} class
-and instantiates it using a scheduling function that executes one
-scheduled event each time the user clicks on the ``Step" button rather
-than due to the passage of time.
-
-The \texttt{RaftServerHttp} class (\texttt{http.js}) embeds a simple
-web server into each Raft node and then uses normal HTTP requests to
-send RPC messages between Raft nodes.
-
-For this paper, the \texttt{RaftServerLocal} class was extended with
-the capability of sending RPCs over the WebRTC Data Channel.
-
-\subsubsection{Differences between Raft and Raft.js}
-
-The current version of Raft.js implements most of the Raft algorithm
-including: leader election, log replication, safety, membership
-changes, basic client interaction, and read-only operation
-optimizations. % TODO: read-only operations needs mentioning earlier
-Log compaction and full client linearizability are not currently
-implemented (clients and client transactions are not assigned unique
-IDs). Log compaction is important for long-running production systems
-in order to limit memory growth and allow new nodes to catch up their
-logs more efficiently. However log compaction is not required for
-verifying overall system correctness and does not significantly impact
-short-running test configurations. Full client linearizability is
-an important feature for simplifying certain types of distributed
-applications, however the implementation of linearizability requires
-some significant additions to the Raft implementation (e.g. assigning
-client IDs and sequence IDs and tracking timed-out clients). For the
-chat application, simply adding a single atomic check-and-set state
-machine command is sufficient to achieve a linearized chat history.
-This does impose a slight additional cost on the client because it
-must retry the atomic operations until they succeed. The author
-intends to implement both log compaction and full client
-linearizability in the future, however these do not have a significant
-impact on the ability to test Raft combined with WebRTC.
-
-The Raft protocol has undergone some revisions since the original
-draft paper \cite{raft_paper:ongaro14} (including incorporation of
-suggestions by the author of this paper). These changes include
-cluster membership simplifications, separating the concepts of
-committing entries to the log and applying entries to the state
-machine, clearer client interaction, etc. As part of the work for
-implementing Raft over WebRTC, the Raft.js implementation was updated
-to reflect these changes to the Raft protocol definition.
-
-The are also some other differences between Raft.js and Raft as
-described in \cite[Consensus:~Diego]{raft_thesis:ongaro14}:
-
-\begin{enumerate}
-\item The paper describes the Raft RPCs in terms of synchronous stream
-    based request/response model where requests and responses are
-    automatically correlated together by a lower level of the software
-    stack. For example with HTTP 1.0 \cite{http:rfc1945} client
-    requests are followed by a server response on any given TCP
-    stream. Most remote procedure call mechanisms also use
-    a synchronous request/response model. %TODO/CITE
-    WebRTC DataChannel connections are message based rather than
-    request/response stream based. %TODO/CITE
-    In the original Raft definition of RPC, request and response messages
-    almost contain enough information to function correctly in an
-    environment without builtin request/response correlation, such as
-    UDP or SCTP when used with reliable transport disabled. %TODO/CITE
-    Raft.js includes a small modification to the response RPCs for
-    requestVote and appendEntries to add a `sourceId' field that
-    enables the protocol to function with message based transports.
-\item The Raft paper is clear that each membership change must be
-    delayed until all the previous membership change is committed
-    (sequential) \cite[Section~4.1]{raft_thesis:ongaro14}. It is
-    implied that the leader node should track all pending membership
-    change requests and apply them one at a time.  However, in
-    Raft.js, if a client requests a membership change while another
-    change request is pending (uncommitted), the leader will reject
-    the change request with a status of `PENDING\_CONFIG\_CHANGE'.
-    This keeps the core Raft implementation simpler with the trade-off
-    being that the client implementation of membership change requests
-    is slightly more complex due to retry logic.
-\end{enumerate}
-
 \subsection{WebRTC}
 
 WebRTC is a collection of browser APIs \cite{webrtc:feb2015} and
 network protocols \cite{draft-rtcweb-overview} that are currently
-being standardized by the W3C and IETF respectively. Collectively these
-APIs and protocols enable real-time peer-to-peer video, audio and data
-communication between browsers.
+being standardized by the W3C and IETF respectively. Collectively
+these APIs and protocols enable real-time peer-to-peer video, audio
+and data communication between browsers.
 
 \subsubsection{WebRTC Discovery and Signaling}
 
@@ -464,9 +354,9 @@ address book service, client presence/availability, etc. %TODO/CITE
 
 \subsubsection{WebRTC APIs}
 
-The WebRTC browser APIs enable JavaScript web applications
-to establish browser-to-browser network connectivity in order to
-perform real-time video, audio and data communication. These APIs are
+The WebRTC browser APIs enable JavaScript web applications to
+establish browser-to-browser network connectivity in order to perform
+real-time video, audio and data communication. These APIs are
 currently in the process of being standardized by the \emph{Web
 Real-Time Communications Working Group} of the World Wide Web
 Consortium (W3C) \cite{webrtc:wg}.
@@ -512,22 +402,22 @@ There are three primary WebRTC interfaces:
 \end{enumerate}
 
 
-\subsubsection{WebRTC Protocol}
+\subsubsection{WebRTC Protocols}
 
 There is a large suite of protocols that are required for a working
 WebRTC system. The Internet Engineering Task Force (IETF) organization
 is responsible for specifying and/or standardizing (where necessary)
 the protocols that are part of WebRTC \cite{draft-rtcweb-overview}
-\cite{draft-rtcweb-security-arch} \cite{draft-rtcweb-security}. In many
-cases an existing protocol is applicable and is referenced or
+\cite{draft-rtcweb-security-arch} \cite{draft-rtcweb-security}. In
+many cases an existing protocol is applicable and is referenced or
 extended as part of the WebRTC suite. %TODO/CITE
 
-The protocols that make up the WebRTC suite are categorized into
-five general functionality groups:
+The protocols that make up the WebRTC suite are categorized into five
+general functionality groups:
+\ifdefined\OPTIONAL
 
 \begin{enumerate}
     \item data transport
-        \ifdefined\OPTIONAL
         \\
         \cite{draft-rtcweb-transports}
         \cite{draft-rtcweb-qos}
@@ -549,18 +439,14 @@ five general functionality groups:
         \cite{RFC6544:tcp-ice}
         \cite{RFC4571:rtp-rtcp}
         \cite{RFC5764:dtls-srtp}
-        \fi
     \item data framing and security
-        \ifdefined\OPTIONAL
         \\
         \cite{RFC3550:rtp}
         \cite{RFC3711:srtp}
         \cite{draft-rtcweb-rtp-usage}
         \cite{draft-rtcweb-data-channel}
         \cite{draft-rtcweb-data-protocol}
-        \fi
     \item connection management
-        \ifdefined\OPTIONAL
         \\
         \cite{RFC2327:sdp}
         \cite{RFC3264:sdp-offer-answer}
@@ -568,16 +454,21 @@ five general functionality groups:
         \cite{RFC5245:ice}
         \cite{draft-mmusic-trickle-ice}
         \cite{RFC5763:srtp-using-dtls}
-        \fi
     \item data formats
     \item presentation and control
     \item local system support functions
 \end{enumerate}
 
 The last three functionality groups focus on interactive audio and video
-applications and are less relevant to Raft over WebRTC. \ifdefined\OPTIONAL
+applications and are less relevant to Raft over WebRTC.
 Some of the important standards for the first three functionality
-groups are cited above. \fi
+groups are cited above.
+\else
+data transport, data framing and security, connection management, data
+formats, presentation and control, local system support functions.
+The last three functionality groups focus on interactive audio and
+video applications and are less relevant to Raft over WebRTC.
+\fi
 
 The signaling transport itself is not defined as part of WebRTC.
 This is up to the application designer. The JavaScript interface used
@@ -631,16 +522,119 @@ run their own signaling service using PeerJS PeerServer.
 
 \fi  % \ifdefined\OPTIONAL
 
-%\begin{figure*}[!t]
+\section{Design and Implementation}
+
 \begin{figure}[!t]
-%\centerline{\includegraphics[width=0.8\textwidth]{imgs/raft_rtc_sequence}}
-\centerline{\includegraphics[width=0.45\textwidth]{imgs/raft_rtc_sequence}}
-\caption{Raft over RTC Sequence Diagram}
-  \label{fig:raft_rtc_sequence}
+  \centerline{\includegraphics[width=0.45\textwidth]{imgs/raft_rtc_architecture}}
+  \caption{Raft over RTC Architecture}
+    \label{fig:raft_rtc_architecture}
 \end{figure}
 
-\section {Design and Implementation}
+\subsection{Raft.js Core Library}
 
+Raft.js is an implementation of the Raft algorithm in JavaScript that
+was created by the author of this paper \cite{raft.js}.  Raft.js is
+designed to run in either a browser environment or within Node.js
+(server-side JavaScript). Raft.js implements the Raft algorithm as
+described in \cite[Consensus:~Diego]{raft_thesis:ongaro14}.
+
+\subsubsection{Modular Design}
+
+The implementation of the Raft algorithm is in the
+\texttt{RaftServerBase} class (in \texttt{base.js}). The base class
+omits the implementation of functions with side-effects such as RPC
+communication, durable storage, scheduling/timeouts, or state machine
+command/management. In order to create a working implementation these
+functions must be provided either as configuration parameters when the
+class is instantiated or by sub-classing the class.
+
+The modular design of the Raft.js implementation allows it to be
+easily used in different contexts. For example, the \texttt{RaftServerLocal}
+class (\texttt{local.js}) implements RPC calls using plain JavaScript function
+calls between different instances of the class (nodes) in the same
+execution context. For example, the online Raft visualization at
+http://kanaka.github.io/raft.js/
+%% \href{http://kanaka.github.io/raft.js/}{http://kanaka.github.io/raft.js/}
+\cite{raft.js:visualization} uses the \texttt{RaftServerLocal} class
+and instantiates it using a scheduling function that executes one
+scheduled event each time the user clicks on the ``Step" button rather
+than due to the passage of time.
+
+The \texttt{RaftServerHttp} class (\texttt{http.js}) embeds a simple
+web server into each Raft node and then uses normal HTTP requests to
+send RPC messages between Raft nodes.
+
+For this paper, the \texttt{RaftServerLocal} class was extended with
+the capability of sending RPCs over the WebRTC Data Channel.
+
+\subsubsection{Differences between Raft and Raft.js}
+
+The current version of Raft.js implements most of the Raft algorithm
+including: leader election, log replication, safety, membership
+changes, basic client interaction, and read-only operation
+optimizations. % TODO: read-only operations needs mentioning earlier
+Log compaction and full client linearizability are not currently
+implemented (clients and client transactions are not assigned unique
+IDs). Log compaction is important for long-running production systems
+in order to limit memory growth and allow new nodes to catch up their
+logs more efficiently. However log compaction is not required for
+verifying overall system correctness and does not significantly impact
+short-running test configurations.
+
+Full client linearizability is an important feature for simplifying
+certain types of distributed applications, however the implementation
+of linearizability requires some significant additions to the Raft
+implementation (e.g. assigning client IDs and sequence IDs and
+tracking timed-out clients). For the chat application, simply adding
+a single atomic check-and-set state machine command is sufficient to
+achieve a linearized chat history.  This does impose a slight
+additional cost on the client because it must retry the atomic
+operations until they succeed. The author intends to implement both
+log compaction and full client linearizability in the future, however
+these do not have a significant impact on the ability to test Raft
+combined with WebRTC.
+
+The Raft protocol has undergone some revisions since the original
+draft paper \cite{raft_paper:ongaro14} (including incorporation of
+suggestions by the author of this paper). These changes include
+cluster membership simplifications, separating the concepts of
+committing entries to the log and applying entries to the state
+machine, clearer client interaction, etc. As part of the work for
+implementing Raft over WebRTC, the Raft.js implementation was updated
+to reflect these changes to the Raft protocol definition.
+
+The are also some other differences between Raft.js and Raft as
+described in \cite[Consensus:~Diego]{raft_thesis:ongaro14}:
+
+\begin{enumerate}
+\item The paper describes the Raft RPCs in terms of synchronous stream
+    based request/response model where requests and responses are
+    automatically correlated together by a lower level of the software
+    stack. For example with HTTP 1.0 \cite{http:rfc1945} client
+    requests are followed by a server response on any given TCP
+    stream. Most remote procedure call mechanisms also use
+    a synchronous request/response model. %TODO/CITE
+    WebRTC DataChannel connections are message based rather than
+    request/response stream based. %TODO/CITE
+    In the original Raft definition of RPC, request and response messages
+    almost contain enough information to function correctly in an
+    environment without builtin request/response correlation, such as
+    UDP or SCTP when used with reliable transport disabled. %TODO/CITE
+    Raft.js includes a small modification to the response RPCs for
+    requestVote and appendEntries to add a `sourceId' field that
+    enables the protocol to function with message based transports.
+\item The Raft paper is clear that each membership change must be
+    delayed until all the previous membership change is committed
+    (sequential) \cite[Section~4.1]{raft_thesis:ongaro14}. It is
+    implied that the leader node should track all pending membership
+    change requests and apply them one at a time.  However, in
+    Raft.js, if a client requests a membership change while another
+    change request is pending (uncommitted), the leader will reject
+    the change request with a status of `PENDING\_CONFIG\_CHANGE'.
+    This keeps the core Raft implementation simpler with the trade-off
+    being that the client implementation of membership change requests
+    is slightly more complex due to retry logic.
+\end{enumerate}
 
 \ifdefined\OPTIONAL
 
@@ -710,7 +704,7 @@ PeerJS \cite{peerjs:103}.
 The file `rtc\_server.js' implements the signaling server for the Raft
 over WebRTC application. The server extends the PeerJS
 `ExpressPeerServer' object in order to provide WebRTC signaling. In
-addition to the signaling function, the server also provides the
+addition to the WebRTC signaling function the server also provides the
 following service endpoints:
 
 \begin{enumerate}
@@ -774,7 +768,7 @@ browser context (separate browser, browser window, or browser tab) and
 loading the same URL without the ``firstServer" fragment identifier
 (Figure~\ref{fig:raft_rtc_sequence}~[9]). There is a convenience link
 provided in the application page that opens a new browser window with
-a new cluster node (see \ref{fig:browser_1}).
+a new cluster node.  %(see \ref{fig:browser_1}).
 
 When each page first loads, a PeerJS signaling connection is
 established with the server
@@ -804,8 +798,11 @@ server receives its first RPC. The prevents the server from
 trying to becoming a leader before it is incorporated into the cluster
 by an appendEntries RPC from the true cluster leader.
 
+\subsubsection{Client Statistics}
+
 In addition to the low level Raft message log, the following
 statistics are shown in the application:
+\ifdefined\OPTIONAL
 
 \begin{enumerate}
 \item \emph{Term}: the current Raft leadership term.
@@ -821,6 +818,13 @@ statistics are shown in the application:
     `appendEntries' RPCs that have been sent from and received by this
     node.
 \end{enumerate}
+\else
+the current Raft leadership term, the current Raft node state
+(follower, candidate, or leader), Raft cluster size (number of
+participating nodes), number of entries in the transaction log, and
+number of request vote and append entries RPCs that have been sent and
+received.
+\fi
 
 \subsubsection{Client Request Redirects}
 
@@ -830,7 +834,9 @@ statistics are shown in the application:
 In the Raft over WebRTC implementation each local browser is a client
 of the Raft cluster. However in Raft, the leader node is the only node
 that adds entries to the log so clients on follower nodes must have
-a way to communicate with the leader. This is implemented as a pair of
+a way to communicate with the leader.
+\ifdefined\OPTIONAL
+This is implemented as a pair of
 functions named \texttt{clientRequest} and
 \texttt{clientRequestResponse}. The \texttt{clientRequest} function is
 called by the client with the arguments of a client request RPC and
@@ -858,18 +864,32 @@ as follows:
     \texttt{clientRequest} function is called with the results from
     the RPC response.
 \end{enumerate}
+\else
+When a \texttt{clientRequest} message is sent to a local Raft node
+that is not the leader, the \texttt{clientRequestResponse} message
+will be returned with a status of ``NOT\_LEADER" and the ID of the
+current leader. The \texttt{clientRequest} message will then be
+re-issued over the WebRTC DataCannel to the leader ID that was
+returned.
+\fi
 
 \subsection{Chat Application}
 
+\begin{figure}[!t]
+  \centerline{\includegraphics[width=0.45\textwidth]{imgs/raft_rtc_sequence}}
+  \caption{Raft over RTC Sequence Diagram}
+    \label{fig:raft_rtc_sequence}
+\end{figure}
+
 The chat application extends the basic Raft.js over WebRTC client. The
 chat application provides a large text area containing the chat
-history and a text entry field below it
-(see Figure~\ref{fig:browser_chat_1}). When the user clicks on the
-\emph{Send} button (or presses enter), the current node ID is
-prepended to the beginning of the text line and it is added to
-a pending send queue and the text entry field is blanked. A function
-to flush sends runs periodically (currently every 100ms) and does the
-following:
+history and a text entry field below it. % (see Figure~\ref{fig:browser_chat_1}).
+When the user clicks on the \emph{Send} button (or presses enter), the
+current node ID is prepended to the beginning of the text line and it
+is added to a pending send queue and the text entry field is blanked.
+\ifdefined\OPTIONAL
+A function to flush the send queue runs periodically (currently every
+100ms) and does the following:
 % TODO: 100ms above should be less
 
 \begin{enumerate}
@@ -891,41 +911,47 @@ following:
     send is in progress. The next time the flush function runs it will
     attempt to send again. % TODO: reword
 \end{enumerate}
+\else
+A function to flush the send queue runs periodically (currently every
+100ms) to send the chat message at the head of the queue using
+the \emph{seqAppend} operation.
+\fi
 
 % TODO: normalize use of \texttt and \emph
 
-The chat application also extends the default set of state machine
-operations to add a \emph{seqAppend} operation. This is an atomic
+The chat application extends the default set of state machine
+operations to add the \emph{seqAppend} operation. This is an atomic
 operation that is implemented as follows:
 
 \begin{enumerate}
-\item the \emph{seqAppend} operation operates on a specially structured
-    key/value pair in the state machine map. The value of the pair is
-    another associative map that contains a counter and list structure
-    where the actual chat lines are accumulated. \emph{seqAppend}
-    operations are sent with both a count and then new value to
-    append.
-\item when a \emph{seqAppend} operation is applied to the state
+\item The \emph{seqAppend} operation operates on a specially
+    structured key/value pair in the state machine map. The value of
+    the pair is another associative map that contains a counter and
+    list structure where the actual chat lines are accumulated.
+    \emph{seqAppend} operations are sent with both a count and the new
+    value to append.
+\item When a \emph{seqAppend} operation is applied to the state
     machine and the count value in the command matches the counter in
     the state machine's value, then the new line in the request is
-    added to the value list and the counter is incremented. If the count
-    value does not match the counter then the the operation is not
-    applied. In either case, a list is returned in the
-    \texttt{clientRequestResponse} that contains two values: a boolean
+    added to the value list and the counter is incremented. If the
+    count value does not match the counter then the the operation is
+    not applied. In either case, a list is returned in the
+    \texttt{clientRequestResponse} that contains two values: a Boolean
     indicating whether the \emph{seqAppend} operation succeeded and
     a number indicating the current value of the counter.
-\item the first time the \emph{seqAppend} operation is used on a non-existent
-    key, the structure described above is created with the counter set
-    to 0 and the list structure is created with the single value that
-    was passed in the \emph{seqAppend} operation.
-\item clients that call the \emph{seqAppend} operation should check the
-    status value in the result list. If the status is false, then the
-    client should retry the operation. Regardless of success of
+\item The first time the \emph{seqAppend} operation is used on
+    a non-existent key, the structure previously described is created
+    with the counter set to 0 and the list structure is created with
+    the single value that was passed in the \emph{seqAppend}
+    operation.
+\item Clients that call the \emph{seqAppend} operation should check
+    the status value in the result list. If the status is false, then
+    the client should retry the operation. Regardless of success of
     failure, then client should store the current value of the counter
     for the next \emph{seqAppend} call or retry.
 \end{enumerate}
 
-\section{Results}
+\section{Experimental Results}
 
 
 \ifdefined\OPTIONAL
@@ -1144,17 +1170,17 @@ is directed to an X virtual frame buffer (xvfb) which provides
 effectively headless testing.
 
 To simplify the execution of the tests and to make the testing
-infrastructure more portable, a docker container environment was used
-to encapsulate and execute the SlimerJS environment. The container is
-built using \emph{test/Dockerfile} which is in turn derived from
-the ``fentas/slimerjs" docker image \cite{fentas:slimerjs}.
+infrastructure more portable, a docker container environment
+encapsulates and executes the SlimerJS environment. The container is
+built using \emph{test/Dockerfile} which is in turn derived from the
+``fentas/slimerjs" docker image \cite{fentas:slimerjs}.
 This custom Dockerfile was created because the upstream version of the
 Dockerfile used an older version of XULRunner that did not support
 more than 7 WebRTC clients communicating together simultaneously. This
 issue was discovered during initial testing.
 
-Writing tests using SlimerJS involves creating JavaScript test programs
-which start a \emph{Twst} server instance and then launch a SlimerJS
+Writing tests using SlimerJS involves creating JavaScript test
+programs which start a \emph{Twst} server instance and then launch a SlimerJS
 docker container for each node of the cluster. Each container starts
 a XULRunner browser instance of the Raft over WebRTC chat application.
 Also included with the application is the \emph{Twst} client library
@@ -1165,8 +1191,8 @@ application nodes.
 
 Three different tests programs/servers were created to test the basic
 Raft over WebRTC application. Each of the tests takes a parameter
-indicating the number of nodes/pages to launch. The test
-source files are:
+indicating the number of nodes/pages to launch. The test source files
+are:
 
 \begin{enumerate}
     \item \emph{test/common.js}: a module of common functions used by
@@ -1174,8 +1200,8 @@ source files are:
     \item \emph{test/test\_up.js}: launch and start an initial leader
         node/page, then start the rest of the nodes (if any) so that
         the leader will configure them into the cluster. Then test
-        then waits for every node to be recorded (applied) into the log
-        of every other node of the cluster. The test reports the
+        then waits for every node to be recorded (applied) into the
+        log of every other node of the cluster. The test reports the
         number of milliseconds for the cluster to reach this state.
     \item \emph{test/test\_kill\_nodes.js}: similar to
         \emph{test/test\_up.js} but once all the nodes are configured
@@ -1196,6 +1222,7 @@ source files are:
         come up and for the messages to propagate to every node.
 \end{enumerate}
 
+\ifdefined\OPTIONAL
 The tests were all run on a system with the following configuration:
 
 \begin{enumerate}
@@ -1210,6 +1237,13 @@ The tests were all run on a system with the following configuration:
         \item \emph{XULRunner}: 38.0.5
     \end{enumerate}
 \end{enumerate}
+\else
+The tests were all run on a system with 8 Intel Core i7 processors
+running at 3.20GHz and 12 GB of main memory. The Docker image used to
+run the test was built using Ubuntu 12.04.5 LTS with \emph{SlimerJS}
+version 0.9.6, and \emph{XULRunner} version 38.0.5.
+\fi
+
 
 Five different tests (using different options for the three test
 programs) were run at 17 different cluster sizes (odd cluster sizes
@@ -1269,37 +1303,20 @@ tests and cluster size combinations was run 7 times.
         %height=1.5\textwidth, width=1.4\textwidth,
         %width=0.45\textwidth,
         xlabel={Nodes}, ylabel={Time (seconds)},
-        xmin=0, xmax=43,
+        xmin=0, xmax=37,
         ymin=0, ymax=15,
         grid=major,
         %legend pos=outer north east,
         legend pos=north west,
         scatter/classes={%
-            start_et250={mark=x,draw=magenta},
-            start_et250_average={mark=,draw=red},
-            %start_et250_fail={mark=x,/raw=red},
-            start_et500={mark=x,draw=cyan},
-            start_et500_average={mark=,draw=red},
-            %start_et500_fail={mark=x,draw=red},
             start_et1000={mark=x,draw=blue},
-            start_et1000_average={mark=,draw=red}}]
-    \addplot[scatter,only marks,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/start_et250.dat};
-    \addplot[magenta,scatter,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/start_et250_average.dat};
-
-    \addplot[scatter,only marks,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/start_et500.dat};
-    \addplot[cyan,scatter,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/start_et500_average.dat};
-    %\addplot[scatter,%
-    %    scatter src=explicit symbolic]%
-    %table[meta=label] {data/start_et500_fail.dat};
-
+            start_et1000_average={mark=,draw=red},
+            start_et500={mark=x,draw=cyan},
+            %start_et500_fail={mark=x,draw=red},
+            start_et500_average={mark=,draw=red},
+            start_et250={mark=x,draw=magenta},
+            %start_et250_fail={mark=x,/raw=red}
+            start_et250_average={mark=,draw=red}}]
     \addplot[scatter,only marks,%
         scatter src=explicit symbolic]%
     table[meta=label] {data/start_et1000.dat};
@@ -1307,7 +1324,24 @@ tests and cluster size combinations was run 7 times.
         scatter src=explicit symbolic]%
     table[meta=label] {data/start_et1000_average.dat};
 
-    \legend{250ms,,500ms,,1000ms,}
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/start_et500.dat};
+    %\addplot[scatter,%
+    %    scatter src=explicit symbolic]%
+    %table[meta=label] {data/start_et500_fail.dat};
+    \addplot[cyan,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/start_et500_average.dat};
+
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/start_et250.dat};
+    \addplot[magenta,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/start_et250_average.dat};
+
+    \legend{1000ms,,500ms,,250ms,}
     \end{axis}
     \end{tikzpicture}
     \caption{Initial Cluster Activation}
@@ -1326,31 +1360,14 @@ tests and cluster size combinations was run 7 times.
         %legend pos=outer north east,
         legend pos=north west,
         scatter/classes={%
-            kill_1_et250={mark=x,draw=magenta},
-            kill_1_et250_average={mark=,draw=red},
-            %kill_1_et250_fail={mark=x,/raw=red},
-            kill_1_et500={mark=x,draw=cyan},
-            kill_1_et500_average={mark=,draw=red},
-            %kill_1_et500_fail={mark=x,draw=red},
             kill_1_et1000={mark=x,draw=blue},
-            kill_1_et1000_average={mark=,draw=red}}]
-    \addplot[scatter,only marks,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_1_et250.dat};
-    \addplot[magenta,scatter,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_1_et250_average.dat};
-
-    \addplot[scatter,only marks,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_1_et500.dat};
-    \addplot[cyan,scatter,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_1_et500_average.dat};
-    %\addplot[scatter,%
-    %    scatter src=explicit symbolic]%
-    %table[meta=label] {data/kill_1_et500_fail.dat};
-
+            kill_1_et1000_average={mark=,draw=red},
+            kill_1_et500={mark=x,draw=cyan},
+            %kill_1_et500_fail={mark=x,draw=red},
+            kill_1_et500_average={mark=,draw=red},
+            kill_1_et250={mark=x,draw=magenta},
+            %kill_1_et250_fail={mark=x,/raw=red},
+            kill_1_et250_average={mark=,draw=red}}]
     \addplot[scatter,only marks,%
         scatter src=explicit symbolic]%
     table[meta=label] {data/kill_1_et1000.dat};
@@ -1358,7 +1375,24 @@ tests and cluster size combinations was run 7 times.
         scatter src=explicit symbolic]%
     table[meta=label] {data/kill_1_et1000_average.dat};
 
-    \legend{250ms,,500ms,,1000ms,}
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_1_et500.dat};
+    %\addplot[scatter,%
+    %    scatter src=explicit symbolic]%
+    %table[meta=label] {data/kill_1_et500_fail.dat};
+    \addplot[cyan,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_1_et500_average.dat};
+
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_1_et250.dat};
+    \addplot[magenta,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_1_et250_average.dat};
+
+    \legend{1000ms,,500ms,,250ms,}
 
     \end{axis}
     \end{tikzpicture}
@@ -1388,29 +1422,29 @@ tests and cluster size combinations was run 7 times.
             kill_half_et1000_average={mark=,draw=red}}]
     \addplot[scatter,only marks,%
         scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_half_et250.dat};
-    \addplot[magenta,scatter,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_half_et250_average.dat};
-
-    \addplot[scatter,only marks,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_half_et500.dat};
-    \addplot[cyan,scatter,%
-        scatter src=explicit symbolic]%
-    table[meta=label] {data/kill_half_et500_average.dat};
-    %\addplot[scatter,%
-    %    scatter src=explicit symbolic]%
-    %table[meta=label] {data/kill_half_et500_fail.dat};
-
-    \addplot[scatter,only marks,%
-        scatter src=explicit symbolic]%
     table[meta=label] {data/kill_half_et1000.dat};
     \addplot[blue,scatter,%
         scatter src=explicit symbolic]%
     table[meta=label] {data/kill_half_et1000_average.dat};
 
-    \legend{250ms,,500ms,,1000ms,}
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_half_et500.dat};
+    %\addplot[scatter,%
+    %    scatter src=explicit symbolic]%
+    %table[meta=label] {data/kill_half_et500_fail.dat};
+    \addplot[cyan,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_half_et500_average.dat};
+
+    \addplot[scatter,only marks,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_half_et250.dat};
+    \addplot[magenta,scatter,%
+        scatter src=explicit symbolic]%
+    table[meta=label] {data/kill_half_et250_average.dat};
+
+    \legend{1000ms,,500ms,,250ms,}
 
     \end{axis}
     \end{tikzpicture}
@@ -1433,30 +1467,30 @@ is shown as a blue ``x" and the black line represents the average for
 each cluster size.
 
 In Figure~\ref{fig:propagate1} the time to propagate a single message
-to a single node of the cluster is approximately 0.1 seconds. However,
-this really just represents the tests scanning/checking granularity.
-The time to finish propagating and committing a single message shows
-a slight linear slope upwards from about 0.3 seconds for a three node
-cluster to about 0.5 seconds for a 41 node cluster. The time to
-propagate 100 messages (Figure~\ref{fig:propagate100}) has a much
-higher slope and also appears to be non-linear. TODO: why?
+to a single node of the cluster is approximately 0.1 seconds. This
+simply represents the tests scanning/checking granularity.  The time
+to finish propagating and committing a single message shows a slight
+linear slope upwards from about 0.3 seconds for a three node cluster
+to about 0.5 seconds for a 41 node cluster. The time to propagate 100
+messages (Figure~\ref{fig:propagate100}) has a much higher slope and
+also appears to be non-linear. % TODO: why?
 
 Figure~\ref{fig:cluster_up} shows the results of running the
 \emph{test/test\_up.js} test to determine the amount of time that
-a cluster takes to start. The cluster is fully started once a
-leader has been elected and the leader has successfully added all the
-other nodes to the running configuration. Each election timer value
-is represented as a different color and the line represents the
-average value for each cluster size. The cluster startup times show
-a fairly linear increase as the cluster size increases. The reason
-that the slope varies with election timer is due to the fact that the
-election timer also determines the leader heartbeat value (currently
-set to one fifth of the election timer value). The leader heartbeat
-determines the frequency with which \emph{appendEntries} messages are
-sent from the leader to followers and is also used to propagate log
-entries.  This means that the rate at which log entries (and thus
-cluster configuration updates) can be propagated is proportional to
-the election timer value.
+a cluster takes to start. The cluster is fully started once a leader
+has been elected and the leader has successfully added all the other
+nodes to the running configuration. Each election timer value is
+represented as a different color and the line represents the average
+value for each cluster size. The cluster startup times show a fairly
+linear increase as the cluster size increases. The reason that the
+slope varies with election timer is due to the fact that the election
+timer also determines the leader heartbeat value (currently set to one
+fifth of the election timer value). The leader heartbeat determines
+the frequency with which \emph{appendEntries} messages are sent from
+the leader to followers and is also used to propagate log entries.
+This means that the rate at which log entries (and thus cluster
+configuration updates) can be propagated is proportional to the
+election timer value.
 
 Figures \ref{fig:recovery_leader_failure} and
 \ref{fig:recovery_half_failure} show the results of running the
@@ -1502,31 +1536,29 @@ context where the communication latency may be highly variable over
 time.
 
 
-\section{Next Steps}
+\section{Future Work}
 
 One of the useful outcomes of this project was that it brought to
 light many areas where further study of Raft, WebRTC, and Raft over
-WebRTC should be pursued.
-
-Here are some interesting areas for further exploration:
+WebRTC should be pursued. Here are some interesting areas for further
+exploration:
 
 \begin{enumerate}
-\item Explore the use of alternate WebRTC transport modes for relaxing
-    ordering constraints and delivery guarantees. Since the Raft
-    protocol is tolerant of out-of-order and dropped messages, it is
-    possible that Raft over WebRTC could be more efficient with one or
-    both of these constraints relaxed.
-\item Test the survivability of the cluster when the signaling server
-    becomes completely unresponsive or very slow.
 \item Explore models for dynamically adjusting Raft timeout values to
     account for changing network and browser conditions.
+\item Explore alternate WebRTC transport modes for relaxing ordering
+    constraints and delivery guarantees. Since the Raft protocol is
+    tolerant of out-of-order and dropped messages, it is possible that
+    Raft over WebRTC could be more efficient with one or both of these
+    constraints relaxed.
+\item Test the survivability of the cluster when the signaling server
+    becomes completely unresponsive or very slow.
+\item Test larger scale deployments spanning larger and more diverse
+    network domains. Characterize the factors that affect and limit
+    scalability.
 \item Explore models for dealing with the case where the cluster goes
     from two nodes down to one node. Can usefulness and availability
     be improved without sacrificing Raft safety constraints?
-\item Test the system in more diverse network environments. Determine
-    the reliability of establishing direct browser-to-browser
-    communication.  Determine if corporate firewalls make this as
-    difficult as some of the documentation and standards texts imply. %TODO/CITE
 \item Perform quantitative and real-world testing to better
     characterize the performance, availability and scalability
     characteristics of the system.
@@ -1535,22 +1567,14 @@ Here are some interesting areas for further exploration:
     the signaling server that the nodes have disconnected.
 \item Consider extensions to the Raft protocol that enable slow
     leaders to be proactively detected so that a more capable node
-    (network, CPU, etc) can be elected. This would help address that
-    background page/tag throttling of modern browsers.
-\item Test larger scale deployments spanning larger and more diverse
-    network domains. Determine the factors that affect scalability and
-    characterize scaling limits.
-\item Perform wider cross-browser testing including Internet Explorer
-    and Opera.
+    (network, CPU, etc) can be elected. This would help address
+    background page/tag throttling in modern browsers.
 \item Implement Raft log compaction and full client linearizability.
-\item Explore models that allow for a combination of strict shared
-    state and high performance bulk data such as media or object
-    blobs. For example, the data with full consensus might contain
-    hashes that refer to bulk data.
 \item Implement a Node.js based Raft over WebRTC application. This
     would allow non-browser contexts to participate in the Raft
     cluster together with the browser clients. PeerJS issue \#103 must
     be resolved for this to be feasible \cite{peerjs:103}.
+\ifdefined\OPTIONAL
 \item Explore a design where some nodes of the cluster are non-voting
     and are not counted as part of transaction commit quorum. However,
     these nodes would still be included in the log replication
@@ -1559,18 +1583,47 @@ Here are some interesting areas for further exploration:
     group of non-voting nodes. This may enable higher scaling of the
     system. It also enables interesting applications such as a logging
     or backup nodes.
+\item Perform wider cross-browser testing including Internet Explorer
+    and Opera.
+\item Explore models that allow for a combination of strict shared
+    state and high performance bulk data such as media or object
+    blobs. For example, the data with full consensus might contain
+    hashes that refer to bulk data.
+\fi
 \end{enumerate}
 
 
+\section{Conclusion}
+
+The wide reach of the browser platform (exceeding most if not all
+other computing platforms) and the recent advances in browser
+programming and communication interfaces make the browser a very
+interesting platform for a wide variety of applications. The
+combination of the Raft distributed consensus algorithm with the
+WebRTC communication protocol enables a middleware system for building
+powerful distributed browser-to-browser applications.
+
+An important use case for the Raft over WebRTC middleware system is
+the ability to create distributed applications that minimize
+dependence on centralized infrastructure and are able to tolerate
+unreliable communication and frequent changes in cluster membership
+(adds, removes, failures). The demonstration chat application was able
+to easily scale to clusters containing several dozen nodes and quickly
+recover from multiple node failures. Further study is expected to show
+that a dynamically adjusted election timer that accounts for
+communication latency and cluster size would allow the cluster size to
+be scaled significantly larger (at the cost of slower recovery from
+a leader failure).
+
 \section*{Acknowledgments}
-I would like to thank my academic supervisor, David Levine, for his
-excellent input and oversight of this project. I would also like to
-thank Diego Ongaro for his amazing work on the Raft protocol and paper which
-made implementing a Raft implementation a pleasure.  There are too many people
-involved in the creation and standardization of WebRTC but I would like to
-thank them for their tireless work to make browser-to-browser communication
-possible. Last but not least, I would like to thank my family for putting up
-with the long nights and weekends I spent on this project. Thanks!
+
+I would like to thank Diego Ongaro for his amazing work on the Raft
+protocol which made implementing a Raft implementation a pleasure.
+I would also like to thank the many people involved in the creation
+and standardization of WebRTC and for their tireless work to make
+browser-to-browser communication possible. Last but not least, I would
+like to thank my family for putting up with the long nights and
+weekends I spent on this project. Thanks!
 
 \bibliographystyle{./IEEEtranBST2/IEEEtran}
 \bibliography{./references/ietf,./references/w3c,./references/raft,./references/other}
