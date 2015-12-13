@@ -50,19 +50,18 @@ Email: levine@cse.uta.edu}}
 \maketitle
 
 \begin{abstract}
-We describe the creation of a browser-based distributed peer-to-peer
-application using WebRTC, PeerJS and Raft.js. WebRTC is a protocol
-that modern browsers have begun to integrate which enables
-browser-to-browser communication. PeerJS is a WebRTC client library
-and extensible signaling server. Raft.js is an implementation in
-JavaScript of the Raft distributed consensus protocol. These
-technologies are combined to create a chat application that guarantees
-a shared, consistent and linearized view of the chat history without
-relying on a single centralized server for communication. We also
-create a series of automated tests using the SlimerJS browser
-automation tool and use them to show the correctness of the chat
-application and also to measure the performance and scalability of the
-application for various cluster sizes.
+We describe a browser-based middleware system for
+creating distributed peer-to-peer applications. The system integrates
+Raft.js, an implementation of the Raft distributed consensus
+algorithm, with the WebRTC communication protocol which enables direct
+browser-to-browser communication. The middleware system is used to
+create a chat application that guarantees a shared, consistent and
+linearized view of the chat history without relying on a single
+centralized server for communication. The Raft over WebRTC middleware
+and the chat application are validated with a series of automated
+tests using the SlimerJS browser automation tool. The results
+demonstrate the correctness and robustness of the system and also
+characterize the system in terms of performance and scalability.
 \end{abstract}
 
 \section{Introduction}
