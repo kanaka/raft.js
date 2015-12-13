@@ -38,4 +38,4 @@ workshop.pdf: workshop.tex
 #	pdflatex -halt-on-error "$(if $(OPTIONAL),\def\OPTIONAL{},)\input{$<}"
 
 clean:
-	rm -f *.pdf *.bak *.log *.out *.aux *.run.xml paper-blx.bib paper.bbl paper.bcf paper.blg paper-min.pdf
+	rm -f *.bak *.log *.out *.aux *.run.xml paper-blx.bib paper.bbl paper.bcf paper.blg paper-min.pdf
