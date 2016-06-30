@@ -1,66 +1,37 @@
-common = require('./test_common');
-http = require('./http');
+if (typeof module !== 'undefined') {
+    var copyMap = require('./base').copyMap,
+        RaftServerHttp = require('./http').RaftServerHttp,
+        test_common = require('./test_common'),
+        tests = require('./tests')
+} else {
+    var test_http = {},
+        exports = test_http
+}
 
-serverPool = {};
-portIdx = 9000;
+serverPool = {}  // Map of server IDs to raft instances
+serverAddress = {} // Map of server IDs to listen addresses
+portIdx = 9000
 
 function startServers(opts, n) {
-    n = n || 3;
-    var serverOpts = {};
+    n = n || 3
+    var serverOpts = {}
     for (var i=0; i<n; i++) {
-        serverOpts[i] = http.copyMap(opts);
-        serverOpts[i].listenAddress = "localhost:" + (portIdx++);
+        serverOpts[i] = copyMap(opts)
+        serverOpts[i].serverPool = serverPool
+        serverOpts[i].listenAddress = "localhost:" + (portIdx++)
+
+        serverAddress[i] = serverOpts[i].listenAddress
+        serverOpts[i].serverAddress = serverAddress
     }
-    return common.startServers(serverPool, serverOpts,
-                                  http.RaftServerHttp);
+    test_common.startServers(RaftServerHttp, serverOpts)
+    return serverOpts
 }
-function addServersAsync() {
-    return common.addServersAsync(serverPool);
-}
-
-/*
-function addServer(sid, opts) {
-    opts = http.copyMap(opts);
-    opts.listenAddress = "localhost:" + (portIdx++);
-    return common.addServer(serverPool, sid, opts,
-                            http.RaftServerHttp);
-}
-*/
-
-function getAll(attr) {
-    return common.getAll(serverPool, attr);
-}
- 
-function getLeaderId() {
-    return common.getLeaderId(serverPool);
-}
-
 
 if (typeof require !== 'undefined' && require.main === module) {
-    //startServers({verbose: true});
-    startServers();
-    addServersAsync();
-    console.log("Waiting 2 seconds for leader election");
-    setTimeout(function () {
-        var lid = getLeaderId();
-        console.log("leader: " + lid);
-        common.validateState(serverPool);
-        serverPool[lid].clientRequest({op:"set",key:'a',value:1});
-        serverPool[lid].clientRequest({op:"set",key:'b',value:2});
-        serverPool[lid].clientRequest({op:"set",key:'a',value:3});
-        console.log("Waiting 1 second for log propagation");
-        setTimeout(function () {
-            common.validateState(serverPool);
-            common.showState(serverPool);
-            console.log("Validated server pool state");
-            process.exit(0);
-        }, 1000);
-    }, 2000);
+    startServers()
+    tests.test1(serverPool)
 } else {
-    exports.http = http;
-    exports.startServers = startServers;
-    //exports.addServer = addServer;
-    exports.serverPool = serverPool;
-    exports.getAll = getAll;
-    exports.getLeaderId = getLeaderId;
+    exports.serverPool = serverPool
+    exports.startServers = startServers
 }
+

@@ -3,21 +3,12 @@ if (typeof module === 'undefined') {
         exports = test_common;
 }
 
-serverData = {};
-
 pendingServerMap = {};
 
-function startServers (spool, serverOpts, klass) {
-    for (var sid in serverOpts) {
-        var addr = serverOpts[sid].listenAddress;
-        serverData[sid] = addr;
-    }
+function startServers(klass, serverOpts) {
     var sids = Object.keys(serverOpts);
     for (var idx = 0; idx < sids.length; idx++) {
         sid = sids[idx];
-        // force debug so _self is exposed for get* functions
-        serverOpts[sid].debug = true;
-        serverOpts[sid].serverData = serverData;
         if (idx === 0) {
             // Tell the first server to initialize
             serverOpts[sid].firstServer = true;
@@ -25,7 +16,7 @@ function startServers (spool, serverOpts, klass) {
             // Add the other servers to the add list
             pendingServerMap[sid] = serverOpts[sid].listenAddress;
         }
-        spool[sid] = new klass(sid.toString(), serverOpts[sid]);
+        new klass(sid.toString(), serverOpts[sid]);
     }
 }
 
@@ -55,51 +46,18 @@ function addServersAsync(spool) {
         } else {
             console.log("addServersAsync: no leader yet, delaying");
         }
-        setTimeout(function() { addServersAsync(spool); }, 250);
+        // Schedule via node schedule method in order to allow schedule
+        // method overrides (does not matter which server is used)
+        spool[0].schedule(function() { addServersAsync(spool); }, 250,
+                          {type: 'addServersAsync'});
     }
 }
-
-/*
-function addServer (spool, sid, opts, klass) {
-    if (sid in serverData) {
-        throw new Error("Server " + sid + " already exists");
-    }
-    var lid = getLeaderId(spool);
-    if (!lid) {
-        throw new Error("Could not determine current leader");
-    }
-    var addr = opts.listenAddress;
-    serverData[sid] = addr;
-    opts.serverData = serverData;
-    spool[sid] = new klass(sid.toString(), opts);
-    spool[lid].addServer({newServer: [sid, addr]},
-            function(res) {
-                console.log("addServer result:", res);
-            });
-}
-
-function removeServer(spool, sid) {
-    if (!sid in serverData) {
-        throw new Error("Server " + sid + " does not exists");
-    }
-    var lid = getLeaderId(spool);
-    if (!lid) {
-        throw new Error("Could not determine current leader");
-    }
-    delete serverData[sid];
-    spool[lid].removeServer(serverData,
-            function(res) {
-                console.log("removeServer result:", res);
-            });
-
-}
-*/
 
 function getAll(spool, attr) {
     var results = {};
     for (var i in spool) {
         if (!spool.hasOwnProperty(i)) { continue; }
-        results[i] = spool[i]._self[attr];
+        results[i] = spool[i][attr];
     }
     return results;
 }
@@ -107,7 +65,7 @@ function getAll(spool, attr) {
 function getLeaderId(spool) {
     for (var i in spool) {
         if (!spool.hasOwnProperty(i)) { continue; }
-        if (spool[i]._self.state === 'leader') {
+        if (spool[i].state === 'leader') {
             return i;
         }
     }
@@ -237,11 +195,11 @@ function showState(spool) {
     var logs = [], sms = [];
     console.log("Logs:");
     for (var sid in spool) {
-        console.log(sid + ": " + JSON.stringify(spool[sid]._self.log));
+        console.log(sid + ": " + JSON.stringify(spool[sid].log));
     }
     console.log("State Machines:");
     for (var sid in spool) {
-        console.log(sid + ": " + JSON.stringify(spool[sid]._self.stateMachine));
+        console.log(sid + ": " + JSON.stringify(spool[sid].stateMachine));
     }
 }
 
@@ -251,7 +209,7 @@ function validateState(spool) {
     var leaderCnt = 0;
     for (var i in spool) {
         if (!spool.hasOwnProperty(i)) { continue; }
-        if (spool[i]._self.state === 'leader') {
+        if (spool[i].state === 'leader') {
             leaderCnt += 1;
         }
     }
@@ -264,8 +222,8 @@ function validateState(spool) {
     // server
     var logs = [], sms = [];
     for (var sid in spool) {
-        logs.push(spool[sid]._self.log);
-        sms.push(spool[sid]._self.stateMachine);
+        logs.push(spool[sid].log);
+        sms.push(spool[sid].stateMachine);
     }
 
     if (!deepCompare.apply(null, logs)) {
@@ -282,7 +240,6 @@ function validateState(spool) {
 
 exports.startServers = startServers;
 exports.addServersAsync = addServersAsync;
-//exports.addServer = addServer;
 exports.getAll = getAll;
 exports.getLeaderId = getLeaderId;
 exports.showState = showState;

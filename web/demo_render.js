@@ -181,7 +181,7 @@ function updateD3() {
         .html(function (d) {
                 var id = d.id;
                 return node_template.format(
-                    d.serverMap[id], d.state, "T" + d.currentTerm,
+                    d._serverMap[id], d.state, "T" + d.currentTerm,
                     d.commitIndex+1, d.log.length);
             });
     // Remove
@@ -213,8 +213,8 @@ function updateTasks() {
 // Register callback functions to monitor changes to the task queue
 tqueueOpts.scheduleCallback = function(task) {
     if (task.data.rpc) {
-        var src = serverPool[task.data.src]._self,
-            dst = serverPool[task.data.dst]._self,
+        var src = serverPool[task.data.src],
+            dst = serverPool[task.data.dst],
             type;
         if (task.data.type === 'RPC') {
             type = "green";
@@ -249,7 +249,7 @@ startServers({debug:true, verbose:1}, 5, function (msg) {
 
 // Populate the nodes from the serverPool
 for (var k in serverPool) {
-    nodes.push(serverPool[k]._self);
+    nodes.push(serverPool[k]);
 }
 
 // Populate the fully interconnected dashed lines

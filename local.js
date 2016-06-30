@@ -1,117 +1,116 @@
 /*
  * raft.js: Raft consensus algorithm in JavaScript
- * Copyright (C) 2013 Joel Martin
+ * Copyright (C) 2016 Joel Martin
  * Licensed under MPL 2.0 (see LICENSE.txt)
  *
  * See README.md for description and usage instructions.
  */
 
-"use strict";
+"use strict"
 
 if (typeof module !== 'undefined') {
-    var fs = require('fs');
-    var base = require("./base");
+    var fs = require('fs'),
+        RaftServerBase = require("./base").RaftServerBase
 } else {
     var local = {},
         exports = local,
-        fs = null;
+        fs = null
 }
 
 // RaftServer that uses in-process communication for RPC
 // Most useful for testing
-var _serverPool = {};
-var _serverStore = {};
 function RaftServerLocal(id, opts) {
-    var self = this,
-        savePath = "raft.store." + id;
-
-    if (id in _serverPool) {
-        throw new Error("Server id '" + id + "' already exists");
+    if (!(this instanceof RaftServerLocal)) {
+        // Handle instantiation without "new"
+        return new RaftServerLocal(id, opts)
     }
-    if (!opts.serverData) {
-        throw new Error("opts.serverData is required");
-    }
-    base.setDefault(opts, 'durable', true);
-    
-    function sendRPC(targetId, rpcName, args) {
-        self.dbg("RPC to "  + targetId + ": " + rpcName);
-        if (!targetId in _serverPool) {
-            console.log("Server id '" + targetId + "' does not exist");
-            // No target, just drop RPC (no callback)
-            return;
-        }
-        _serverPool[targetId][rpcName](args);
-    }
-
-    if (opts.durable && fs) {
-        // Data/commands sent in sendRPC and applied in applyCmd must be
-        // serializable/unserializable by saveFn/loadFn
-        var saveFn = function(data, callback) {
-            var dstr = JSON.stringify(data);
-            //var dstr = JSON.stringify(data,null,2);
-            fs.writeFile(savePath, dstr, function(err) {
-                if(callback) {
-                    callback(!err);
-                }
-            });
-        }
-
-        var loadFn = function(callback) {
-            fs.readFile(savePath, function(err, dstr) {
-                if (!err) {
-                    try {
-                        var data = JSON.parse(dstr);
-                        callback(true, data);
-                    } catch (e) {
-                        callback(false);
-                    }
-                } else {
-                    callback(false);
-                }
-            });
-        }
-    } else {
-        var saveFn = function(data, callback) {
-            _serverStore[id] = data;
-            if(callback) {
-                callback(true);
-            }
-        }
-
-        var loadFn = function(callback) {
-            var data = _serverStore[id]
-            if (data) {
-                callback(true, data);
-            } else {
-                callback(false);
-            }
-        }
-    }
-
-    function applyCmd(stateMachine, cmd) {
-        // TODO: sanity check args
-        switch (cmd.op) {
-            case 'get': stateMachine[cmd.key]; break;
-            case 'set': stateMachine[cmd.key] = cmd.value; break;
-            default: throw new Error("invalid command: '" + cmd.op + "'");
-        }
-        return stateMachine[cmd.key];
-    };
-
-
-    // Options
-    if (!opts.loadFn) { opts.loadFn = loadFn; }
-    if (!opts.saveFn) { opts.saveFn = saveFn; }
-    if (!opts.sendRPC) { opts.sendRPC = sendRPC; }
-    if (!opts.applyCmd) { opts.applyCmd = applyCmd; }
 
     // Call the superclass
-    var api = base.RaftServerBase.call(self, id, opts);
-    _serverPool[id] = api;
-    return api;
+    RaftServerBase.call(this, id, opts)
+
+    if (!opts.serverPool) {
+        throw new Error("opts.serverPool required")
+    }
+
+    if (id in opts.serverPool) {
+        throw new Error("Server id '" + id + "' already exists")
+    }
+
+    opts.serverPool[id] = this
+
+//TODO
+//    if (!opts.serverData) {
+//        throw new Error("opts.serverData required")
+//    }
+
+    // Default options
+    this.setDefault('durable', true)
+    this.setDefault('savePath', "raft.store." + id)
+}
+RaftServerLocal.prototype = Object.create(RaftServerBase.prototype)
+RaftServerLocal.prototype.constructor = RaftServerLocal
+
+
+RaftServerLocal.prototype.sendRPC = function(targetId, rpcName, args) {
+    this.dbg("RPC to "  + targetId + ": " + rpcName)
+    if (!targetId in this._opts.serverPool) {
+        console.log("Server id '" + targetId + "' does not exist")
+        // No target, just drop RPC (no callback)
+        return
+    }
+    this._opts.serverPool[targetId][rpcName](args)
 }
 
-exports.copyMap = base.copyMap;
-exports.RaftServerLocal = RaftServerLocal;
-exports._serverPool = _serverPool;
-exports._serverStore = _serverStore;
+RaftServerLocal.prototype.applyCmd = function(stateMachine, cmd) {
+    // TODO: sanity check args
+    switch (cmd.op) {
+        case 'get': stateMachine[cmd.key]; break
+        case 'set': stateMachine[cmd.key] = cmd.value; break
+        default: throw new Error("invalid command: '" + cmd.op + "'")
+    }
+    return stateMachine[cmd.key]
+}
+
+RaftServerLocal.prototype.saveFn = function(data, callback) {
+    if (this._opts.durable && fs) {
+        var dstr = JSON.stringify(data)
+        //var dstr = JSON.stringify(data,null,2)
+        fs.writeFile(this._opts.savePath, dstr, function(err) {
+            if(callback) {
+                callback(!err)
+            }
+        })
+    } else {
+        this._opts.serverStore[this.id] = data
+        if(callback) {
+            callback(true)
+        }
+    }
+}
+
+RaftServerLocal.prototype.loadFn = function(callback) {
+    if (this._opts.durable && fs) {
+        fs.readFile(this._opts.savePath, function(err, dstr) {
+            if (!err) {
+                try {
+                    var data = JSON.parse(dstr)
+                    callback(true, data)
+                } catch (e) {
+                    callback(false)
+                }
+            } else {
+                callback(false)
+            }
+        })
+    } else {
+        var data = this._opts.serverStore[this.id]
+        if (data) {
+            callback(true, data)
+        } else {
+            callback(false)
+        }
+    }
+}
+
+
+exports.RaftServerLocal = RaftServerLocal
