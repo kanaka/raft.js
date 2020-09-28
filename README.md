@@ -5,7 +5,7 @@ Algorithm](http://raftconsensus.github.io/) in JavaScript. The Raft
 algorithm was developed by Diego Ongaro and John Ousterhout at
 Stanford University. Please refer to their excellent paper on Raft:
 ["In Search of an Understandable Consensus
-Algorithm"](https://ramcloud.stanford.edu/wiki/download/attachments/11370504/raft.pdf).
+Algorithm"](https://raft.github.io/raft.pdf).
 
 
 ## Example
